@@ -1,0 +1,2 @@
+recursive-include tests *.py
+recursive-include docs *.rst *.py
