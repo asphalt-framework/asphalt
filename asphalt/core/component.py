@@ -2,6 +2,8 @@ from abc import ABCMeta, abstractmethod
 
 from .context import ApplicationContext
 
+__all__ = 'Component',
+
 
 class Component(metaclass=ABCMeta):
     """This is the base class for all Asphalt components."""

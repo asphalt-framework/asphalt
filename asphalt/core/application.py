@@ -11,6 +11,8 @@ from .component import Component
 from .context import ApplicationContext, ContextEventType
 from .util import resolve_reference
 
+__all__ = 'Application',
+
 
 class Application:
     """
