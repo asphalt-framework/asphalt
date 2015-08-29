@@ -5,10 +5,15 @@ from enum import Enum
 import asyncio
 import time
 
-from .util import qualified_name, wrap_async_callable
+from .util import qualified_name, asynchronous
 
 __all__ = ('Resource', 'ResourceEventType', 'ResourceEvent', 'ResourceEventListener',
            'ResourceConflict', 'ResourceNotFoundError', 'ResourceCollection')
+
+
+class ResourceEventType(Enum):
+    added = 1
+    removed = 2
 
 
 class Resource:
@@ -26,11 +31,6 @@ class Resource:
     def __str__(self):
         return ('types={0.types!r}, alias={0.alias!r}, value={0.value!r}, '
                 'context_var={0.context_var!r}'.format(self))
-
-
-class ResourceEventType(Enum):
-    added = 1
-    removed = 2
 
 
 class ResourceEvent:
@@ -157,7 +157,7 @@ class ResourceCollection:
 
         return resource
 
-    @wrap_async_callable
+    @asynchronous
     def remove(self, resource: Resource):
         """
         Removes the given resource from the collection and queues a "removed" event to be sent.
@@ -175,7 +175,7 @@ class ResourceCollection:
         # Signal listeners that a resource has been removed
         self._trigger_event(ResourceEventType.removed, resource)
 
-    @wrap_async_callable
+    @asynchronous
     @coroutine
     def request(self, type: Union[str, type], alias: str='default', *,
                 timeout: Union[int, float, None]=10):

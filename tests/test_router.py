@@ -12,15 +12,6 @@ def test_routing_error():
 
 
 class TestEndpoint:
-    @pytest.mark.parametrize('func, blocking, expected_blocking', [
-        (lambda ctx: None, None, True),
-        (coroutine(lambda ctx: None), None, False),
-        (lambda ctx: None, False, False)
-    ], ids=['auto', 'explicit-async', 'explicit-blocking'])
-    def test_constructor(self, func, blocking, expected_blocking):
-        endpoint = Endpoint(func, blocking)
-        assert endpoint.blocking == expected_blocking
-
     def test_not_enough_args(self):
         def func():
             pass

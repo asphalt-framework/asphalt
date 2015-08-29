@@ -4,7 +4,7 @@ from abc import ABCMeta, abstractmethod
 from typing import Optional, Callable, Any, Sequence, Dict
 from enum import Enum
 
-from .util import qualified_name, wrap_async_callable
+from .util import qualified_name, asynchronous
 from .resource import ResourceCollection, ResourceEventType, ResourceEvent, ResourceConflict
 from .router import Endpoint
 
@@ -156,7 +156,7 @@ class AbstractContext(metaclass=ABCMeta):
             if retval is not None:
                 yield from retval
 
-    @wrap_async_callable
+    @asynchronous
     def add_lazy_property(self, scope: ContextScope, context_var: str,
                           creator: Callable[['AbstractContext'], Any]):
         """

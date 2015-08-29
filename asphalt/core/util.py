@@ -5,7 +5,7 @@ from threading import current_thread, main_thread
 from typing import Callable, Any, Container
 from functools import wraps, partial
 
-__all__ = ('resolve_reference', 'qualified_name', 'wrap_blocking_callable', 'wrap_async_callable',
+__all__ = ('resolve_reference', 'qualified_name', 'synchronous', 'asynchronous',
            'wrap_blocking_api', 'wrap_async_api')
 
 
@@ -54,7 +54,7 @@ def qualified_name(obj) -> str:
     return qualname if module == 'builtins' else '{}.{}'.format(module, qualname)
 
 
-def wrap_blocking_callable(func: Callable[..., Any]):
+def synchronous(func: Callable[..., Any]):
     """
     Returns a wrapper that guarantees that the target callable will be run in a thread other than
     the event loop thread. If the call comes from the event loop thread, it schedules the callable
@@ -76,7 +76,7 @@ def wrap_blocking_callable(func: Callable[..., Any]):
     return wrapper
 
 
-def wrap_async_callable(func: Callable[..., Any]):
+def asynchronous(func: Callable[..., Any]):
     """
     Wraps a callable so that it is guaranteed to be called in the event loop.
     If it returns a coroutine or a Future and the call came from another thread, the coroutine
@@ -117,7 +117,7 @@ def wrap_blocking_api(cls: type, methods: Container[str]):
     for consumption asynchronous code.
     """
 
-    wrapped_methods = {method: wrap_blocking_callable(getattr(cls, method)) for method in methods}
+    wrapped_methods = {method: synchronous(getattr(cls, method)) for method in methods}
     return type('Wrapped' + cls.__name__, (cls,), wrapped_methods)
 
 
@@ -127,5 +127,5 @@ def wrap_async_api(cls: type, methods: Container[str]):
     consumption by threaded code.
     """
 
-    wrapped_methods = {method: wrap_async_callable(getattr(cls, method)) for method in methods}
+    wrapped_methods = {method: asynchronous(getattr(cls, method)) for method in methods}
     return type('Wrapped' + cls.__name__, (cls,), wrapped_methods)

@@ -8,7 +8,7 @@ import pytest
 from asphalt.core.application import Application
 from asphalt.core.component import Component
 from asphalt.core.context import ApplicationContext, ContextEventType
-from asphalt.core.util import wrap_async_callable
+from asphalt.core.util import asynchronous
 
 
 class ShutdownAPI:
@@ -16,7 +16,7 @@ class ShutdownAPI:
         self.app_ctx = app_ctx
         self.method = method
 
-    @wrap_async_callable
+    @asynchronous
     def shutdown(self):
         def callback():
             if self.method == 'stop':

@@ -1,9 +1,8 @@
-from asyncio import iscoroutinefunction
 from inspect import getfullargspec, isgeneratorfunction
 from itertools import chain
 from typing import Callable, Any
 
-from .util import qualified_name, wrap_blocking_callable
+from .util import qualified_name
 
 __all__ = 'RoutingError', 'Endpoint', 'BaseRouter'
 
@@ -21,26 +20,19 @@ class RoutingError(LookupError):
 
 
 class Endpoint:
-    __slots__ = 'func', 'blocking'
+    __slots__ = 'func'
 
-    def __init__(self, func: Callable[..., Any], blocking: bool=None):
+    def __init__(self, func: Callable[..., Any]):
         argspec = getfullargspec(func)
         if len(argspec.args) == 0 and not argspec.varargs:
             raise TypeError('{} cannot accept the context argument. '
                             'Please add one positional parameter in its definition.'.
                             format(qualified_name(func)))
 
-        if iscoroutinefunction(func) or blocking is False:
-            self.blocking = False
-        else:
-            if isgeneratorfunction(func):
-                raise TypeError('{} is a generator but not a coroutine. '
-                                'Either mark it as a coroutine or remove the yield statements.'.
-                                format(qualified_name(func)))
-
-            # Wrap the target callable to be run in a thread pool
-            func = wrap_blocking_callable(func)
-            self.blocking = True
+        if isgeneratorfunction(func):
+            raise TypeError('{} is a generator but not a coroutine. '
+                            'Either mark it as a coroutine or remove the yield statements.'.
+                            format(qualified_name(func)))
 
         self.func = func
 
