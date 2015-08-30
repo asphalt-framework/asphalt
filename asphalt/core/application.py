@@ -1,7 +1,7 @@
-from asyncio import AbstractEventLoop, get_event_loop
+from asyncio import AbstractEventLoop
 from concurrent.futures import ThreadPoolExecutor
-from logging import getLogger
 from typing import Dict, Any, Union, List
+from logging import getLogger
 import logging.config
 import asyncio
 
@@ -9,7 +9,6 @@ from pkg_resources import iter_entry_points, EntryPoint
 
 from .component import Component
 from .context import ApplicationContext, ContextEventType
-from .util import resolve_reference
 
 __all__ = 'Application',
 
@@ -26,15 +25,16 @@ class Application:
     :param settings: application specific configuration options (available as ctx.settings)
     """
 
-    __slots__ = ('settings', 'component_types', 'component_options', 'max_threads',
+    __slots__ = ('components', 'settings', 'component_types', 'component_config', 'max_threads',
                  'logging_config', 'logger')
 
     def __init__(self, components: Dict[str, Dict[str, Any]]=None, *, max_threads: int=8,
                  logging: Union[Dict[str, Any], bool]=True, settings: dict=None):
         assert max_threads > 0, 'max_threads must be a positive integer'
+        self.components = []
         self.settings = settings
         self.component_types = {ep.name: ep for ep in iter_entry_points('asphalt.components')}
-        self.component_options = components or {}
+        self.component_config = components or {}
         self.max_threads = max_threads
         self.logging_config = logging
         self.logger = getLogger('asphalt.core')
@@ -42,24 +42,37 @@ class Application:
     def create_context(self) -> ApplicationContext:
         return ApplicationContext(self.settings)
 
-    def create_components(self) -> List[Component]:
-        components = []
-        for name, config in self.component_options.items():
-            assert isinstance(config, dict)
-            if 'class' in config:
-                component_class = resolve_reference(config.pop('class'))
-            elif name in self.component_types:
-                component_class = self.component_types[name]
-                if isinstance(component_class, EntryPoint):
-                    component_class = component_class.load()
-            else:
-                raise LookupError('no such component: {}'.format(name))
+    def add_component(self, component_alias: str, component_class: type=None, **component_kwargs):
+        """
+        Instantiates a component and adds it to the component list used by this application.
 
-            assert issubclass(component_class, Component)
-            component = component_class(**config)
-            components.append(component)
+        The first argument can either be a :cls:`~asphalt.core.component.Component` subclass or a
+        component type name, declared as an ``asphalt.components`` entry point, in which case the
+        component class is retrieved by loading the entry point.
 
-        return components
+        The locally given configuration can be overridden by component configuration parameters
+        supplied to the Application constructor (the ``components`` argument).
+        """
+
+        if not isinstance(component_alias, str) or not component_alias:
+            raise TypeError('component_alias must be a nonempty string')
+
+        if component_class is None:
+            if component_alias not in self.component_types:
+                raise LookupError('no such component type: ' + component_alias) from None
+
+            component_class = self.component_types[component_alias]
+            if isinstance(component_class, EntryPoint):
+                component_class = self.component_types[component_alias] = component_class.load()
+
+        if not issubclass(component_class, Component):
+            raise TypeError('the component class must be a subclass of asphalt.core.Component')
+
+        # Apply the modifications to the hard coded configuration from the external config
+        component_kwargs.update(self.component_config.get(component_alias, {}))
+
+        component = component_class(**component_kwargs)
+        self.components.append(component)
 
     def start(self, app_ctx: ApplicationContext):
         """
@@ -76,7 +89,7 @@ class Application:
             logging.basicConfig(level=logging.INFO)
 
         # Assign a new default executor with the given max worker thread limit
-        event_loop = event_loop or get_event_loop()
+        event_loop = event_loop or asyncio.get_event_loop()
         event_loop.set_default_executor(ThreadPoolExecutor(self.max_threads))
 
         # Create the application context
@@ -85,9 +98,8 @@ class Application:
         try:
             # Start all the components and run the loop until they've finished
             self.logger.info('Starting components')
-            components = self.create_components()
-            coroutines = [coro for coro in (component.start(context) for component in components)
-                          if coro is not None]
+            coroutines = (component.start(context) for component in self.components)
+            coroutines = [coro for coro in coroutines if coro is not None]
             event_loop.run_until_complete(asyncio.gather(*coroutines))
             self.logger.info('All components started')
 

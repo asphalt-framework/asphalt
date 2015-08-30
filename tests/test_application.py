@@ -42,7 +42,7 @@ class ShutdownComponent(Component):
 
 
 class CustomApp(Application):
-    def __init__(self, components, **kwargs):
+    def __init__(self, components=None, **kwargs):
         super().__init__(components, **kwargs)
         self.start_callback_called = False
         self.finish_callback_called = False
@@ -69,35 +69,39 @@ class TestApplication:
 
     @pytest.fixture
     def app(self):
-        app = CustomApp({'shutdown': {'method': 'stop'}})
+        app = CustomApp()
         app.component_types['shutdown'] = ShutdownComponent
         return app
 
-    @pytest.mark.parametrize('add_method', ['specify_class', 'add_type', 'add_entrypoint'])
-    def test_create_components(self, add_method):
-        components_config = {
-            'shutdown': {'method': 'stop'}
-        }
-        if add_method == 'specify_class':
-            components_config['shutdown']['class'] = '{}:{}'.format(
-                __spec__.name, ShutdownComponent.__name__)
+    @pytest.mark.parametrize('use_entrypoint', [True, False], ids=['entrypoint', 'explicit_class'])
+    def test_add_component(self, use_entrypoint):
+        """
+        Tests that add_component works with an without an entry point and that external
+        configuration overriddes local (hardcoded) configuration values.
+        """
 
-        app = CustomApp(components_config)
-        if add_method == 'add_type':
-            app.component_types['shutdown'] = ShutdownComponent
-        elif add_method == 'add_entrypoint':
+        app = CustomApp({'shutdown': {'method': 'stop'}})
+        if not use_entrypoint:
+            app.add_component('shutdown', ShutdownComponent, method='exception')
+        else:
             entrypoint = EntryPoint('shutdown', __spec__.name)
             entrypoint.load = Mock(return_value=ShutdownComponent)
             app.component_types['shutdown'] = entrypoint
+            app.add_component('shutdown', method='exception')
 
-        components = app.create_components()
-        assert len(components) == 1
-        assert isinstance(components[0], ShutdownComponent)
+        assert len(app.components) == 1
+        assert isinstance(app.components[0], ShutdownComponent)
+        assert app.components[0].method == 'stop'
 
-    def test_nonexistent_component(self, app):
-        del app.component_types['shutdown']
-        exc = pytest.raises(LookupError, app.create_components)
-        assert str(exc.value) == 'no such component: shutdown'
+    @pytest.mark.parametrize('alias, cls, exc_cls, message', [
+        ('', None, TypeError, 'component_alias must be a nonempty string'),
+        (6, None, TypeError, 'component_alias must be a nonempty string'),
+        ('foo', None, LookupError, 'no such component type: foo'),
+        ('foo', int, TypeError, 'the component class must be a subclass of asphalt.core.Component')
+    ])
+    def test_add_component_errors(self, app, alias, cls, exc_cls, message):
+        exc = pytest.raises(exc_cls, app.add_component, alias, cls)
+        assert str(exc.value) == message
 
     @pytest.mark.parametrize('shutdown_method', ['stop', 'exit'])
     @pytest.mark.parametrize('logging_config', [
@@ -110,7 +114,7 @@ class TestApplication:
         shut down properly.
         """
 
-        app.component_options['shutdown']['method'] = shutdown_method
+        app.add_component('shutdown', method=shutdown_method)
         app.logging_config = logging_config
         app.run(event_loop)
 
@@ -139,6 +143,7 @@ class TestApplication:
 
         exception = None
         app.start = start
+        app.add_component('shutdown', method='stop')
         app.run(event_loop)
 
         assert str(exception) == 'bad component'
@@ -154,7 +159,7 @@ class TestApplication:
         Tests that BaseExceptions aren't caught anywhere in the stack and crash the application.
         """
 
-        app.component_options['shutdown']['method'] = 'exception'
+        app.add_component('shutdown', method='exception')
         exc = pytest.raises(BaseException, app.run, event_loop)
         assert str(exc.value) == 'this should crash the application'
 
