@@ -79,7 +79,6 @@ setup(
     author='FILL IN HERE',
     author_email='FILL IN HERE',
     classifiers=[
-        'Intended Audience :: End Users/Desktop',
         'Programming Language :: Python',
         'Programming Language :: Python :: 3'
     ],
