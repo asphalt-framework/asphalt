@@ -1,6 +1,6 @@
 from asyncio import AbstractEventLoop
 from concurrent.futures import ThreadPoolExecutor
-from typing import Dict, Any, Union, List
+from typing import Dict, Any, Union
 from logging import getLogger
 import logging.config
 import asyncio

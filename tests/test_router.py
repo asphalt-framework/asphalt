@@ -1,5 +1,3 @@
-from asyncio import coroutine
-
 import pytest
 
 from asphalt.core.router import RoutingError, Endpoint, BaseRouter
