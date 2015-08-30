@@ -46,9 +46,11 @@ class ExampleProjectApplication(Application):
         assert isinstance(yaml.load(config_data), dict)
         assert config_data == """\
 ---
-application_class: example:ExampleProjectApplication
+application: example:ExampleProjectApplication
 components:
-    foo: {}  # REPLACE ME
+  foo: {}  # REPLACE ME
+settings:
+  bar: 1  # REPLACE ME
 logging:
   version: 1
   disable_existing_loggers: false
@@ -108,7 +110,7 @@ def test_run_from_config_file(tmpdir, unsafe):
         path = tmpdir.join('test.yaml')
         path.write("""\
 ---
-application_class: {}
+application: {}
 components:
     foo: {{}}
     bar: {{}}

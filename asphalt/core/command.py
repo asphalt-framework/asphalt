@@ -47,9 +47,11 @@ class {app_subclass}({app_cls.__name__}):
     with (project / 'config.yml').open('w') as f:
         f.write("""\
 ---
-application_class: {package}:{app_subclass}
+application: {package}:{app_subclass}
 components:
-    foo: {{}}  # REPLACE ME
+  foo: {{}}  # REPLACE ME
+settings:
+  bar: 1  # REPLACE ME
 logging:
   version: 1
   disable_existing_loggers: false
@@ -77,7 +79,6 @@ setup(
     author='FILL IN HERE',
     author_email='FILL IN HERE',
     classifiers=[
-        'Intended Audience :: End Users/Desktop',
         'Programming Language :: Python',
         'Programming Language :: Python :: 3'
     ],
@@ -107,7 +108,7 @@ def run_from_config_file(config_file: Union[str, Path], unsafe: bool=False):
     assert isinstance(config, dict), 'the YAML document root must be a dictionary'
 
     # Instantiate and run the application
-    application_class = resolve_reference(config.pop('application_class', Application))
+    application_class = resolve_reference(config.pop('application', Application))
     application = application_class(**config)
     application.run()
 
