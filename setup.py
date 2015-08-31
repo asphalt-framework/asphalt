@@ -31,7 +31,7 @@ setup(
         'Programming Language :: Python :: 3.5'
     ],
     license='Apache License 2.0',
-    zip_safe=True,
+    zip_safe=False,
     packages=[
         'asphalt.core'
     ],
