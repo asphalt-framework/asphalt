@@ -36,9 +36,14 @@ from asphalt.core.context import ApplicationContext
 
 
 class ExampleProjectApplication(Application):
+    def __init__(self, **config):
+        super().__init__(**config)
+        # ADD COMPONENTS HERE
+
     @coroutine
     def start(app_ctx: ApplicationContext):
-        pass  # IMPLEMENT CUSTOM LOGIC HERE
+        # ADD ADDITIONAL RESOURCES HERE (if needed)
+        pass
 """
 
     with projectdir.join('config.yml').open() as f:
@@ -82,7 +87,7 @@ setup(
         'Programming Language :: Python',
         'Programming Language :: Python :: 3'
     ],
-    zip_safe=True,
+    zip_safe=False,
     packages=[
         'example'
     ],

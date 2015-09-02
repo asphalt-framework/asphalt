@@ -76,8 +76,7 @@ class Application:
 
     def start(self, app_ctx: ApplicationContext):
         """
-        This method should be overridden to implement custom application logic.
-        It is called after all the components have initialized.
+        This method can be overridden to provide additional resources to the components.
         It can be a coroutine.
         """
 
@@ -96,17 +95,13 @@ class Application:
         context = self.create_context()
 
         try:
-            # Start all the components and run the loop until they've finished
-            self.logger.info('Starting components')
-            coroutines = (component.start(context) for component in self.components)
+            # Call the start() method of the application and all the components and run the loop
+            # until all the returned awaitables have finished
+            self.logger.info('Starting application')
+            coroutines = [self.start(context)]
+            coroutines.extend(component.start(context) for component in self.components)
             coroutines = [coro for coro in coroutines if coro is not None]
             event_loop.run_until_complete(asyncio.gather(*coroutines))
-            self.logger.info('All components started')
-
-            # Run the application's custom startup code
-            coro = self.start(context)
-            if coro is not None:
-                event_loop.run_until_complete(coro)
 
             # Run all the application context's start callbacks
             event_loop.run_until_complete(context.run_callbacks(ContextEventType.started))

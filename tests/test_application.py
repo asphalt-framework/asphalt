@@ -121,11 +121,10 @@ class TestApplication:
         assert app.start_callback_called
         assert app.finish_callback_called
         records = [record for record in caplog.records() if record.name == 'asphalt.core']
-        assert len(records) == 4
-        assert records[0].message == 'Starting components'
-        assert records[1].message == 'All components started'
-        assert records[2].message == 'Application started'
-        assert records[3].message == 'Application stopped'
+        assert len(records) == 3
+        assert records[0].message == 'Starting application'
+        assert records[1].message == 'Application started'
+        assert records[2].message == 'Application stopped'
 
     def test_start_exception(self, event_loop, app, caplog):
         """
@@ -148,11 +147,10 @@ class TestApplication:
 
         assert str(exception) == 'bad component'
         records = [record for record in caplog.records() if record.name == 'asphalt.core']
-        assert len(records) == 4
-        assert records[0].message == 'Starting components'
-        assert records[1].message == 'All components started'
-        assert records[2].message == 'Error during application startup'
-        assert records[3].message == 'Application stopped'
+        assert len(records) == 3
+        assert records[0].message == 'Starting application'
+        assert records[1].message == 'Error during application startup'
+        assert records[2].message == 'Application stopped'
 
     def test_run_baseexception(self, event_loop, app, caplog):
         """
@@ -165,7 +163,6 @@ class TestApplication:
 
         assert app.start_callback_called
         records = [record for record in caplog.records() if record.name == 'asphalt.core']
-        assert len(records) == 3
-        assert records[0].message == 'Starting components'
-        assert records[1].message == 'All components started'
-        assert records[2].message == 'Application started'
+        assert len(records) == 2
+        assert records[0].message == 'Starting application'
+        assert records[1].message == 'Application started'

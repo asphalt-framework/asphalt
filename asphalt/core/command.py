@@ -39,9 +39,14 @@ from {context_cls.__module__} import {context_cls.__name__}
 
 
 class {app_subclass}({app_cls.__name__}):
+    def __init__(self, **config):
+        super().__init__(**config)
+        # ADD COMPONENTS HERE
+
     @coroutine
     def start(app_ctx: ApplicationContext):
-        pass  # IMPLEMENT CUSTOM LOGIC HERE
+        # ADD ADDITIONAL RESOURCES HERE (if needed)
+        pass
 """.format(app_cls=Application, context_cls=ApplicationContext, app_subclass=app_subclass))
 
     with (project / 'config.yml').open('w') as f:
@@ -82,7 +87,7 @@ setup(
         'Programming Language :: Python',
         'Programming Language :: Python :: 3'
     ],
-    zip_safe=True,
+    zip_safe=False,
     packages=[
         '{package}'
     ],
