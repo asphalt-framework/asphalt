@@ -116,7 +116,7 @@ class TestApplication:
 
         app.add_component('shutdown', method=shutdown_method)
         app.logging_config = logging_config
-        app.run(event_loop)
+        app.run()
 
         assert app.start_callback_called
         assert app.finish_callback_called
@@ -143,7 +143,7 @@ class TestApplication:
         exception = None
         app.start = start
         app.add_component('shutdown', method='stop')
-        app.run(event_loop)
+        app.run()
 
         assert str(exception) == 'bad component'
         records = [record for record in caplog.records() if record.name == 'asphalt.core']
@@ -158,7 +158,7 @@ class TestApplication:
         """
 
         app.add_component('shutdown', method='exception')
-        exc = pytest.raises(BaseException, app.run, event_loop)
+        exc = pytest.raises(BaseException, app.run)
         assert str(exc.value) == 'this should crash the application'
 
         assert app.start_callback_called

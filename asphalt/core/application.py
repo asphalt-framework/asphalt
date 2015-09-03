@@ -1,4 +1,3 @@
-from asyncio import AbstractEventLoop
 from concurrent.futures import ThreadPoolExecutor
 from typing import Dict, Any, Union
 from logging import getLogger
@@ -9,6 +8,7 @@ from pkg_resources import iter_entry_points, EntryPoint
 
 from .component import Component
 from .context import ApplicationContext, ContextEventType
+from . import util
 
 __all__ = 'Application',
 
@@ -80,15 +80,18 @@ class Application:
         It can be a coroutine.
         """
 
-    def run(self, event_loop: AbstractEventLoop=None):
+    def run(self):
         # Configure the logging system
         if isinstance(self.logging_config, dict):
             logging.config.dictConfig(self.logging_config)
         elif self.logging_config:
             logging.basicConfig(level=logging.INFO)
 
+        # This is necessary to make @asynchronous work
+        util.event_loop = asyncio.get_event_loop()
+
         # Assign a new default executor with the given max worker thread limit
-        event_loop = event_loop or asyncio.get_event_loop()
+        event_loop = asyncio.get_event_loop()
         event_loop.set_default_executor(ThreadPoolExecutor(self.max_threads))
 
         # Create the application context

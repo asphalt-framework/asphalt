@@ -1,12 +1,14 @@
-from asyncio import coroutine, iscoroutinefunction, iscoroutine, get_event_loop, async
+from asyncio import coroutine, iscoroutinefunction, iscoroutine, async
 from concurrent.futures import Future
 from importlib import import_module
-from threading import current_thread, main_thread
+from threading import get_ident
 from typing import Callable, Any, Container
 from functools import wraps, partial
 
 __all__ = ('resolve_reference', 'qualified_name', 'synchronous', 'asynchronous',
            'wrap_blocking_api', 'wrap_async_api')
+
+event_loop = None
 
 
 def resolve_reference(ref):
@@ -64,15 +66,13 @@ def synchronous(func: Callable[..., Any]):
 
     @wraps(func, updated=())
     def wrapper(*args, **kwargs):
-        if current_thread() is event_loop_thread:
-            event_loop = get_event_loop()
+        if get_ident() == event_loop._thread_id:
             callback = partial(func, *args, **kwargs)
             return event_loop.run_in_executor(None, callback)
         else:
             return func(*args, **kwargs)
 
     assert not iscoroutinefunction(func), 'Cannot wrap coroutine functions as blocking callables'
-    event_loop_thread = main_thread()
     return wrapper
 
 
@@ -99,15 +99,13 @@ def asynchronous(func: Callable[..., Any]):
             else:
                 f.set_result(retval)
 
-        if current_thread() is event_loop_thread:
+        if event_loop._thread_id in (get_ident(), None):
             return func(*args, **kwargs)
         else:
             f = Future()
             event_loop.call_soon_threadsafe(async, callback())
             return f.result()
 
-    event_loop = get_event_loop()
-    event_loop_thread = main_thread()
     return wrapper
 
 
