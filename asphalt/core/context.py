@@ -8,7 +8,7 @@ from .util import qualified_name, asynchronous
 from .resource import ResourceCollection, ResourceEventType, ResourceEvent, ResourceConflict
 from .router import Endpoint
 
-__all__ = ('ContextScope', 'ContextEventType', 'CallbackPriority', 'AbstractContext',
+__all__ = ('ContextScope', 'ContextEventType', 'CallbackPriority', 'Context',
            'ApplicationContext', 'TransportContext', 'HandlerContext')
 
 
@@ -32,7 +32,7 @@ class CallbackPriority(Enum):
 class EventCallback:
     __slots__ = 'event', 'func', 'args', 'kwargs', 'position'
 
-    def __init__(self, event_type: ContextEventType, func: Callable[['AbstractContext'], Any],
+    def __init__(self, event_type: ContextEventType, func: Callable[['Context'], Any],
                  args: Sequence[Any], kwargs: Dict[str, Any],
                  position: CallbackPriority=CallbackPriority.neutral):
         self.event = event_type
@@ -52,7 +52,7 @@ class EventCallback:
                 format(self, qualified_name(self.func)))
 
 
-class AbstractContext(metaclass=ABCMeta):
+class Context(metaclass=ABCMeta):
     """
     Contexts give request handlers and callbacks access to resources.
 
@@ -67,7 +67,7 @@ class AbstractContext(metaclass=ABCMeta):
 
     exception = None  # type: BaseException
 
-    def __init__(self, parent: Optional['AbstractContext']):
+    def __init__(self, parent: Optional['Context']):
         super().__init__()
         self._parent = parent
         self._scope_callbacks = (parent._scope_callbacks if parent is not None else
@@ -96,7 +96,7 @@ class AbstractContext(metaclass=ABCMeta):
 
     def add_default_callback(
             self, scope: ContextScope, event_type: ContextEventType,
-            func: Callable[['AbstractContext'], Any], args: Sequence[Any]=(),
+            func: Callable[['Context'], Any], args: Sequence[Any]=(),
             kwargs: Dict[str, Any]=None, position: CallbackPriority=CallbackPriority.neutral):
         """
         Adds a callback to be called by :meth:`run_callbacks` whenever the given event occurs in
@@ -116,7 +116,7 @@ class AbstractContext(metaclass=ABCMeta):
         collection.append(callback)
         collection.sort()
 
-    def add_callback(self, event_type: ContextEventType, func: Callable[['AbstractContext'], Any],
+    def add_callback(self, event_type: ContextEventType, func: Callable[['Context'], Any],
                      args: Sequence[Any]=(), kwargs: Dict[str, Any]=None,
                      priority: CallbackPriority=CallbackPriority.neutral):
         """
@@ -158,7 +158,7 @@ class AbstractContext(metaclass=ABCMeta):
 
     @asynchronous
     def add_lazy_property(self, scope: ContextScope, context_var: str,
-                          creator: Callable[['AbstractContext'], Any]):
+                          creator: Callable[['Context'], Any]):
         """
         Adds a "lazy property" creator. When accessing the named property of a context of the
         given scope, the given callable will be used to create the value. The value will be
@@ -181,7 +181,7 @@ class AbstractContext(metaclass=ABCMeta):
         self._property_creators[scope][context_var] = creator
 
 
-class ApplicationContext(AbstractContext):
+class ApplicationContext(Context):
     """
     The default application level context class.
 
@@ -220,7 +220,7 @@ class ApplicationContext(AbstractContext):
         return ContextScope.application
 
 
-class TransportContext(AbstractContext):
+class TransportContext(Context):
     """
     The default transport level context class.
 
@@ -235,7 +235,7 @@ class TransportContext(AbstractContext):
         return ContextScope.transport
 
 
-class HandlerContext(AbstractContext):
+class HandlerContext(Context):
     """
     The default handler level context class.
 
