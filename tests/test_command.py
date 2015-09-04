@@ -31,6 +31,7 @@ def test_quickstart_application(monkeypatch, tmpdir, capsys):
     # Check that example/application.py was properly generated
     with projectdir.join('example').join('application.py').open() as f:
         assert f.read() == """\
+from asyncio import coroutine
 from asphalt.core.application import Application
 from asphalt.core.context import ApplicationContext
 
