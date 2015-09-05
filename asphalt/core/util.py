@@ -8,7 +8,7 @@ from functools import wraps, partial
 __all__ = ('resolve_reference', 'qualified_name', 'synchronous', 'asynchronous',
            'wrap_blocking_api', 'wrap_async_api')
 
-event_loop = None
+event_loop = event_loop_thread_id = None
 
 
 def resolve_reference(ref):
@@ -66,7 +66,7 @@ def synchronous(func: Callable[..., Any]):
 
     @wraps(func, updated=())
     def wrapper(*args, **kwargs):
-        if get_ident() == event_loop._thread_id:
+        if get_ident() == event_loop_thread_id:
             callback = partial(func, *args, **kwargs)
             return event_loop.run_in_executor(None, callback)
         else:
@@ -99,7 +99,7 @@ def asynchronous(func: Callable[..., Any]):
             else:
                 f.set_result(retval)
 
-        if event_loop._thread_id in (get_ident(), None):
+        if event_loop_thread_id in (get_ident(), None):
             return func(*args, **kwargs)
         else:
             f = Future()

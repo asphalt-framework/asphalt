@@ -1,4 +1,5 @@
 from concurrent.futures import ThreadPoolExecutor
+import threading
 from typing import Dict, Any, Union
 from logging import getLogger
 import logging.config
@@ -89,6 +90,7 @@ class Application:
 
         # This is necessary to make @asynchronous work
         util.event_loop = asyncio.get_event_loop()
+        util.event_loop_thread_id = threading.get_ident()
 
         # Assign a new default executor with the given max worker thread limit
         event_loop = asyncio.get_event_loop()
