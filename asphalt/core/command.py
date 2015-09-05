@@ -34,6 +34,8 @@ def quickstart_application():
 
     with (top_package / 'application.py').open('w') as f:
         f.write("""\
+from asyncio import coroutine
+
 from {app_cls.__module__} import {app_cls.__name__}
 from {context_cls.__module__} import {context_cls.__name__}
 
