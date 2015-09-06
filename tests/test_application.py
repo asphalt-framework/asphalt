@@ -7,7 +7,7 @@ import pytest
 
 from asphalt.core.application import Application
 from asphalt.core.component import Component
-from asphalt.core.context import ApplicationContext, ContextEventType
+from asphalt.core.context import ApplicationContext
 from asphalt.core.util import asynchronous
 
 
@@ -30,7 +30,7 @@ class ShutdownAPI:
             event_loop.call_later(0.1, callback)
 
         event_loop = get_event_loop()
-        self.app_ctx.add_callback(ContextEventType.started, schedule)
+        self.app_ctx.add_listener('started', schedule)
 
 
 class ShutdownComponent(Component):
@@ -55,8 +55,8 @@ class CustomApp(Application):
         def finished_callback(ctx):
             self.finish_callback_called = True
 
-        app_ctx.add_callback(ContextEventType.started, started_callback)
-        app_ctx.add_callback(ContextEventType.finished, finished_callback)
+        app_ctx.add_listener('started', started_callback)
+        app_ctx.add_listener('finished', finished_callback)
         app_ctx.shutter.shutdown()
 
 
@@ -132,12 +132,12 @@ class TestApplication:
         application context and made available to finish callbacks.
         """
 
-        def finish(app_ctx):
+        def finish(event):
             nonlocal exception
-            exception = app_ctx.exception
+            exception = event.source.exception
 
         def start(app_ctx: ApplicationContext):
-            app_ctx.add_callback(ContextEventType.finished, finish)
+            app_ctx.add_listener('finished', finish)
             raise Exception('bad component')
 
         exception = None

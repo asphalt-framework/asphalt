@@ -8,7 +8,7 @@ import asyncio
 from pkg_resources import iter_entry_points, EntryPoint
 
 from .component import Component
-from .context import ApplicationContext, ContextEventType
+from .context import ApplicationContext
 from . import util
 
 __all__ = 'Application',
@@ -109,7 +109,7 @@ class Application:
             event_loop.run_until_complete(asyncio.gather(*coroutines))
 
             # Run all the application context's start callbacks
-            event_loop.run_until_complete(context.run_callbacks(ContextEventType.started))
+            event_loop.run_until_complete(context.fire_event('started'))
             self.logger.info('Application started')
         except Exception as exc:
             self.logger.exception('Error during application startup')
@@ -121,6 +121,6 @@ class Application:
             except (KeyboardInterrupt, SystemExit):
                 pass
 
-        event_loop.run_until_complete(context.run_callbacks(ContextEventType.finished))
+        event_loop.run_until_complete(context.fire_event('finished'))
         event_loop.close()
         self.logger.info('Application stopped')

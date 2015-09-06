@@ -3,7 +3,7 @@ from asyncio import coroutine
 import pytest
 
 from asphalt.core.context import (ApplicationContext, TransportContext, HandlerContext,
-                                  ContextScope, ContextEventType, CallbackPriority, EventCallback)
+                                  ContextScope)
 from asphalt.core.resource import ResourceConflict, ResourceNotFoundError
 from asphalt.core.router import Endpoint
 
@@ -24,72 +24,7 @@ def handler_context(transport_context):
     return HandlerContext(transport_context, endpoint)
 
 
-class TestEventCallback:
-    def test_repr_(self):
-        def func(ctx):
-            pass
-
-        callback = EventCallback(ContextEventType.started, func, (1,), {'a': 4},
-                                 CallbackPriority.last)
-        assert (repr(callback) ==
-                "EventCallback(event=started, "
-                "func=test_context.TestEventCallback.test_repr_.<locals>.func, args=(1,), "
-                "kwargs={'a': 4}, position=last)")
-
-
 class TestApplicationContext:
-    @pytest.mark.asyncio
-    @pytest.mark.parametrize('event, results1, results2', [
-        (ContextEventType.started, ((7, 9), {'b': 4}), ((1, 2), {'a': 3})),
-        (ContextEventType.finished, ((6, 1), {'a': 5}), ((4, 5), {'a': 2}))
-    ], ids=['started', 'finished'])
-    def test_callbacks(self, app_context: ApplicationContext, event, results1, results2):
-        """Tests that both default and local callbacks are run and they're sorted by priority."""
-
-        @coroutine
-        def callback(ctx, *args, **kwargs):
-            nonlocal events
-            assert ctx is context
-            events.append((args, kwargs))
-
-        events = []
-        context = TransportContext(app_context)
-        app_context.add_default_callback(ContextScope.transport, ContextEventType.started,
-                                         callback, [1, 2], {'a': 3}, CallbackPriority.last)
-        context.add_callback(ContextEventType.finished, callback, [4, 5], {'a': 2})
-        context.add_callback(ContextEventType.started, callback, [7, 9], {'b': 4})
-        app_context.add_default_callback(ContextScope.transport, ContextEventType.finished,
-                                         callback, [6, 1], {'a': 5}, CallbackPriority.first)
-        yield from context.run_callbacks(event)
-
-        assert len(events) == 2
-        assert events[0] == results1
-        assert events[1] == results2
-
-    def test_no_default_callbacks(self, app_context: ApplicationContext):
-        exc = pytest.raises(AssertionError, app_context.add_default_callback,
-                            ContextScope.application, ContextEventType.started, lambda ctx: None)
-        assert str(exc.value) == ('cannot add default callbacks on the application scope -- '
-                                  'use add_callback() instead')
-
-    @pytest.mark.asyncio
-    def test_add_already_handled_event(self, app_context: ApplicationContext):
-        """Tests that you can't add a callback to an event that's already been handled."""
-
-        yield from app_context.run_callbacks(ContextEventType.started)
-        exc = pytest.raises(ValueError, app_context.add_callback, ContextEventType.started,
-                            lambda ctx: None)
-        assert str(exc.value) == 'cannot add started callbacks to this context any more'
-
-    @pytest.mark.asyncio
-    def test_run_already_handled_event(self, app_context: ApplicationContext):
-        """Tests that you can't run the same types of callbacks twice."""
-
-        yield from app_context.run_callbacks(ContextEventType.started)
-        with pytest.raises(ValueError) as exc:
-            yield from app_context.run_callbacks(ContextEventType.started)
-        assert str(exc.value) == 'the started callbacks for this context have already been run'
-
     def test_add_lazy_resource(self, app_context):
         """Tests that lazy resources are only created once per context instance."""
 
