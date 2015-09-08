@@ -34,7 +34,7 @@ def test_quickstart_application(monkeypatch, tmpdir, capsys):
 from asyncio import coroutine
 
 from asphalt.core.application import Application
-from asphalt.core.context import ApplicationContext
+from asphalt.core.context import Context
 
 
 class ExampleProjectApplication(Application):
@@ -43,7 +43,7 @@ class ExampleProjectApplication(Application):
         # ADD COMPONENTS HERE
 
     @coroutine
-    def start(app_ctx: ApplicationContext):
+    def start(ctx: Context):
         # ADD ADDITIONAL RESOURCES HERE (if needed)
         pass
 """

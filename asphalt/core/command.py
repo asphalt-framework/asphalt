@@ -7,7 +7,7 @@ import pkg_resources
 import yaml
 
 from .application import Application
-from .context import ApplicationContext
+from .context import Context
 from .util import resolve_reference
 
 
@@ -46,10 +46,10 @@ class {app_subclass}({app_cls.__name__}):
         # ADD COMPONENTS HERE
 
     @coroutine
-    def start(app_ctx: ApplicationContext):
+    def start(ctx: Context):
         # ADD ADDITIONAL RESOURCES HERE (if needed)
         pass
-""".format(app_cls=Application, context_cls=ApplicationContext, app_subclass=app_subclass))
+""".format(app_cls=Application, context_cls=Context, app_subclass=app_subclass))
 
     with (project / 'config.yml').open('w') as f:
         f.write("""\

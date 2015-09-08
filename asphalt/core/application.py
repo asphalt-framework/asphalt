@@ -1,14 +1,14 @@
 from concurrent.futures import ThreadPoolExecutor
-import threading
 from typing import Dict, Any, Union
 from logging import getLogger
 import logging.config
+import threading
 import asyncio
 
 from pkg_resources import iter_entry_points, EntryPoint
 
 from .component import Component
-from .context import ApplicationContext
+from .context import Context, ApplicationContext
 from . import util
 
 __all__ = 'Application',
@@ -47,7 +47,7 @@ class Application:
         """
         Instantiates a component and adds it to the component list used by this application.
 
-        The first argument can either be a :cls:`~asphalt.core.component.Component` subclass or a
+        The first argument can either be a :class:`~asphalt.core.component.Component` subclass or a
         component type name, declared as an ``asphalt.components`` entry point, in which case the
         component class is retrieved by loading the entry point.
 
@@ -75,7 +75,7 @@ class Application:
         component = component_class(**component_kwargs)
         self.components.append(component)
 
-    def start(self, app_ctx: ApplicationContext):
+    def start(self, ctx: Context):
         """
         This method can be overridden to provide additional resources to the components.
         It can be a coroutine.

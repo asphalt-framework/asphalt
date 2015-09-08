@@ -1,6 +1,6 @@
 from abc import ABCMeta, abstractmethod
 
-from .context import ApplicationContext
+from .context import Context
 
 __all__ = 'Component',
 
@@ -11,19 +11,19 @@ class Component(metaclass=ABCMeta):
     __slots__ = ()
 
     @abstractmethod
-    def start(self, app_ctx: ApplicationContext):
+    def start(self, ctx: Context):
         """
         This method is called on application start. It can be a coroutine.
 
-        The application context can be used to:
-          * add application start/finish callbacks
-          * add default callbacks for other contexts
-          * add context getters
-          * add resources (via app_ctx.resources)
-          * request resources (via app_ctx.resources)
+        The context can be used to:
+          * add context event listeners (:meth:`~Context.add_event_listener`)
+          * add resources (:meth:`~Context.add_resource`)
+          * add lazily created resources (:meth:`~Context.add_lazy_resource`)
+          * request resources (:meth:`~Context.request_resource`)
 
-        When dealing with resources, it is advisable to add as many resources as possible
-        before requesting any. This will speed up the dependency resolution.
+        If the component requests any resources, it is advisable to first add all the resources
+        it can before requesting any. This will speed up the dependency resolution and prevent
+        deadlocks.
 
-        :param app_ctx: the application context
+        :param ctx: the context for which the component was created
         """

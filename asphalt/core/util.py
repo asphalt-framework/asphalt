@@ -53,7 +53,7 @@ def qualified_name(obj) -> str:
         module = type_.__module__
         qualname = type_.__qualname__
 
-    return qualname if module == 'builtins' else '{}.{}'.format(module, qualname)
+    return qualname if module in ('typing', 'builtins') else '{}.{}'.format(module, qualname)
 
 
 def synchronous(func: Callable[..., Any]):

@@ -1,114 +1,242 @@
 from asyncio import coroutine
+from itertools import count
+from functools import partial
+import asyncio
 
 import pytest
 
-from asphalt.core.context import (ApplicationContext, TransportContext, HandlerContext,
-                                  ContextScope)
-from asphalt.core.resource import ResourceConflict, ResourceNotFoundError
+from asphalt.core.context import (ResourceConflict, ResourceNotFound, Resource, ContextScope,
+                                  Context, ApplicationContext, TransportContext, HandlerContext)
 from asphalt.core.router import Endpoint
 
 
-@pytest.fixture
-def app_context():
-    return ApplicationContext({'setting': 'blah'})
+class TestResource:
+    @pytest.fixture
+    def resource(self):
+        return Resource(6, ('int', 'object'), 'foo', 'bar.foo')
+
+    @pytest.fixture
+    def lazy_resource(self):
+        return Resource(None, ('int',), 'foo', 'bar.foo', lambda ctx: (ctx, 6))
+
+    def test_get(self, resource):
+        ctx = Context(ContextScope.application)
+        assert resource.get_value(ctx) == 6
+
+    def test_get_lazy(self):
+        resource = Resource(None, ('int',), 'foo', None, lambda ctx: (ctx, 6))
+        ctx = Context(ContextScope.application)
+        assert resource.get_value(ctx) == (ctx, 6)
+
+    def test_repr(self, resource: Resource):
+        assert repr(resource) == ("Resource(types=('int', 'object'), alias='foo', "
+                                  "value=6, context_var='bar.foo', lazy=False)")
+
+    def test_str(self, resource: Resource):
+        assert str(resource) == ("types=('int', 'object'), alias='foo', "
+                                 "value=6, context_var='bar.foo', lazy=False")
 
 
-@pytest.fixture
-def transport_context(app_context):
-    return TransportContext(app_context)
+class TestContext:
+    @pytest.fixture
+    def context(self):
+        return Context(ContextScope.application)
 
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize('delay', [False, True], ids=['immediate', 'delayed'])
+    def test_add_resource(self, context, event_loop, delay):
+        """Tests that a resource is properly added to the collection and listeners are notified."""
 
-@pytest.fixture
-def handler_context(transport_context):
-    endpoint = Endpoint(lambda ctx: None)
-    return HandlerContext(transport_context, endpoint)
+        events = []
+        trigger = asyncio.Event()
+        context.add_listener('resource_added', events.append)
+        context.add_listener('resource_added', lambda evt: trigger.set())
+        if delay:
+            call = partial(context.add_resource, 6, 'foo', 'foo.bar', types=(int, float))
+            event_loop.call_soon(call)
+        else:
+            context.add_resource(6, 'foo', 'foo.bar', types=(int, float))
 
+        value = yield from context.request_resource(int, 'foo', timeout=2)
+        assert value == 6
 
-class TestApplicationContext:
-    def test_add_lazy_resource(self, app_context):
+        yield from trigger.wait()
+        assert len(events) == 1
+        event = events[0]
+        assert event.types == ('int', 'float')
+        assert event.alias == 'foo'
+
+    def test_add_name_conflict(self, context):
+        """Tests that add() won't let replace existing resources."""
+
+        context.add_resource(5, 'foo')
+        exc = pytest.raises(ResourceConflict, context.add_resource, 4, 'foo')
+        assert str(exc.value) == ('"foo" conflicts with Resource(types=(\'int\',), alias=\'foo\', '
+                                  'value=5, context_var=None, lazy=False)')
+
+    @pytest.mark.asyncio
+    def test_remove_resource(self, context):
+        """Tests that resources can be removed and that the listeners are notified."""
+
+        resource = context.add_resource(4)
+
+        events = []
+        trigger = asyncio.Event()
+        context.add_listener('resource_removed', events.append)
+        context.add_listener('resource_removed', lambda evt: trigger.set())
+        context.remove_resource(resource)
+
+        yield from trigger.wait()
+        assert len(events) == 1
+        assert events[0].types == ('int',)
+
+        with pytest.raises(ResourceNotFound):
+            yield from context.request_resource(int, timeout=0)
+
+    def test_remove_nonexistent(self, context):
+        resource = Resource(5, ('int',), 'default', None)
+        exc = pytest.raises(LookupError, context.remove_resource, resource)
+        assert str(exc.value) == ("Resource(types=('int',), alias='default', value=5, "
+                                  "context_var=None, lazy=False) not found in this context")
+
+    @pytest.mark.asyncio
+    def test_request_timeout(self, context):
+        with pytest.raises(ResourceNotFound) as exc:
+            yield from context.request_resource(int, timeout=0.2)
+
+        assert str(exc.value) == "no matching resource was found for type='int' alias='default'"
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize('bad_arg, errormsg', [
+        ('type', 'type must be a type or a nonempty string'),
+        ('alias', 'alias must be a nonempty string')
+    ], ids=['bad_type', 'bad_alias'])
+    def test_bad_request(self, context, bad_arg, errormsg):
+        type_ = None if bad_arg == 'type' else 'foo'
+        alias = None if bad_arg == 'alias' else 'foo'
+        with pytest.raises(ValueError) as exc:
+            yield from context.request_resource(type_, alias)
+        assert str(exc.value) == errormsg
+
+    def test_add_lazy_resource(self, context):
         """Tests that lazy resources are only created once per context instance."""
 
         def creator(ctx):
-            nonlocal value
-            assert ctx is app_context
-            value += 1
-            return value
+            assert ctx is context
+            return next(counter)
 
-        value = 0
-        app_context.add_lazy_property(app_context.scope, 'foo', creator)
-        assert app_context.foo == 1
-        assert app_context.foo == 1
-        assert 'foo' in app_context.__dict__
+        counter = count(1)
+        context.add_lazy_resource(creator, int, context_var='foo')
+        assert context.foo == 1
+        assert context.foo == 1
+        assert context.__dict__['foo'] == 1
 
-    def test_resource_added_removed(self, app_context):
+    def test_resource_added_removed(self, context):
         """
-        Tests that when resources are added, they are also set as properties of the application
-        context. Likewise, when they are removed, they are deleted from the application context.
+        Tests that when resources are added, they are also set as properties of the context.
+        Likewise, when they are removed, they are deleted from the context.
         """
 
-        resource = app_context.resources.add(1, context_var='foo')
-        assert app_context.foo == 1
-        app_context.resources.remove(resource)
-        assert 'foo' not in app_context.__dict__
+        resource = context.add_resource(1, context_var='foo')
+        assert context.foo == 1
+        context.remove_resource(resource)
+        assert 'foo' not in context.__dict__
 
-    @pytest.mark.asyncio
-    def test_add_member_conflicting_resource(self, app_context):
-        app_context.a = 2
-        exc = pytest.raises(ResourceConflict, app_context.resources.add, 2, context_var='a')
-        assert str(exc.value) == (
-            "Resource(types=('int',), alias='default', value=2, context_var='a') "
-            "conflicts with an application context property")
+    def test_add_lazy_resource_coroutine(self, context):
+        """Tests that coroutine functions are not accepted as lazy resource creators."""
 
-        with pytest.raises(ResourceNotFoundError):
-            yield from app_context.resources.request(int, timeout=0)
-
-    @pytest.mark.asyncio
-    def test_add_lazy_property_conflicting_resource(self, app_context: ApplicationContext):
-        app_context.add_lazy_property(ContextScope.application, 'a', lambda ctx: 2)
-        exc = pytest.raises(ResourceConflict, app_context.resources.add, 2, context_var='a')
-        assert str(exc.value) == (
-            "Resource(types=('int',), alias='default', value=2, context_var='a') "
-            "conflicts with an application scoped lazy property")
-
-        with pytest.raises(ResourceNotFoundError):
-            yield from app_context.resources.request(int, timeout=0)
-
-    def test_lazy_property_coroutine(self, app_context: ApplicationContext):
-        exc = pytest.raises(AssertionError, app_context.add_lazy_property,
-                            ContextScope.application, 'foo', coroutine(lambda ctx: None))
+        exc = pytest.raises(AssertionError, context.add_lazy_resource,
+                            coroutine(lambda ctx: None), 'foo')
         assert str(exc.value) == 'creator cannot be a coroutine function'
 
-    def test_lazy_property_duplicate(self, app_context: ApplicationContext):
-        app_context.add_lazy_property(ContextScope.application, 'foo', lambda ctx: None)
-        exc = pytest.raises(ValueError, app_context.add_lazy_property, ContextScope.application,
-                            'foo', lambda ctx: None)
+    @pytest.mark.asyncio
+    def test_add_resource_conflicting_attribute(self, context):
+        context.a = 2
+        exc = pytest.raises(ResourceConflict, context.add_resource, 2, context_var='a')
+        assert str(exc.value) == (
+            "Resource(types=('int',), alias='default', value=2, context_var='a', lazy=False) "
+            "conflicts with an existing context attribute")
+
+        with pytest.raises(ResourceNotFound):
+            yield from context.request_resource(int, timeout=0)
+
+    def test_add_lazy_resource_conflicting_resource(self, context):
+        context.add_lazy_resource(lambda ctx: 2, int, context_var='a')
+        exc = pytest.raises(ResourceConflict, context.add_resource, 2, 'foo', context_var='a')
+        assert str(exc.value) == (
+            "Resource(types=('int',), alias='foo', value=2, context_var='a', lazy=False) "
+            "conflicts with an existing lazy resource")
+
+    def test_add_lazy_resource_duplicate(self, context):
+        context.add_lazy_resource(lambda ctx: None, str, context_var='foo')
+        exc = pytest.raises(ResourceConflict, context.add_lazy_resource, lambda ctx: None,
+                            str, context_var='foo')
         assert (str(exc.value) ==
-                'there is already a lazy property for "foo" on the application scope')
+                "\"default\" conflicts with Resource(types=('str',), alias='default', value=None, "
+                "context_var='foo', lazy=True)")
+
+    def test_attribute_error(self, context):
+        exc = pytest.raises(AttributeError, getattr, context, 'foo')
+        assert str(exc.value) == 'no such context variable: foo'
+
+    def test_get_parent_attribute(self, context):
+        """
+        Tests that accessing a nonexistent attribute on a context retrieves the value from parent.
+        """
+
+        child_context = Context(ContextScope.transport, context)
+        context.a = 2
+        assert child_context.a == 2
+
+    @pytest.mark.asyncio
+    def test_request_resource_parent_add(self, context):
+        """
+        Tests that adding a resource to the parent context will satisfy a resource request in a
+        child context.
+        """
+
+        child_context = Context(ContextScope.transport, context)
+        request = asyncio.async(child_context.request_resource(int, timeout=1))
+        context.add_resource(6)
+        resource = yield from request
+        assert resource == 6
+
+    @pytest.mark.asyncio
+    def test_request_lazy_resource_context_var(self, context):
+        """Tests that requesting a lazy resource also sets the context variable."""
+
+        context.add_lazy_resource(lambda ctx: 6, int, context_var='foo')
+        yield from context.request_resource(int)
+        assert context.__dict__['foo'] == 6
+
+    def test_remove_lazy_resource(self, context):
+        """
+        Tests that the lazy resource is no longer created when it has been removed and its
+        context variable is accessed.
+        """
+
+        resource = context.add_lazy_resource(lambda ctx: 6, int, context_var='foo')
+        context.remove_resource(resource)
+        exc = pytest.raises(AttributeError, getattr, context, 'foo')
+        assert str(exc.value) == 'no such context variable: foo'
 
 
-class TestTransportContext:
-    def test_getattr_parent_attr(self, app_context, transport_context):
-        app_context.a = 6
-        assert transport_context.a == 6
-
-    def test_lazy_property(self, transport_context):
-        transport_context.add_lazy_property(ContextScope.transport, 'a', lambda ctx: ctx)
-        assert transport_context.a is transport_context
-
-    def test_getattr_error(self, transport_context):
-        exc = pytest.raises(AttributeError, getattr, transport_context, 'nonexistent')
-        assert str(exc.value) == 'no such context property: nonexistent'
+def test_application_context():
+    settings = {'foo': 2}
+    ctx = ApplicationContext(settings)
+    assert ctx.scope == ContextScope.application
+    assert ctx.settings == settings
 
 
-class TestHandlerContext:
-    def test_getattr_parent_attr(self, transport_context, handler_context):
-        transport_context.a = 6
-        assert handler_context.a == 6
+def test_transport_context():
+    parent = Context(ContextScope.application)
+    ctx = TransportContext(parent)
+    assert ctx.scope == ContextScope.transport
 
-    def test_lazy_property(self, handler_context):
-        handler_context.add_lazy_property(ContextScope.handler, 'a', lambda ctx: ctx)
-        assert handler_context.a is handler_context
 
-    def test_getattr_error(self, handler_context):
-        exc = pytest.raises(AttributeError, getattr, handler_context, 'nonexistent')
-        assert str(exc.value) == 'no such context property: nonexistent'
+def test_handler_context():
+    parent = Context(ContextScope.transport)
+    endpoint = Endpoint(lambda ctx: None)
+    ctx = HandlerContext(parent, endpoint)
+    assert ctx.scope == ContextScope.handler
+    assert ctx.endpoint == endpoint

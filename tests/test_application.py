@@ -7,13 +7,13 @@ import pytest
 
 from asphalt.core.application import Application
 from asphalt.core.component import Component
-from asphalt.core.context import ApplicationContext
+from asphalt.core.context import Context
 from asphalt.core.util import asynchronous
 
 
 class ShutdownAPI:
-    def __init__(self, app_ctx: ApplicationContext, method: str):
-        self.app_ctx = app_ctx
+    def __init__(self, ctx: Context, method: str):
+        self.ctx = ctx
         self.method = method
 
     @asynchronous
@@ -30,15 +30,15 @@ class ShutdownAPI:
             event_loop.call_later(0.1, callback)
 
         event_loop = get_event_loop()
-        self.app_ctx.add_listener('started', schedule)
+        self.ctx.add_listener('started', schedule)
 
 
 class ShutdownComponent(Component):
     def __init__(self, method: str):
         self.method = method
 
-    def start(self, app_ctx: ApplicationContext):
-        app_ctx.resources.add(ShutdownAPI(app_ctx, self.method), context_var='shutter')
+    def start(self, ctx: Context):
+        ctx.add_resource(ShutdownAPI(ctx, self.method), context_var='shutter')
 
 
 class CustomApp(Application):
@@ -48,16 +48,16 @@ class CustomApp(Application):
         self.finish_callback_called = False
 
     @coroutine
-    def start(self, app_ctx: ApplicationContext):
+    def start(self, ctx: Context):
         def started_callback(ctx):
             self.start_callback_called = True
 
         def finished_callback(ctx):
             self.finish_callback_called = True
 
-        app_ctx.add_listener('started', started_callback)
-        app_ctx.add_listener('finished', finished_callback)
-        app_ctx.shutter.shutdown()
+        ctx.add_listener('started', started_callback)
+        ctx.add_listener('finished', finished_callback)
+        ctx.shutter.shutdown()
 
 
 class TestApplication:
@@ -136,8 +136,8 @@ class TestApplication:
             nonlocal exception
             exception = event.source.exception
 
-        def start(app_ctx: ApplicationContext):
-            app_ctx.add_listener('finished', finish)
+        def start(ctx: Context):
+            ctx.add_listener('finished', finish)
             raise Exception('bad component')
 
         exception = None
