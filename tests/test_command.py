@@ -38,14 +38,12 @@ from asphalt.core.context import Context
 
 
 class ExampleProjectApplication(Application):
-    def __init__(self, **config):
-        super().__init__(**config)
-        # ADD COMPONENTS HERE
-
     @coroutine
     def start(ctx: Context):
-        # ADD ADDITIONAL RESOURCES HERE (if needed)
-        pass
+        # Add components and resources here as needed
+        self.add_component('foo')
+        yield from super().start(ctx)
+        # The components have started now
 """
 
     with projectdir.join('config.yml').open() as f:

@@ -14,7 +14,7 @@ from . import util
 __all__ = 'Application',
 
 
-class Application:
+class Application(Component):
     """
     This class orchestrates the configuration and setup of the chosen Asphalt components.
 
@@ -76,10 +76,11 @@ class Application:
         self.components.append(component)
 
     def start(self, ctx: Context):
-        """
-        This method can be overridden to provide additional resources to the components.
-        It can be a coroutine.
-        """
+        # Start all the components and return a Future which completes when all the components
+        # have started
+        tasks = [retval for retval in (component.start(ctx) for component in self.components)
+                 if retval is not None]
+        return asyncio.gather(*tasks)
 
     def run(self):
         # Configure the logging system
@@ -88,25 +89,24 @@ class Application:
         elif self.logging_config:
             logging.basicConfig(level=logging.INFO)
 
-        # This is necessary to make @asynchronous work
-        util.event_loop = asyncio.get_event_loop()
-        util.event_loop_thread_id = threading.get_ident()
-
         # Assign a new default executor with the given max worker thread limit
         event_loop = asyncio.get_event_loop()
         event_loop.set_default_executor(ThreadPoolExecutor(self.max_threads))
+
+        # This is necessary to make @asynchronous work
+        util.event_loop = event_loop
+        util.event_loop_thread_id = threading.get_ident()
 
         # Create the application context
         context = self.create_context()
 
         try:
-            # Call the start() method of the application and all the components and run the loop
-            # until all the returned awaitables have finished
+            # Call the application's start() method.
+            # If it returns an awaitable, run the event loop until it's done.
             self.logger.info('Starting application')
-            coroutines = [self.start(context)]
-            coroutines.extend(component.start(context) for component in self.components)
-            coroutines = [coro for coro in coroutines if coro is not None]
-            event_loop.run_until_complete(asyncio.gather(*coroutines))
+            retval = self.start(context)
+            if retval is not None:
+                event_loop.run_until_complete(retval)
 
             # Run all the application context's start callbacks
             event_loop.run_until_complete(context.dispatch('started'))

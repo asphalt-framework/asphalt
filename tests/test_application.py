@@ -55,6 +55,7 @@ class CustomApp(Application):
         def finished_callback(ctx):
             self.finish_callback_called = True
 
+        yield from super().start(ctx)
         ctx.add_listener('started', started_callback)
         ctx.add_listener('finished', finished_callback)
         ctx.shutter.shutdown()

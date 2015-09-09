@@ -41,14 +41,12 @@ from {context_cls.__module__} import {context_cls.__name__}
 
 
 class {app_subclass}({app_cls.__name__}):
-    def __init__(self, **config):
-        super().__init__(**config)
-        # ADD COMPONENTS HERE
-
     @coroutine
     def start(ctx: Context):
-        # ADD ADDITIONAL RESOURCES HERE (if needed)
-        pass
+        # Add components and resources here as needed
+        self.add_component('foo')
+        yield from super().start(ctx)
+        # The components have started now
 """.format(app_cls=Application, context_cls=Context, app_subclass=app_subclass))
 
     with (project / 'config.yml').open('w') as f:
