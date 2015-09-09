@@ -26,21 +26,15 @@ Project links
 -------------
 
 * `Documentation`_
+* `Help and support`_
 * `Source code`_
 * `Issue tracker`_
 
-
-Support
--------
-
-* `Freenode IRC`_: #asphalt
-* `StackOverflow`_: Tag your questions with ``asphalt``
 
 .. _semantic versioning: http://semver.org/
 .. _asyncio: https://docs.python.org/3/library/asyncio.html
 .. _available components: https://github.com/asphalt-framework/asphalt/wiki/Components
 .. _Documentation: http://asphalt.readthedocs.org/en/latest/
+.. _Help and support: https://github.com/asphalt-framework/asphalt/wiki/Help-and-support
 .. _Source code: https://github.com/asphalt-framework/asphalt
 .. _Issue tracker: https://github.com/asphalt-framework/asphalt/issues
-.. _Freenode IRC: https://freenode.net/
-.. _StackOverflow: http://stackoverflow.com/questions/tagged/asphalt
