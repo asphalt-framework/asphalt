@@ -42,7 +42,7 @@ class Resource:
 
 class ResourceEvent(Event):
     """
-    Fired when a resource has been added or removed to a context.
+    Dispatched when a resource has been added or removed to a context.
 
     :ivar source: the relevant context
     :ivar types: names of the types for the resource
@@ -52,9 +52,9 @@ class ResourceEvent(Event):
 
     __slots__ = 'types', 'alias', 'lazy'
 
-    def __init__(self, source: 'Context', event_name: str, types: Tuple[str], alias: str,
+    def __init__(self, source: 'Context', topic: str, types: Tuple[str], alias: str,
                  lazy: bool):
-        super().__init__(source, event_name)
+        super().__init__(source, topic)
         self.types = types
         self.alias = alias
         self.lazy = lazy
@@ -132,8 +132,8 @@ class Context(EventSource):
 
         # Forward resource events from the parent(s)
         if parent is not None:
-            parent.add_listener('resource_added', self._fire_event)
-            parent.add_listener('resource_removed', self._fire_event)
+            parent.add_listener('resource_added', self._dispatch)
+            parent.add_listener('resource_removed', self._dispatch)
 
     def __getattr__(self, name):
         creator = self._resource_creators.get(name)
@@ -189,7 +189,7 @@ class Context(EventSource):
         if creator is None and resource.context_var:
             setattr(self, context_var, value)
 
-        self.fire_event('resource_added', types, alias, False)
+        self.dispatch('resource_added', types, alias, False)
         return resource
 
     @asynchronous
@@ -197,7 +197,7 @@ class Context(EventSource):
             self, value, alias: str='default', context_var: str=None, *,
             types: Union[Union[str, type], Iterable[Union[str, type]]]=()) -> Resource:
         """
-        Adds a resource to the collection and fires a "resource_added" event.
+        Adds a resource to the collection and dispatches a "resource_added" event.
 
         :param value: the actual resource value
         :param alias: an identifier for this resource (unique among all its registered types)
@@ -239,7 +239,7 @@ class Context(EventSource):
     @asynchronous
     def remove_resource(self, resource: Resource):
         """
-        Removes the given resource from the collection and fires a "resource_removed" event.
+        Removes the given resource from the collection and dispatches a "resource_removed" event.
 
         :param resource: the resource to be removed
         :raises LookupError: the given resource was not in the collection
@@ -259,7 +259,7 @@ class Context(EventSource):
         if resource.context_var and resource.context_var in self.__dict__:
             delattr(self, resource.context_var)
 
-        self.fire_event('resource_removed', resource.types, resource.alias, False)
+        self.dispatch('resource_removed', resource.types, resource.alias, False)
 
     def _get_resource(self, resource_type: str, alias: str):
         resource = self._resources.get(resource_type, {}).get(alias)

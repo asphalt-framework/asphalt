@@ -109,7 +109,7 @@ class Application:
             event_loop.run_until_complete(asyncio.gather(*coroutines))
 
             # Run all the application context's start callbacks
-            event_loop.run_until_complete(context.fire_event('started'))
+            event_loop.run_until_complete(context.dispatch('started'))
             self.logger.info('Application started')
         except Exception as exc:
             self.logger.exception('Error during application startup')
@@ -121,6 +121,6 @@ class Application:
             except (KeyboardInterrupt, SystemExit):
                 pass
 
-        event_loop.run_until_complete(context.fire_event('finished'))
+        event_loop.run_until_complete(context.dispatch('finished'))
         event_loop.close()
         self.logger.info('Application stopped')
