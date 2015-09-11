@@ -5,8 +5,10 @@ from threading import get_ident
 from typing import Callable, Any, Container
 from functools import wraps, partial
 
+from pkg_resources import EntryPoint, iter_entry_points
+
 __all__ = ('resolve_reference', 'qualified_name', 'synchronous', 'asynchronous',
-           'wrap_blocking_api', 'wrap_async_api')
+           'wrap_blocking_api', 'wrap_async_api', 'PluginContainer')
 
 event_loop = event_loop_thread_id = None
 
@@ -127,3 +129,45 @@ def wrap_async_api(cls: type, methods: Container[str]):
 
     wrapped_methods = {method: asynchronous(getattr(cls, method)) for method in methods}
     return type('Wrapped' + cls.__name__, (cls,), wrapped_methods)
+
+
+class PluginContainer:
+    """
+    A convenience class for loading entry points on demand.
+
+    :param namespace: a setuptools entry points namespace
+    """
+
+    __slots__ = 'namespace', '_entrypoints'
+
+    def __init__(self, namespace: str):
+        self.namespace = namespace
+        self._entrypoints = {ep.name: ep for ep in iter_entry_points(namespace)}
+
+    def resolve(self, obj):
+        """
+        If ``obj`` is a textual reference to an object (contains ":"), returns the resolved
+        reference using :func:`resolve_reference`. If it is a string of any other kind, loads the
+        named entry point in this container's namespace. Otherwise, ``obj`` is returned as is.
+
+        :param obj: an entry point identifier, an object reference or an arbitrary object
+        :return: the loaded entry point, resolved object or the unchanged input value
+        :raises LookupError: if ``obj`` was a string but the named entry point was not found
+        """
+
+        if not isinstance(obj, str):
+            return obj
+        if ':' in obj:
+            return resolve_reference(obj)
+
+        value = self._entrypoints.get(obj)
+        if value is None:
+            raise LookupError('no such entry point in {}: {}'.format(self.namespace, obj))
+
+        if isinstance(value, EntryPoint):
+            value = self._entrypoints[obj] = value.load()
+
+        return value
+
+    def __repr__(self):
+        return '{0.__class__.__name__}(namespace={0.namespace!r})'.format(self)

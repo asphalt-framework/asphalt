@@ -6,9 +6,11 @@ import sys
 import pkg_resources
 import yaml
 
-from .application import Application
+from .util import PluginContainer
+from .component import create_component, ContainerComponent
 from .context import Context
-from .util import resolve_reference
+
+runners = PluginContainer('asphalt.runners')
 
 
 def quickstart_application():
@@ -19,7 +21,7 @@ def quickstart_application():
 
     project_name = input('Project name: ')
     package = input('Top level package name: ')
-    app_subclass = '{}Application'.format(
+    component_subclass = '{}Application'.format(
         ''.join(part.capitalize() for part in project_name.split()))
 
     project = Path(project_name)
@@ -36,27 +38,25 @@ def quickstart_application():
         f.write("""\
 from asyncio import coroutine
 
-from {app_cls.__module__} import {app_cls.__name__}
+from {component_cls.__module__} import {component_cls.__name__}
 from {context_cls.__module__} import {context_cls.__name__}
 
 
-class {app_subclass}({app_cls.__name__}):
+class {component_subclass}({component_cls.__name__}):
     @coroutine
     def start(ctx: Context):
         # Add components and resources here as needed
-        self.add_component('foo')
         yield from super().start(ctx)
         # The components have started now
-""".format(app_cls=Application, context_cls=Context, app_subclass=app_subclass))
+""".format(component_cls=ContainerComponent, context_cls=Context,
+           component_subclass=component_subclass))
 
     with (project / 'config.yml').open('w') as f:
         f.write("""\
 ---
-application: {package}:{app_subclass}
-components:
-  foo: {{}}  # REPLACE ME
-settings:
-  bar: 1  # REPLACE ME
+component:
+  type: {package}:{component_subclass}
+  components: {{}}  # override component configurations here (or just remove this)
 logging:
   version: 1
   disable_existing_loggers: false
@@ -70,7 +70,7 @@ logging:
   root:
     handlers: [console]
     level: INFO
-""".format(package=package, app_subclass=app_subclass))
+""".format(package=package, component_subclass=component_subclass))
 
     with (project / 'setup.py').open('w') as f:
         f.write("""\
@@ -99,7 +99,7 @@ setup(
            next_major_version=next_major_version))
 
 
-def run_from_config_file(config_file: Union[str, Path], unsafe: bool=False):
+def run_from_config_file(config_file: Union[str, Path], runner: str='asyncio', unsafe: bool=False):
     """
     Runs an application using configuration from the given configuration file.
 
@@ -112,10 +112,19 @@ def run_from_config_file(config_file: Union[str, Path], unsafe: bool=False):
         config = yaml.load(stream) if unsafe else yaml.safe_load(stream)
     assert isinstance(config, dict), 'the YAML document root must be a dictionary'
 
-    # Instantiate and run the application
-    application_class = resolve_reference(config.pop('application', Application))
-    application = application_class(**config)
-    application.run()
+    # Instantiate the top level component
+    try:
+        component_config = config.pop('component')
+    except KeyError:
+        raise LookupError('missing configuration key: component') from None
+    else:
+        component = create_component(**component_config)
+
+    # Get a reference to the runner
+    runner = runners.resolve(config.pop('runner', runner))
+
+    # Start the application
+    runner(component, **config)
 
 
 def main():
@@ -128,6 +137,9 @@ def main():
     run_parser.add_argument(
         '--unsafe', action='store_true', default=False,
         help='Load the YAML file in unsafe mode (enables YAML markup extensions)')
+    run_parser.add_argument(
+        '--runner', default='asyncio',
+        help='Select the runner with which to start the application')
     run_parser.set_defaults(func=run_from_config_file)
 
     quickstart_parser = subparsers.add_parser(

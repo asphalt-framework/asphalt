@@ -7,10 +7,8 @@ import time
 
 from .util import qualified_name, asynchronous
 from .event import EventSource, Event
-from .router import Endpoint
 
-__all__ = ('ResourceEvent', 'ResourceConflict', 'ResourceNotFound', 'ContextScope', 'Context',
-           'ApplicationContext', 'TransportContext', 'HandlerContext')
+__all__ = 'ResourceEvent', 'ResourceConflict', 'ResourceNotFound', 'ContextScope', 'Context'
 
 
 class Resource:
@@ -309,39 +307,3 @@ class Context(EventSource):
             self.remove_listener(handle)
 
         return resource.get_value(self)
-
-
-class ApplicationContext(Context):
-    """
-    The default application level context class.
-
-    :param settings: application specific settings
-    """
-
-    def __init__(self, settings: dict):
-        super().__init__(ContextScope.application)
-        self.settings = settings
-
-
-class TransportContext(Context):
-    """
-    The default transport level context class.
-
-    :param parent: the application context
-    """
-
-    def __init__(self, parent: Context):
-        super().__init__(ContextScope.transport, parent)
-
-
-class HandlerContext(Context):
-    """
-    The default handler level context class.
-
-    :param parent: the transport context
-    :param endpoint: the endpoint being handled
-    """
-
-    def __init__(self, parent: Context, endpoint: Endpoint):
-        super().__init__(ContextScope.handler, parent)
-        self.endpoint = endpoint

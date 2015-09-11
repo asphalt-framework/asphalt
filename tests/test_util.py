@@ -4,9 +4,10 @@ import threading
 
 import pytest
 
+from asphalt.core.runner import run_application
 from asphalt.core.util import (
     resolve_reference, qualified_name, synchronous, wrap_blocking_api,
-    wrap_async_api, asynchronous)
+    wrap_async_api, asynchronous, PluginContainer)
 
 
 @pytest.mark.parametrize('inputval', [
@@ -118,3 +119,20 @@ def test_wrap_async_callable_exception(event_loop):
     with pytest.raises(ValueError) as exc:
         yield from event_loop.run_in_executor(None, wrapped_async_func)
     assert str(exc.value) == 'test'
+
+
+class TestPluginContainer:
+    @pytest.fixture
+    def container(self):
+        return PluginContainer('asphalt.runners')
+
+    @pytest.mark.parametrize('inputvalue', [
+        'asyncio',
+        'asphalt.core.runner:run_application',
+        run_application
+    ], ids=['entrypoint', 'reference', 'arbitrary_object'])
+    def test_resolve(self, container, inputvalue):
+        assert container.resolve(inputvalue) is run_application
+
+    def test_repr(self, container):
+        assert repr(container) == "PluginContainer(namespace='asphalt.runners')"

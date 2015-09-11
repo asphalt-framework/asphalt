@@ -6,8 +6,7 @@ import asyncio
 import pytest
 
 from asphalt.core.context import (ResourceConflict, ResourceNotFound, Resource, ContextScope,
-                                  Context, ApplicationContext, TransportContext, HandlerContext)
-from asphalt.core.router import Endpoint
+                                  Context)
 
 
 class TestResource:
@@ -219,24 +218,3 @@ class TestContext:
         context.remove_resource(resource)
         exc = pytest.raises(AttributeError, getattr, context, 'foo')
         assert str(exc.value) == 'no such context variable: foo'
-
-
-def test_application_context():
-    settings = {'foo': 2}
-    ctx = ApplicationContext(settings)
-    assert ctx.scope == ContextScope.application
-    assert ctx.settings == settings
-
-
-def test_transport_context():
-    parent = Context(ContextScope.application)
-    ctx = TransportContext(parent)
-    assert ctx.scope == ContextScope.transport
-
-
-def test_handler_context():
-    parent = Context(ContextScope.transport)
-    endpoint = Endpoint(lambda ctx: None)
-    ctx = HandlerContext(parent, endpoint)
-    assert ctx.scope == ContextScope.handler
-    assert ctx.endpoint == endpoint

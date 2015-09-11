@@ -49,6 +49,9 @@ setup(
     entry_points={
         'console_scripts': [
             'asphalt = asphalt.core.command:main'
+        ],
+        'asphalt.runners': [
+            'asyncio = asphalt.core.runner:run_application'
         ]
     }
 )

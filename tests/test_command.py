@@ -4,8 +4,7 @@ import pytest
 import yaml
 
 from asphalt.core import command
-
-DerivedApplication = None
+from asphalt.core.component import ContainerComponent
 
 
 def test_quickstart_application(monkeypatch, tmpdir, capsys):
@@ -33,15 +32,14 @@ def test_quickstart_application(monkeypatch, tmpdir, capsys):
         assert f.read() == """\
 from asyncio import coroutine
 
-from asphalt.core.application import Application
+from asphalt.core.component import ContainerComponent
 from asphalt.core.context import Context
 
 
-class ExampleProjectApplication(Application):
+class ExampleProjectApplication(ContainerComponent):
     @coroutine
     def start(ctx: Context):
         # Add components and resources here as needed
-        self.add_component('foo')
         yield from super().start(ctx)
         # The components have started now
 """
@@ -51,11 +49,9 @@ class ExampleProjectApplication(Application):
         assert isinstance(yaml.load(config_data), dict)
         assert config_data == """\
 ---
-application: example:ExampleProjectApplication
-components:
-  foo: {}  # REPLACE ME
-settings:
-  bar: 1  # REPLACE ME
+component:
+  type: example:ExampleProjectApplication
+  components: {}  # override component configurations here (or just remove this)
 logging:
   version: 1
   disable_existing_loggers: false
@@ -106,31 +102,46 @@ setup(
 @pytest.mark.parametrize('unsafe', [False, True], ids=['safe', 'unsafe'])
 def test_run_from_config_file(tmpdir, unsafe):
     if unsafe:
-        app_class = '!!python/name:{}.DerivedApplication'.format(__spec__.name)
+        component_class = '!!python/name:{0.__module__}.{0.__name__}'.format(ContainerComponent)
     else:
-        app_class = '{}:DerivedApplication'.format(__spec__.name)
+        component_class = '{0.__module__}:{0.__name__}'.format(ContainerComponent)
 
-    with patch('{}.DerivedApplication'.format(__spec__.name)) as cls:
-        path = tmpdir.join('test.yaml')
-        path.write("""\
+    path = tmpdir.join('test.yaml')
+    path.write("""\
 ---
-application: {}
-components:
-    foo: {{}}
-    bar: {{}}
-settings:
-    setting: blah
+runner: test_command:alternate_runner
+component:
+  type: {}
 logging:
   version: 1
   disable_existing_loggers: false
-""".format(app_class))
-        command.run_from_config_file(str(path), unsafe)
+""".format(component_class))
 
-        components = {'foo': {}, 'bar': {}}
-        logging = {'version': 1, 'disable_existing_loggers': False}
-        settings = {'setting': 'blah'}
-        cls.assert_called_once_with(components=components, logging=logging, settings=settings)
-        cls().run.assert_called_once_with()
+    global alternate_runner
+    alternate_runner = Mock()
+    try:
+        command.run_from_config_file(str(path), unsafe=unsafe)
+
+        assert alternate_runner.call_count == 1
+        args, kwargs = alternate_runner.call_args
+        assert len(args) == 1
+        assert isinstance(args[0], ContainerComponent)
+        assert len(kwargs) == 1
+        assert kwargs['logging'] == {'version': 1, 'disable_existing_loggers': False}
+    finally:
+        del alternate_runner
+
+
+def test_run_from_config_file_missing_component_key(tmpdir):
+    path = tmpdir.join('test.yaml')
+    path.write("""\
+---
+logging:
+  version: 1
+  disable_existing_loggers: false
+""")
+    exc = pytest.raises(LookupError, command.run_from_config_file, str(path))
+    assert str(exc.value) == 'missing configuration key: component'
 
 
 @pytest.mark.parametrize('args, exits', [
