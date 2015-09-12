@@ -8,7 +8,6 @@ if sys.version_info < (3, 4):
 
 here = os.path.dirname(__file__)
 readme = open(os.path.join(here, 'README.rst')).read()
-extra_requirements = {(3, 4): ['typing >= 3.5.0b1']}
 
 setup(
     name='asphalt',
@@ -41,10 +40,9 @@ setup(
     install_requires=[
         'setuptools',  # this is here to tell downstream packagers that it needs pkg_resources
         'PyYAML >= 3.11'
-    ] + extra_requirements.get(sys.version_info[:2], []),
+    ],
     extras_require={
-        ':python_version == "{}.{}"'.format(major, minor): pkg
-        for ((major, minor), pkg) in extra_requirements.items()
+        ':python_version == "3.4"': 'typing >= 3.5.0b1'
     },
     entry_points={
         'console_scripts': [
