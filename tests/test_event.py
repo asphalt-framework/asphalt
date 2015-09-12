@@ -40,7 +40,9 @@ class TestListenerHandle:
 class TestEventSource:
     @pytest.fixture
     def source(self):
-        return EventSource({'event_a': DummyEvent, 'event_b': DummyEvent})
+        event_source = EventSource()
+        event_source._register_topics({'event_a': DummyEvent, 'event_b': DummyEvent})
+        return event_source
 
     def test_add_listener(self, source):
         handle = source.add_listener('event_a', lambda: None)

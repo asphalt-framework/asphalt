@@ -1,5 +1,4 @@
 from asyncio import async, coroutine, Task
-from collections import defaultdict
 from typing import Dict, Callable, Any, Sequence
 from enum import Enum
 
@@ -54,17 +53,23 @@ class ListenerHandle:
 class EventSource:
     """
     A mixin class that provides support for dispatching and listening to events.
-    It requires a mapping of topics to their respective event classes as its first argument.
-
-    :param event_classes: a mapping of topic -> event class
     """
 
-    __slots__ = '_event_classes', '_listener_handles'
+    __slots__ = '_topics'
 
-    def __init__(self, event_classes: Dict[str, Any], *args, **kwargs):
-        self._event_classes = event_classes
-        self._listener_handles = defaultdict(list)
+    def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self._topics = {}
+
+    def _register_topics(self, topics: Dict[str, Any]):
+        """
+        Registers a number of supported topics and their respective event classes
+
+        :param topics: a dictionary of topic -> event class
+        """
+
+        for topic, event_class in topics.items():
+            self._topics[topic] = {'event_class': event_class, 'listeners': []}
 
     @asynchronous
     def add_listener(self, topic: str, callback: Callable[[Any], Any],
@@ -87,11 +92,11 @@ class EventSource:
         :raises ValueError: if the named event has not been registered in this event source
         """
 
-        if topic not in self._event_classes:
+        if topic not in self._topics:
             raise ValueError('no such topic registered: {}'.format(topic))
 
         handle = ListenerHandle(topic, callback, args, kwargs or {}, priority)
-        handles = self._listener_handles[topic]
+        handles = self._topics[topic]['listeners']
         handles.append(handle)
         handles.sort()
         return handle
@@ -106,7 +111,7 @@ class EventSource:
         """
 
         try:
-            self._listener_handles[handle.topic].remove(handle)
+            self._topics[handle.topic]['listeners'].remove(handle)
         except (KeyError, ValueError):
             raise ValueError('listener not found') from None
 
@@ -123,17 +128,17 @@ class EventSource:
         :raises ValueError: if the named event has not been registered in this event source
         """
 
-        event_class = self._event_classes.get(topic)
-        if event_class is None:
+        if topic not in self._topics:
             raise ValueError('no such topic registered: {}'.format(topic))
 
         # Run call_listeners() in a separate task to avoid arbitrary exceptions from listeners
+        event_class = self._topics[topic]['event_class']
         event = event_class(self, topic, *args, **kwargs)
         return async(self._dispatch(event))
 
     @coroutine
     def _dispatch(self, event: Event):
-        for handle in self._listener_handles[event.topic]:
+        for handle in self._topics[event.topic]['listeners']:
             retval = handle.callback(event, *handle.args, **handle.kwargs)
             if retval is not None:
                 yield from retval

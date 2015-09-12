@@ -117,7 +117,8 @@ class Context(EventSource):
     exception = None  # type: BaseException
 
     def __init__(self, scope: ContextScope, parent: 'Context'=None):
-        super().__init__({
+        super().__init__()
+        self._register_topics({
             'started': Event,
             'finished': Event,
             'resource_added': ResourceEvent,
