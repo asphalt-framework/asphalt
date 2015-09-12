@@ -1,14 +1,13 @@
 from typing import Optional, Callable, Any, Union, Iterable, Tuple
 from asyncio import iscoroutinefunction
 from collections import defaultdict
-from enum import Enum
 import asyncio
 import time
 
 from .util import qualified_name, asynchronous
 from .event import EventSource, Event
 
-__all__ = 'ResourceEvent', 'ResourceConflict', 'ResourceNotFound', 'ContextScope', 'Context'
+__all__ = 'ResourceEvent', 'ResourceConflict', 'ResourceNotFound', 'Context'
 
 
 class Resource:
@@ -77,23 +76,6 @@ class ResourceNotFound(LookupError):
         return 'no matching resource was found for type={0.type!r} alias={0.alias!r}'.format(self)
 
 
-class ContextScope(Enum):
-    """
-    Context scope gives component and application developers a hint regarding the expected lifetime
-    of a context:
-
-    * an ``application`` scoped context has no parent and lives until the application is stopped
-    * a ``transport`` scoped context is usually associated with a datastream (typically a network \
-                      connection)
-    * a ``handler`` scoped context is short lived and is usually associated with a request of \
-                    some kind
-    """
-
-    application = 1
-    transport = 2
-    handler = 3
-
-
 class Context(EventSource):
     """
     Contexts give request handlers and callbacks access to resources.
@@ -116,7 +98,7 @@ class Context(EventSource):
 
     exception = None  # type: BaseException
 
-    def __init__(self, scope: ContextScope, parent: 'Context'=None):
+    def __init__(self, parent: 'Context'=None):
         super().__init__()
         self._register_topics({
             'started': Event,
@@ -124,7 +106,6 @@ class Context(EventSource):
             'resource_added': ResourceEvent,
             'resource_removed': ResourceEvent
         })
-        self.scope = scope
         self._parent = parent
         self._resources = defaultdict(dict)  # type: Dict[str, Dict[str, Resource]]
         self._resource_creators = {}  # type: Dict[str, Callable[[Context], Any]

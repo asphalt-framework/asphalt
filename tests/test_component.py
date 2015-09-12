@@ -4,7 +4,7 @@ import asyncio
 import pytest
 
 from asphalt.core.component import ContainerComponent, Component, component_types, create_component
-from asphalt.core.context import Context, ContextScope
+from asphalt.core.context import Context
 
 
 class DummyComponent(Component):
@@ -59,8 +59,7 @@ class TestContainerComponent:
 
     @pytest.mark.asyncio
     def test_start(self, container):
-        context = Context(ContextScope.application)
-        yield from container.start(context)
+        yield from container.start(Context())
         assert container.child_components['dummy'].started
 
 

@@ -5,8 +5,7 @@ import asyncio
 
 import pytest
 
-from asphalt.core.context import (ResourceConflict, ResourceNotFound, Resource, ContextScope,
-                                  Context)
+from asphalt.core.context import ResourceConflict, ResourceNotFound, Resource, Context
 
 
 class TestResource:
@@ -19,12 +18,12 @@ class TestResource:
         return Resource(None, ('int',), 'foo', 'bar.foo', lambda ctx: (ctx, 6))
 
     def test_get(self, resource):
-        ctx = Context(ContextScope.application)
+        ctx = Context()
         assert resource.get_value(ctx) == 6
 
     def test_get_lazy(self):
         resource = Resource(None, ('int',), 'foo', None, lambda ctx: (ctx, 6))
-        ctx = Context(ContextScope.application)
+        ctx = Context()
         assert resource.get_value(ctx) == (ctx, 6)
 
     def test_repr(self, resource: Resource):
@@ -39,7 +38,7 @@ class TestResource:
 class TestContext:
     @pytest.fixture
     def context(self):
-        return Context(ContextScope.application)
+        return Context()
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize('delay', [False, True], ids=['immediate', 'delayed'])
@@ -183,7 +182,7 @@ class TestContext:
         Tests that accessing a nonexistent attribute on a context retrieves the value from parent.
         """
 
-        child_context = Context(ContextScope.transport, context)
+        child_context = Context(context)
         context.a = 2
         assert child_context.a == 2
 
@@ -194,7 +193,7 @@ class TestContext:
         child context.
         """
 
-        child_context = Context(ContextScope.transport, context)
+        child_context = Context(context)
         request = asyncio.async(child_context.request_resource(int, timeout=1))
         context.add_resource(6)
         resource = yield from request

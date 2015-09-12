@@ -7,7 +7,7 @@ import asyncio
 import os
 
 from .component import Component
-from .context import Context, ContextScope
+from .context import Context
 from . import util
 
 
@@ -45,7 +45,7 @@ def run_application(component: Component, *, max_threads: int=None,
     util.event_loop_thread_id = threading.get_ident()
 
     # Create the top level context
-    context = Context(ContextScope.application)
+    context = Context()
 
     logger = getLogger(__name__)
     logger.info('Starting application')
