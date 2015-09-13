@@ -6,8 +6,7 @@ import pytest
 
 from asphalt.core.runner import run_application
 from asphalt.core.util import (
-    resolve_reference, qualified_name, synchronous, wrap_blocking_api,
-    wrap_async_api, asynchronous, PluginContainer)
+    resolve_reference, qualified_name, synchronous, asynchronous, PluginContainer)
 
 
 @pytest.mark.parametrize('inputval', [
@@ -68,42 +67,6 @@ def test_wrap_async_callable(event_loop, run_in_threadpool):
         retval = yield from event_loop.run_in_executor(None, func, 1, 2)
     else:
         retval = yield from func(1, 2)
-
-    assert retval == 3
-
-
-@pytest.mark.asyncio
-@pytest.mark.parametrize('run_in_threadpool', [False, True], ids=['eventloop', 'threadpool'])
-def test_wrap_blocking_api(event_loop, run_in_threadpool):
-    class BlockingAPI:
-        def method(self, x, y):
-            assert threading.current_thread() is not threading.main_thread()
-            return x + y
-
-    wrapped_class = wrap_blocking_api(BlockingAPI, ['method'])
-    if run_in_threadpool:
-        retval = yield from event_loop.run_in_executor(None, wrapped_class().method, 1, 2)
-    else:
-        retval = yield from wrapped_class().method(1, 2)
-
-    assert retval == 3
-
-
-@pytest.mark.asyncio
-@pytest.mark.parametrize('run_in_threadpool', [False, True], ids=['eventloop', 'threadpool'])
-def test_wrap_async_api(event_loop, run_in_threadpool):
-    class AsyncAPI:
-        @coroutine
-        def method(self, x, y):
-            assert threading.current_thread() is threading.main_thread()
-            yield from asyncio.sleep(0.2)
-            return x + y
-
-    wrapped_class = wrap_async_api(AsyncAPI, ['method'])
-    if run_in_threadpool:
-        retval = yield from event_loop.run_in_executor(None, wrapped_class().method, 1, 2)
-    else:
-        retval = yield from wrapped_class().method(1, 2)
 
     assert retval == 3
 

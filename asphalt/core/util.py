@@ -2,13 +2,12 @@ from asyncio import coroutine, iscoroutinefunction, iscoroutine, async
 from concurrent.futures import Future
 from importlib import import_module
 from threading import get_ident
-from typing import Callable, Any, Container
+from typing import Callable, Any
 from functools import wraps, partial
 
 from pkg_resources import EntryPoint, iter_entry_points
 
-__all__ = ('resolve_reference', 'qualified_name', 'synchronous', 'asynchronous',
-           'wrap_blocking_api', 'wrap_async_api', 'PluginContainer')
+__all__ = 'resolve_reference', 'qualified_name', 'synchronous', 'asynchronous', 'PluginContainer'
 
 event_loop = event_loop_thread_id = None
 
@@ -109,26 +108,6 @@ def asynchronous(func: Callable[..., Any]):
             return f.result()
 
     return wrapper
-
-
-def wrap_blocking_api(cls: type, methods: Container[str]):
-    """
-    Returns a subclass of the given class with all its specified methods wrapped as coroutines
-    for consumption asynchronous code.
-    """
-
-    wrapped_methods = {method: synchronous(getattr(cls, method)) for method in methods}
-    return type('Wrapped' + cls.__name__, (cls,), wrapped_methods)
-
-
-def wrap_async_api(cls: type, methods: Container[str]):
-    """
-    Returns a subclass of the given class with all its specified methods wrapped for
-    consumption by threaded code.
-    """
-
-    wrapped_methods = {method: asynchronous(getattr(cls, method)) for method in methods}
-    return type('Wrapped' + cls.__name__, (cls,), wrapped_methods)
 
 
 class PluginContainer:
