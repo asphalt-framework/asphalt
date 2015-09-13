@@ -101,7 +101,6 @@ class Context(EventSource):
     def __init__(self, parent: 'Context'=None):
         super().__init__()
         self._register_topics({
-            'started': Event,
             'finished': Event,
             'resource_added': ResourceEvent,
             'resource_removed': ResourceEvent
@@ -128,7 +127,6 @@ class Context(EventSource):
         raise AttributeError('no such context variable: {}'.format(name))
 
     def __enter__(self):
-        get_event_loop().run_until_complete(self.dispatch('started'))
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
@@ -137,7 +135,6 @@ class Context(EventSource):
 
     @coroutine
     def __aenter__(self):
-        yield from self.dispatch('started')
         return self
 
     @coroutine

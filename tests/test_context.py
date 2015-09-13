@@ -58,17 +58,12 @@ class TestContext:
         exception variable when an exception is raised during the context lifetime.
         """
 
-        def started_listener(event):
-            nonlocal started_called
-            started_called = True
-
         def finished_listener(event):
             nonlocal finished_called
             finished_called = True
 
         exception = RuntimeError('test') if raise_exception else None
-        started_called = finished_called = False
-        context.add_listener('started', started_listener)
+        finished_called = False
         context.add_listener('finished', finished_listener)
         try:
             with context:
@@ -77,7 +72,6 @@ class TestContext:
         except RuntimeError:
             pass
 
-        assert started_called
         assert finished_called
         assert context.exception == exception
 
@@ -91,24 +85,18 @@ class TestContext:
         exception variable when an exception is raised during the context lifetime.
         """
 
-        def started_listener(event):
-            nonlocal started_called
-            started_called = True
-
         def finished_listener(event):
             nonlocal finished_called
             finished_called = True
 
         exception = RuntimeError('test') if raise_exception else None
-        started_called = finished_called = False
-        context.add_listener('started', started_listener)
+        finished_called = False
         context.add_listener('finished', finished_listener)
         try:
             yield from use_contextmanager(context, exception)
         except RuntimeError:
             pass
 
-        assert started_called
         assert finished_called
         assert context.exception == exception
 

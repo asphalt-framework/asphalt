@@ -1,6 +1,7 @@
+from asyncio import coroutine
 from abc import ABCMeta, abstractmethod
 from collections import OrderedDict
-from typing import Dict, Any, Union
+from typing import Dict, Any, Union, Optional
 import asyncio
 
 from .util import qualified_name, PluginContainer
@@ -67,21 +68,35 @@ class ContainerComponent(Component):
         component = create_component(type or alias, **kwargs)
         self.child_components[alias] = component
 
-    def start(self, ctx: Context):
-        # Automatically create any components that have configuration specified for them but have
-        # not been manually added
+    @coroutine
+    def start(self, ctx: Context) -> Optional[Context]:
+        """
+        Creates child components that have been configured but not yet created.
+        Then, a new context is created and the start() methods of the child components are called
+        with the new context as the argument.
+
+        :return: the child context that was created, or ``None`` if there were no child components
+        """
+
         for alias in self.component_config:
-            self.add_component(alias)
+            if alias not in self.child_components:
+                self.add_component(alias)
 
-        # Start all the child components and return a Future which completes when they all have
-        # started, or None
-        tasks = []
-        for component in self.child_components.values():
-            retval = component.start(ctx)
-            if retval is not None:
-                tasks.append(retval)
+        if self.child_components:
+            child_context = Context(ctx)
+            tasks = []
+            for component in self.child_components.values():
+                retval = component.start(child_context)
+                if retval is not None:
+                    tasks.append(retval)
 
-        return asyncio.gather(*tasks) if tasks else None
+            if tasks:
+                yield from asyncio.gather(*tasks)
+
+            # Finish the child context when the parent context finishes
+            ctx.add_listener('finished', lambda event: child_context.dispatch('finished'))
+
+            return child_context
 
 
 def create_component(type: Union[str, type], **kwargs) -> Component:

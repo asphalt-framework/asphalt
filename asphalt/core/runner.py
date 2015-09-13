@@ -44,24 +44,17 @@ def run_application(component: Component, *, max_threads: int=None,
     util.event_loop = event_loop
     util.event_loop_thread_id = threading.get_ident()
 
-    # Create the top level context
-    context = Context()
-
     logger = getLogger(__name__)
     logger.info('Starting application')
-    try:
-        # Call the component's start() method.
-        # If it returns a value, assume it is an awaitable and run the event loop until it's done.
-        retval = component.start(context)
-        if retval is not None:
-            event_loop.run_until_complete(retval)
+    with Context() as context:
+        try:
+            retval = component.start(context)
+            if retval is not None:  # retval should be an awaitable or None
+                event_loop.run_until_complete(retval)
+        except BaseException:
+            logger.exception('Error during application startup')
+            raise
 
-        # Run all the top level context's start callbacks
-        event_loop.run_until_complete(context.dispatch('started'))
-    except Exception as exc:
-        logger.exception('Error during application startup')
-        context.exception = exc
-    else:
         # Finally, run the event loop until the process is terminated or Ctrl+C is pressed
         logger.info('Application started')
         try:
@@ -69,6 +62,5 @@ def run_application(component: Component, *, max_threads: int=None,
         except (KeyboardInterrupt, SystemExit):
             pass
 
-    event_loop.run_until_complete(context.dispatch('finished'))
-    event_loop.close()
     logger.info('Application stopped')
+    event_loop.close()
