@@ -1,5 +1,5 @@
 from typing import Optional, Callable, Any, Union, Iterable, Tuple
-from asyncio import iscoroutinefunction
+from asyncio import get_event_loop, coroutine, iscoroutinefunction
 from collections import defaultdict
 import asyncio
 import time
@@ -126,6 +126,24 @@ class Context(EventSource):
             return getattr(self._parent, name)
 
         raise AttributeError('no such context variable: {}'.format(name))
+
+    def __enter__(self):
+        get_event_loop().run_until_complete(self.dispatch('started'))
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.exception = exc_val
+        get_event_loop().run_until_complete(self.dispatch('finished'))
+
+    @coroutine
+    def __aenter__(self):
+        yield from self.dispatch('started')
+        return self
+
+    @coroutine
+    def __aexit__(self, exc_type, exc_val, exc_tb):
+        self.exception = exc_val
+        yield from self.dispatch('finished')
 
     def _add_resource(self, value, alias: str, context_var: str,
                       types: Union[Union[str, type], Iterable[Union[str, type]]],

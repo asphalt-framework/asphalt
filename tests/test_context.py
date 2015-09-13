@@ -4,6 +4,7 @@ from functools import partial
 import asyncio
 
 import pytest
+import sys
 
 from asphalt.core.context import ResourceConflict, ResourceNotFound, Resource, Context
 
@@ -35,10 +36,81 @@ class TestResource:
                                  "value=6, context_var='bar.foo', lazy=False")
 
 
+use_contextmanager = None
+if sys.version_info >= (3, 5):
+    exec("""
+async def use_contextmanager(context, exception):
+    async with context:
+        if exception:
+            raise exception
+    """)
+
+
 class TestContext:
     @pytest.fixture
     def context(self):
         return Context()
+
+    @pytest.mark.parametrize('raise_exception', [True, False], ids=['exception', 'no_exception'])
+    def test_contextmanager(self, context, raise_exception):
+        """
+        Tests that "with context:" dispatches both started and finished events and sets the
+        exception variable when an exception is raised during the context lifetime.
+        """
+
+        def started_listener(event):
+            nonlocal started_called
+            started_called = True
+
+        def finished_listener(event):
+            nonlocal finished_called
+            finished_called = True
+
+        exception = RuntimeError('test') if raise_exception else None
+        started_called = finished_called = False
+        context.add_listener('started', started_listener)
+        context.add_listener('finished', finished_listener)
+        try:
+            with context:
+                if exception:
+                    raise exception
+        except RuntimeError:
+            pass
+
+        assert started_called
+        assert finished_called
+        assert context.exception == exception
+
+    @pytest.mark.asyncio
+    @pytest.mark.skipif('sys.version_info < (3, 5)')
+    @pytest.mark.parametrize('raise_exception', [True, False], ids=['exception', 'no_exception'])
+    @coroutine
+    def test_async_contextmanager(self, context, raise_exception):
+        """
+        Tests that "async with context:" dispatches both started and finished events and sets the
+        exception variable when an exception is raised during the context lifetime.
+        """
+
+        def started_listener(event):
+            nonlocal started_called
+            started_called = True
+
+        def finished_listener(event):
+            nonlocal finished_called
+            finished_called = True
+
+        exception = RuntimeError('test') if raise_exception else None
+        started_called = finished_called = False
+        context.add_listener('started', started_listener)
+        context.add_listener('finished', finished_listener)
+        try:
+            yield from use_contextmanager(context, exception)
+        except RuntimeError:
+            pass
+
+        assert started_called
+        assert finished_called
+        assert context.exception == exception
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize('delay', [False, True], ids=['immediate', 'delayed'])
