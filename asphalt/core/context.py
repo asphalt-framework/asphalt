@@ -265,16 +265,20 @@ class Context(EventSource):
 
     @asynchronous
     def request_resource(self, type: Union[str, type], alias: str='default', *,
-                         timeout: Union[int, float, None]=10):
+                         timeout: Union[int, float, None]=10, optional: bool=False):
         """
         Requests a resource matching the given type and alias.
-        If no such resource was not found, this method will wait ``timeout`` seconds for it to
-        become available.
+        If no such resource was found, this method will wait ``timeout`` seconds for it to become
+        available.
 
         :param type: type of the requested resource
         :param alias: alias of the requested resource
         :param timeout: the timeout in seconds
+        :param optional: if ``True``, return None instead of raising an exception if no matching \
+                         resource becomes available within the timeout period
         :return: the value contained by the requested resource (**NOT** a Resource instance)
+        :raises ResourceNotFound: if the requested resource does not become available in the \
+                                  allotted time
         """
 
         if not type:
@@ -296,7 +300,10 @@ class Context(EventSource):
                 yield from asyncio.wait_for(event.wait(), delay)
             except asyncio.TimeoutError:
                 self.remove_listener(handle)
-                raise ResourceNotFound(resource_type, alias)
+                if optional:
+                    return None
+                else:
+                    raise ResourceNotFound(resource_type, alias)
 
             resource = self._get_resource(resource_type, alias)
 

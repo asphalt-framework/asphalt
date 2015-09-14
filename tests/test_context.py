@@ -247,6 +247,16 @@ class TestContext:
         assert child_context.a == 2
 
     @pytest.mark.asyncio
+    def test_request_optional(self, context):
+        """
+        Tests that requesting a nonexistent resource with optional=True returns None instead of
+        raising an exception.
+        """
+
+        resource = yield from context.request_resource(str, timeout=0, optional=True)
+        assert resource is None
+
+    @pytest.mark.asyncio
     def test_request_resource_parent_add(self, context):
         """
         Tests that adding a resource to the parent context will satisfy a resource request in a
