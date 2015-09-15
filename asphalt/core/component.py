@@ -1,7 +1,7 @@
 from asyncio import coroutine
 from abc import ABCMeta, abstractmethod
 from collections import OrderedDict
-from typing import Dict, Any, Union, Optional
+from typing import Dict, Any, Union
 import asyncio
 
 from .util import qualified_name, PluginContainer
@@ -69,13 +69,10 @@ class ContainerComponent(Component):
         self.child_components[alias] = component
 
     @coroutine
-    def start(self, ctx: Context) -> Optional[Context]:
+    def start(self, ctx: Context):
         """
-        Creates child components that have been configured but not yet created.
-        Then, a new context is created and the start() methods of the child components are called
-        with the new context as the argument.
-
-        :return: the child context that was created, or ``None`` if there were no child components
+        Creates child components that have been configured but not yet created and then calls their
+        :meth:`Component.start` methods in separate tasks and waits until they have completed.
         """
 
         for alias in self.component_config:
@@ -83,20 +80,14 @@ class ContainerComponent(Component):
                 self.add_component(alias)
 
         if self.child_components:
-            child_context = Context(ctx)
             tasks = []
             for component in self.child_components.values():
-                retval = component.start(child_context)
+                retval = component.start(ctx)
                 if retval is not None:
                     tasks.append(retval)
 
             if tasks:
                 yield from asyncio.gather(*tasks)
-
-            # Finish the child context when the parent context finishes
-            ctx.add_listener('finished', lambda event: child_context.dispatch('finished'))
-
-            return child_context
 
 
 def create_component(type: Union[str, type], **kwargs) -> Component:
