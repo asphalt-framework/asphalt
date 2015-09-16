@@ -7,10 +7,12 @@ import pkg_resources
 import yaml
 
 from .util import PluginContainer
-from .component import create_component, ContainerComponent
+from .component import ContainerComponent, component_types
 from .context import Context
 
-runners = PluginContainer('asphalt.runners')
+__all__ = 'runners', 'quickstart_application', 'run_from_config_file'
+
+runners = PluginContainer('asphalt.core.runners')
 
 
 def quickstart_application():
@@ -118,7 +120,7 @@ def run_from_config_file(config_file: Union[str, Path], runner: str='asyncio', u
     except KeyError:
         raise LookupError('missing configuration key: component') from None
     else:
-        component = create_component(**component_config)
+        component = component_types.create_object(**component_config)
 
     # Get a reference to the runner
     runner = runners.resolve(config.pop('runner', runner))

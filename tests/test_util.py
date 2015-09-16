@@ -1,12 +1,22 @@
 from asyncio import coroutine
+from unittest.mock import Mock
 import asyncio
 import threading
+from pkg_resources import EntryPoint
 
 import pytest
 
-from asphalt.core.runner import run_application
 from asphalt.core.util import (
     resolve_reference, qualified_name, synchronous, asynchronous, PluginContainer)
+
+
+class BaseDummyPlugin:
+    pass
+
+
+class DummyPlugin(BaseDummyPlugin):
+    def __init__(self, **kwargs):
+        self.kwargs = kwargs
 
 
 @pytest.mark.parametrize('inputval', [
@@ -87,15 +97,42 @@ def test_wrap_async_callable_exception(event_loop):
 class TestPluginContainer:
     @pytest.fixture
     def container(self):
-        return PluginContainer('asphalt.runners')
+        container = PluginContainer('asphalt.core.test_plugin_container', BaseDummyPlugin)
+        entrypoint = EntryPoint('dummy', 'test_util')
+        entrypoint.load = Mock(return_value=DummyPlugin)
+        container._entrypoints = {'dummy': entrypoint}
+        return container
 
     @pytest.mark.parametrize('inputvalue', [
-        'asyncio',
-        'asphalt.core.runner:run_application',
-        run_application
+        'dummy',
+        'test_util:DummyPlugin',
+        DummyPlugin
     ], ids=['entrypoint', 'reference', 'arbitrary_object'])
     def test_resolve(self, container, inputvalue):
-        assert container.resolve(inputvalue) is run_application
+        assert container.resolve(inputvalue) is DummyPlugin
+
+    def test_resolve_bad_entrypoint(self, container):
+        exc = pytest.raises(LookupError, container.resolve, 'blah')
+        assert str(exc.value) == 'no such entry point in asphalt.core.test_plugin_container: blah'
+
+    @pytest.mark.parametrize('argument', [DummyPlugin, 'dummy', 'test_util:DummyPlugin'],
+                             ids=['explicit_class', 'entrypoint', 'class_reference'])
+    def test_create_object(self, container, argument):
+        """
+        Tests that create_object works with all three supported ways of passing a plugin class
+        reference.
+        """
+
+        component = container.create_object(argument, a=5, b=2)
+
+        assert isinstance(component, DummyPlugin)
+        assert component.kwargs == {'a': 5, 'b': 2}
+
+    def test_create_object_bad_type(self, container):
+        exc = pytest.raises(TypeError, container.create_object, int)
+        assert str(exc.value) == 'int is not a subclass of test_util.BaseDummyPlugin'
 
     def test_repr(self, container):
-        assert repr(container) == "PluginContainer(namespace='asphalt.runners')"
+        assert repr(container) == (
+               "PluginContainer(namespace='asphalt.core.test_plugin_container', "
+               "base_class=test_util.BaseDummyPlugin)")

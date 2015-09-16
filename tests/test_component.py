@@ -3,7 +3,7 @@ import asyncio
 
 import pytest
 
-from asphalt.core.component import ContainerComponent, Component, component_types, create_component
+from asphalt.core.component import ContainerComponent, Component, component_types
 from asphalt.core.context import Context
 
 
@@ -46,7 +46,7 @@ class TestContainerComponent:
         (6, None, TypeError, 'component_alias must be a nonempty string'),
         ('foo', None, LookupError, 'no such entry point in asphalt.components: foo'),
         ('foo', int, TypeError,
-         'the component type must be a subclass of asphalt.core.component.Component')
+         'int is not a subclass of asphalt.core.component.Component')
     ], ids=['empty_alias', 'alias_type', 'bogus_entry_point', 'wrong_subclass'])
     def test_add_component_errors(self, container, alias, cls, exc_cls, message):
         exc = pytest.raises(exc_cls, container.add_component, alias, cls)
@@ -61,17 +61,3 @@ class TestContainerComponent:
     def test_start(self, container):
         yield from container.start(Context())
         assert container.child_components['dummy'].started
-
-
-@pytest.mark.parametrize('argument', [DummyComponent, 'dummy', 'test_component:DummyComponent'],
-                         ids=['entrypoint', 'explicit_class', 'class_reference'])
-def test_create_component(argument):
-    """
-    Tests that create_component works with an without an entry point and that external
-    configuration overriddes directly supplied configuration values.
-    """
-
-    component = create_component(argument, a=5, b=2)
-
-    assert isinstance(component, DummyComponent)
-    assert component.kwargs == {'a': 5, 'b': 2}

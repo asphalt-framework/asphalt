@@ -2,7 +2,7 @@ from asyncio import coroutine, iscoroutinefunction, iscoroutine, async
 from concurrent.futures import Future
 from importlib import import_module
 from threading import get_ident
-from typing import Callable, Any
+from typing import Callable, Any, Union
 from functools import wraps, partial
 
 from pkg_resources import EntryPoint, iter_entry_points
@@ -112,15 +112,18 @@ def asynchronous(func: Callable[..., Any]):
 
 class PluginContainer:
     """
-    A convenience class for loading entry points on demand.
+    A convenience class for loading and instantiating plugins through the use of entry points.
 
     :param namespace: a setuptools entry points namespace
+    :param base_class: the base class for plugins of this type \
+                       (or ``None`` if the entry points don't point to classes)
     """
 
-    __slots__ = 'namespace', '_entrypoints'
+    __slots__ = 'namespace', 'base_class', '_entrypoints'
 
-    def __init__(self, namespace: str):
+    def __init__(self, namespace: str, base_class: type=None):
         self.namespace = namespace
+        self.base_class = base_class
         self._entrypoints = {ep.name: ep for ep in iter_entry_points(namespace)}
 
     def resolve(self, obj):
@@ -148,5 +151,24 @@ class PluginContainer:
 
         return value
 
+    def create_object(self, type: Union[type, str], **constructor_kwargs):
+        """
+        Instantiates a plugin. The entry points in this namespace must point to subclasses of
+        the ``base_class`` parameter passed to this container.
+
+        :param type: an entry point identifier, a textual reference to a class or an actual class
+        :param constructor_kwargs: keyword arguments passed to the constructor of the plugin class
+        :return: the plugin instance
+        """
+
+        assert self.base_class, 'base class has not been defined'
+        plugin_class = self.resolve(type)
+        if not issubclass(plugin_class, self.base_class):
+            raise TypeError('{} is not a subclass of {}'.format(
+                qualified_name(plugin_class), qualified_name(self.base_class)))
+
+        return plugin_class(**constructor_kwargs)
+
     def __repr__(self):
-        return '{0.__class__.__name__}(namespace={0.namespace!r})'.format(self)
+        return ('{0.__class__.__name__}(namespace={0.namespace!r}, base_class={1})'
+                .format(self, qualified_name(self.base_class)))

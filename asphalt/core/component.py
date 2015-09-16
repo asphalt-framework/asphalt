@@ -4,12 +4,10 @@ from collections import OrderedDict
 from typing import Dict, Any, Union
 import asyncio
 
-from .util import qualified_name, PluginContainer
+from .util import PluginContainer
 from .context import Context
 
-__all__ = 'Component', 'ContainerComponent'
-
-component_types = PluginContainer('asphalt.components')
+__all__ = 'Component', 'ContainerComponent', 'component_types'
 
 
 class Component(metaclass=ABCMeta):
@@ -65,7 +63,7 @@ class ContainerComponent(Component):
         # Allow the external configuration to override the constructor arguments
         kwargs.update(self.component_config.get(alias, {}))
 
-        component = create_component(type or alias, **kwargs)
+        component = component_types.create_object(type or alias, **kwargs)
         self.child_components[alias] = component
 
     @coroutine
@@ -90,23 +88,4 @@ class ContainerComponent(Component):
                 yield from asyncio.gather(*tasks)
 
 
-def create_component(type: Union[str, type], **kwargs) -> Component:
-    """
-    Instantiates a component.
-
-    The ``type`` argument can either be a :class:`Component` subclass or
-    a component type name, declared as an ``asphalt.components`` entry point, in which case the
-    component class is retrieved by loading the entry point. If the value is omitted, the value
-    of ``alias`` is used as the entry point name to look up the class.
-
-    Any extra keyword arguments are passed directly to the constructor of the component class.
-
-    :param type: entry point name or :cls:`Component` subclass or a textual reference to one
-    """
-
-    component_class = component_types.resolve(type)
-    if not issubclass(component_class, Component):
-        raise TypeError('the component type must be a subclass of {}'.
-                        format(qualified_name(Component)))
-
-    return component_class(**kwargs)
+component_types = PluginContainer('asphalt.components', Component)

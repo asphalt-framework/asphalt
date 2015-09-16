@@ -48,7 +48,7 @@ setup(
         'console_scripts': [
             'asphalt = asphalt.core.command:main'
         ],
-        'asphalt.runners': [
+        'asphalt.core.runners': [
             'asyncio = asphalt.core.runner:run_application'
         ]
     }
