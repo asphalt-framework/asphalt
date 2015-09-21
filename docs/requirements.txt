@@ -1,2 +1,1 @@
-sphinx
-sphinx-autodoc-annotation
+sphinx-autodoc-typehints
