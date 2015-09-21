@@ -134,5 +134,5 @@ class TestPluginContainer:
 
     def test_repr(self, container):
         assert repr(container) == (
-               "PluginContainer(namespace='asphalt.core.test_plugin_container', "
-               "base_class=test_util.BaseDummyPlugin)")
+            "PluginContainer(namespace='asphalt.core.test_plugin_container', "
+            "base_class=test_util.BaseDummyPlugin)")
