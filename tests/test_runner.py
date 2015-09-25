@@ -1,4 +1,6 @@
 from asyncio import new_event_loop, set_event_loop, get_event_loop, coroutine
+from unittest.mock import patch
+import logging
 import sys
 
 import pytest
@@ -38,12 +40,24 @@ def event_loop():
         event_loop.stop()
 
 
-@pytest.mark.parametrize('coroutine_start', [False, True], ids=['coroutine', 'normal'])
 @pytest.mark.parametrize('logging_config', [
-    True,
+    None,
+    logging.INFO,
     {'version': 1, 'loggers': {'asphalt': {'level': 'INFO'}}}
-], ids=['basic', 'dictconfig'])
-def test_run(coroutine_start, caplog, logging_config):
+], ids=['disabled', 'loglevel', 'dictconfig'])
+def test_run_logging_config(logging_config):
+    """Checks that logging initialization happens as expected."""
+
+    with patch('asphalt.core.runner.basicConfig') as basicConfig,\
+            patch('asphalt.core.runner.dictConfig') as dictConfig:
+        run_application(ShutdownComponent(), logging=logging_config)
+
+    assert basicConfig.call_count == (1 if logging_config == logging.INFO else 0)
+    assert dictConfig.call_count == (1 if isinstance(logging_config, dict) else 0)
+
+
+@pytest.mark.parametrize('coroutine_start', [False, True], ids=['coroutine', 'normal'])
+def test_run_callbacks(coroutine_start, caplog):
     """
     Tests that the "finished" callbacks are run when the application is started and shut down
     properly and that the proper logging messages are emitted.
@@ -51,7 +65,7 @@ def test_run(coroutine_start, caplog, logging_config):
 
     component = ShutdownComponent()
     component.start = coroutine(component.start) if coroutine_start else component.start
-    run_application(component, logging=logging_config)
+    run_application(component)
 
     assert component.finish_callback_called
     records = [record for record in caplog.records() if record.name == 'asphalt.core.runner']
