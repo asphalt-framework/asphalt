@@ -1,24 +1,17 @@
 from asyncio import async, coroutine, Task
 from typing import Dict, Callable, Any, Sequence
-from enum import Enum
 
 from .util import qualified_name, asynchronous
 
-__all__ = 'ListenerPriority', 'Event', 'ListenerHandle', 'EventSource'
-
-
-class ListenerPriority(Enum):
-    first = 1
-    neutral = 2
-    last = 3
+__all__ = 'Event', 'ListenerHandle', 'EventSource'
 
 
 class Event:
     """
     The base class for all events.
 
-    :ivar source: the object where this event originated from
-    :ivar topic: the topic
+    :ivar EventSource source: the event source where this event originated from
+    :ivar str topic: the topic
     """
 
     __slots__ = 'source', 'topic'
@@ -29,31 +22,25 @@ class Event:
 
 
 class ListenerHandle:
-    __slots__ = 'topic', 'callback', 'args', 'kwargs', 'priority'
+    """A handle that can be used to remove an event listener from its :class:`EventSource`."""
+
+    __slots__ = 'topic', 'callback', 'args', 'kwargs'
 
     def __init__(self, topic: str, callback: Callable[[Event], Any],
-                 args: Sequence[Any], kwargs: Dict[str, Any], priority: ListenerPriority):
+                 args: Sequence[Any], kwargs: Dict[str, Any]):
         self.topic = topic
         self.callback = callback
         self.args = args
         self.kwargs = kwargs
-        self.priority = priority
-
-    def __lt__(self, other):
-        if isinstance(other, ListenerHandle):
-            return (self.topic, self.priority.value) < (self.topic, other.priority.value)
-        return NotImplemented
 
     def __repr__(self):
         return ('ListenerHandle(topic={0.topic!r}, callback={1}, args={0.args!r}, '
-                'kwargs={0.kwargs!r}, priority={0.priority.name})'.
+                'kwargs={0.kwargs!r})'.
                 format(self, qualified_name(self.callback)))
 
 
 class EventSource:
-    """
-    A mixin class that provides support for dispatching and listening to events.
-    """
+    """A mixin class that provides support for dispatching and listening to events."""
 
     __slots__ = '_topics'
 
@@ -73,21 +60,16 @@ class EventSource:
 
     @asynchronous
     def add_listener(self, topic: str, callback: Callable[[Any], Any],
-                     args: Sequence[Any]=(), kwargs: Dict[str, Any]=None, *,
-                     priority: ListenerPriority=ListenerPriority.neutral) -> ListenerHandle:
+                     args: Sequence[Any]=(), kwargs: Dict[str, Any]=None) -> ListenerHandle:
         """
         Starts listening to events specified by ``topic``. The callback (which can be
         a coroutine function) will be called with a single argument (an :class:`Event` instance).
         The exact event class used depends on the event class mappings given to the constructor.
 
-        It is possible to prioritize the listener to be called among the first or last in the
-        group by specifying an alternate :class:`ListenerPriority` value as ``priority``.
-
         :param topic: the topic to listen to
         :param callback: a callable to call with the event object when the event is dispatched
         :param args: positional arguments to call the callback with (in addition to the event)
         :param kwargs: keyword arguments to call the callback with
-        :param priority: priority of the callback among other listeners of the same event
         :return: a listener handle which can be used with :meth:`remove_listener` to unlisten
         :raises ValueError: if the named event has not been registered in this event source
         """
@@ -95,10 +77,9 @@ class EventSource:
         if topic not in self._topics:
             raise ValueError('no such topic registered: {}'.format(topic))
 
-        handle = ListenerHandle(topic, callback, args, kwargs or {}, priority)
+        handle = ListenerHandle(topic, callback, args, kwargs or {})
         handles = self._topics[topic]['listeners']
         handles.append(handle)
-        handles.sort()
         return handle
 
     @asynchronous
@@ -119,11 +100,10 @@ class EventSource:
     def dispatch(self, topic: str, *args, **kwargs) -> Task:
         """
         Instantiates an event matching the given topic and calls all the listeners in a separate
-        task.
+        task. Any extra positional and keyword arguments are passed directly to the event class
+        constructor.
 
         :param topic: the topic
-        :param args: positional arguments to pass to the event class constructor
-        :param kwargs: keyword arguments to pass to the event class constructor
         :return: a Task that completes when all the event listeners have been called
         :raises ValueError: if the named event has not been registered in this event source
         """
