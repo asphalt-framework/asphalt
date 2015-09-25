@@ -1,10 +1,9 @@
 from asyncio import coroutine
 import asyncio
-import operator
 
 import pytest
 
-from asphalt.core.event import EventSource, Event, ListenerHandle
+from asphalt.core.event import EventSource, Event, EventListener
 
 
 class DummyEvent(Event):
@@ -14,15 +13,15 @@ class DummyEvent(Event):
         self.kwargs = kwargs
 
 
-class TestListenerHandle:
+class TestEventListener:
     @pytest.fixture
     def handle(self):
-        return ListenerHandle('foo', lambda: None, (), {})
+        return EventListener('foo', lambda: None, (), {})
 
     def test_repr(self, handle):
         assert repr(handle) == (
-            "ListenerHandle(topic='foo', "
-            "callback=test_event.TestListenerHandle.handle.<locals>.<lambda>, args=(), kwargs={})")
+            "EventListener(topic='foo', "
+            "callback=test_event.TestEventListener.handle.<locals>.<lambda>, args=(), kwargs={})")
 
 
 class TestEventSource:
@@ -34,7 +33,7 @@ class TestEventSource:
 
     def test_add_listener(self, source):
         handle = source.add_listener('event_a', lambda: None)
-        assert isinstance(handle, ListenerHandle)
+        assert isinstance(handle, EventListener)
         assert handle.topic == 'event_a'
 
     def test_add_listener_nonexistent_event(self, source):
@@ -88,7 +87,7 @@ class TestEventSource:
     @pytest.mark.parametrize('topic', ['event_a', 'foo'],
                              ids=['existing_event', 'nonexistent_event'])
     def test_remove_noexistent_listener(self, source, topic):
-        handle = ListenerHandle(topic, lambda: None, (), {})
+        handle = EventListener(topic, lambda: None, (), {})
         exc = pytest.raises(LookupError, source.remove_listener, handle)
         assert str(exc.value) == 'listener not found'
 

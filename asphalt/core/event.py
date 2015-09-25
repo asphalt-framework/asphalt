@@ -2,7 +2,7 @@ from typing import Dict, Callable, Any, Sequence, Union
 
 from .util import qualified_name, asynchronous
 
-__all__ = 'Event', 'ListenerHandle', 'EventSource'
+__all__ = 'Event', 'EventListener', 'EventSource'
 
 
 class Event:
@@ -20,7 +20,7 @@ class Event:
         self.topic = topic
 
 
-class ListenerHandle:
+class EventListener:
     """A handle that can be used to remove an event listener from its :class:`EventSource`."""
 
     __slots__ = 'topic', 'callback', 'args', 'kwargs'
@@ -33,7 +33,7 @@ class ListenerHandle:
         self.kwargs = kwargs
 
     def __repr__(self):
-        return ('ListenerHandle(topic={0.topic!r}, callback={1}, args={0.args!r}, '
+        return ('{0.__class__.__name__}(topic={0.topic!r}, callback={1}, args={0.args!r}, '
                 'kwargs={0.kwargs!r})'.
                 format(self, qualified_name(self.callback)))
 
@@ -59,7 +59,7 @@ class EventSource:
 
     @asynchronous
     def add_listener(self, topic: str, callback: Callable[[Any], Any],
-                     args: Sequence[Any]=(), kwargs: Dict[str, Any]=None) -> ListenerHandle:
+                     args: Sequence[Any]=(), kwargs: Dict[str, Any]=None) -> EventListener:
         """
         Starts listening to events specified by ``topic``. The callback (which can be
         a coroutine function) will be called with a single argument (an :class:`Event` instance).
@@ -76,13 +76,13 @@ class EventSource:
         if topic not in self._topics:
             raise LookupError('no such topic registered: {}'.format(topic))
 
-        handle = ListenerHandle(topic, callback, args, kwargs or {})
+        handle = EventListener(topic, callback, args, kwargs or {})
         handles = self._topics[topic]['listeners']
         handles.append(handle)
         return handle
 
     @asynchronous
-    def remove_listener(self, handle: ListenerHandle):
+    def remove_listener(self, handle: EventListener):
         """
         Removes an event listener previously added via :meth:`add_listener`.
 
