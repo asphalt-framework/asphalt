@@ -117,8 +117,8 @@ class Context(EventSource):
 
         # Forward resource events from the parent(s)
         if parent is not None:
-            parent.add_listener('resource_added', self._dispatch)
-            parent.add_listener('resource_removed', self._dispatch)
+            parent.add_listener('resource_added', self.dispatch)
+            parent.add_listener('resource_removed', self.dispatch)
 
     def __getattr__(self, name):
         creator = self._resource_creators.get(name)
@@ -148,6 +148,7 @@ class Context(EventSource):
         self.exception = exc_val
         yield from self.dispatch('finished')
 
+    @coroutine
     def _add_resource(self, value, alias: str, context_var: str,
                       types: Union[Union[str, type], Iterable[Union[str, type]]],
                       creator: Optional[Callable[['Context'], Any]]):
@@ -190,7 +191,7 @@ class Context(EventSource):
         if creator is None and resource.context_var:
             setattr(self, context_var, value)
 
-        self.dispatch('resource_added', types, alias, False)
+        yield from self.dispatch('resource_added', types, alias, False)
         return resource
 
     @asynchronous
@@ -261,7 +262,7 @@ class Context(EventSource):
         if resource.context_var and resource.context_var in self.__dict__:
             delattr(self, resource.context_var)
 
-        self.dispatch('resource_removed', resource.types, resource.alias, False)
+        yield from self.dispatch('resource_removed', resource.types, resource.alias, False)
 
     def _get_resource(self, resource_type: str, alias: str) -> Optional[Resource]:
         resource = self._resources.get(resource_type, {}).get(alias)

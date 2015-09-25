@@ -1,5 +1,4 @@
-from asyncio import async, coroutine, Task
-from typing import Dict, Callable, Any, Sequence
+from typing import Dict, Callable, Any, Sequence, Union
 
 from .util import qualified_name, asynchronous
 
@@ -71,11 +70,11 @@ class EventSource:
         :param args: positional arguments to call the callback with (in addition to the event)
         :param kwargs: keyword arguments to call the callback with
         :return: a listener handle which can be used with :meth:`remove_listener` to unlisten
-        :raises ValueError: if the named event has not been registered in this event source
+        :raises LookupError: if the named event has not been registered in this event source
         """
 
         if topic not in self._topics:
-            raise ValueError('no such topic registered: {}'.format(topic))
+            raise LookupError('no such topic registered: {}'.format(topic))
 
         handle = ListenerHandle(topic, callback, args, kwargs or {})
         handles = self._topics[topic]['listeners']
@@ -88,37 +87,45 @@ class EventSource:
         Removes an event listener previously added via :meth:`add_listener`.
 
         :param handle: the listener handle returned from :meth:`add_listener`
-        :raises ValueError: if the handle was not found among the registered listeners
+        :raises LookupError: if the handle was not found among the registered listeners
         """
 
         try:
             self._topics[handle.topic]['listeners'].remove(handle)
         except (KeyError, ValueError):
-            raise ValueError('listener not found') from None
+            raise LookupError('listener not found') from None
 
     @asynchronous
-    def dispatch(self, topic: str, *args, **kwargs) -> Task:
+    def dispatch(self, event: Union[str, Event], *args, **kwargs):
         """
-        Instantiates an event matching the given topic and calls all the listeners in a separate
-        task. Any extra positional and keyword arguments are passed directly to the event class
-        constructor.
+        Dispatches an event, optionally constructing one first.
 
-        :param topic: the topic
-        :return: a Task that completes when all the event listeners have been called
-        :raises ValueError: if the named event has not been registered in this event source
+        This method has two forms: dispatch(``event``) and
+        dispatch(``topic``, ``*args``, ``**kwargs``).
+        The former dispatches an existing event object while the latter instantiates one, using
+        this object as the source. Any extra positional and keyword arguments are passed directly
+        to the event class constructor.
+
+        Any exceptions raised by the listener callbacks are passed through to the caller.
+
+        :param event: an :class:`~asphalt.core.event.Event` instance or an event topic
+        :raises LookupError: if the topic has not been registered in this event source
         """
 
-        if topic not in self._topics:
-            raise ValueError('no such topic registered: {}'.format(topic))
+        topic = event.topic if isinstance(event, Event) else event
+        try:
+            registration = self._topics[topic]
+        except KeyError:
+            raise LookupError('no such topic registered: {}'.format(topic)) from None
 
-        # Run call_listeners() in a separate task to avoid arbitrary exceptions from listeners
-        event_class = self._topics[topic]['event_class']
-        event = event_class(self, topic, *args, **kwargs)
-        return async(self._dispatch(event))
+        if isinstance(event, Event):
+            assert not args and not kwargs, 'passing extra arguments makes no sense here'
+            assert isinstance(event, registration['event_class']), 'event class mismatch'
+        else:
+            event_class = registration['event_class']
+            event = event_class(self, topic, *args, **kwargs)
 
-    @coroutine
-    def _dispatch(self, event: Event):
-        for handle in self._topics[event.topic]['listeners']:
-            retval = handle.callback(event, *handle.args, **handle.kwargs)
+        for listener in registration['listeners']:
+            retval = listener.callback(event, *listener.args, **listener.kwargs)
             if retval is not None:
                 yield from retval

@@ -1,10 +1,9 @@
-from asyncio import coroutine
+from asyncio import coroutine, async
 from itertools import count
-from functools import partial
 import asyncio
+import sys
 
 import pytest
-import sys
 
 from asphalt.core.context import ResourceConflict, ResourceNotFound, Resource, Context
 
@@ -106,29 +105,28 @@ class TestContext:
         """Tests that a resource is properly added to the collection and listeners are notified."""
 
         events = []
-        trigger = asyncio.Event()
         context.add_listener('resource_added', events.append)
-        context.add_listener('resource_added', lambda evt: trigger.set())
         if delay:
-            call = partial(context.add_resource, 6, 'foo', 'foo.bar', types=(int, float))
-            event_loop.call_soon(call)
+            async(context.add_resource(6, 'foo', 'foo.bar', types=(int, float)))
         else:
-            context.add_resource(6, 'foo', 'foo.bar', types=(int, float))
+            yield from context.add_resource(6, 'foo', 'foo.bar', types=(int, float))
 
         value = yield from context.request_resource(int, 'foo')
         assert value == 6
 
-        yield from trigger.wait()
         assert len(events) == 1
         event = events[0]
         assert event.types == ('int', 'float')
         assert event.alias == 'foo'
 
+    @pytest.mark.asyncio
     def test_add_name_conflict(self, context):
         """Tests that add() won't let replace existing resources."""
 
-        context.add_resource(5, 'foo')
-        exc = pytest.raises(ResourceConflict, context.add_resource, 4, 'foo')
+        yield from context.add_resource(5, 'foo')
+        with pytest.raises(ResourceConflict) as exc:
+            yield from context.add_resource(4, 'foo')
+
         assert str(exc.value) == ('"foo" conflicts with Resource(types=(\'int\',), alias=\'foo\', '
                                   'value=5, context_var=None, lazy=False)')
 
@@ -136,24 +134,23 @@ class TestContext:
     def test_remove_resource(self, context):
         """Tests that resources can be removed and that the listeners are notified."""
 
-        resource = context.add_resource(4)
-
         events = []
-        trigger = asyncio.Event()
         context.add_listener('resource_removed', events.append)
-        context.add_listener('resource_removed', lambda evt: trigger.set())
-        context.remove_resource(resource)
+        resource = yield from context.add_resource(4)
+        yield from context.remove_resource(resource)
 
-        yield from trigger.wait()
         assert len(events) == 1
         assert events[0].types == ('int',)
 
         with pytest.raises(ResourceNotFound):
             yield from context.request_resource(int, timeout=0)
 
+    @pytest.mark.asyncio
     def test_remove_nonexistent(self, context):
         resource = Resource(5, ('int',), 'default', None)
-        exc = pytest.raises(LookupError, context.remove_resource, resource)
+        with pytest.raises(LookupError) as exc:
+            yield from context.remove_resource(resource)
+
         assert str(exc.value) == ("Resource(types=('int',), alias='default', value=5, "
                                   "context_var=None, lazy=False) not found in this context")
 
@@ -176,6 +173,7 @@ class TestContext:
             yield from context.request_resource(type_, alias)
         assert str(exc.value) == errormsg
 
+    @pytest.mark.asyncio
     def test_add_lazy_resource(self, context):
         """Tests that lazy resources are only created once per context instance."""
 
@@ -184,20 +182,21 @@ class TestContext:
             return next(counter)
 
         counter = count(1)
-        context.add_lazy_resource(creator, int, context_var='foo')
+        yield from context.add_lazy_resource(creator, int, context_var='foo')
         assert context.foo == 1
         assert context.foo == 1
         assert context.__dict__['foo'] == 1
 
+    @pytest.mark.asyncio
     def test_resource_added_removed(self, context):
         """
         Tests that when resources are added, they are also set as properties of the context.
         Likewise, when they are removed, they are deleted from the context.
         """
 
-        resource = context.add_resource(1, context_var='foo')
+        resource = yield from context.add_resource(1, context_var='foo')
         assert context.foo == 1
-        context.remove_resource(resource)
+        yield from context.remove_resource(resource)
         assert 'foo' not in context.__dict__
 
     def test_add_lazy_resource_coroutine(self, context):
@@ -210,7 +209,9 @@ class TestContext:
     @pytest.mark.asyncio
     def test_add_resource_conflicting_attribute(self, context):
         context.a = 2
-        exc = pytest.raises(ResourceConflict, context.add_resource, 2, context_var='a')
+        with pytest.raises(ResourceConflict) as exc:
+            yield from context.add_resource(2, context_var='a')
+
         assert str(exc.value) == (
             "Resource(types=('int',), alias='default', value=2, context_var='a', lazy=False) "
             "conflicts with an existing context attribute")
@@ -218,17 +219,22 @@ class TestContext:
         with pytest.raises(ResourceNotFound):
             yield from context.request_resource(int, timeout=0)
 
+    @pytest.mark.asyncio
     def test_add_lazy_resource_conflicting_resource(self, context):
-        context.add_lazy_resource(lambda ctx: 2, int, context_var='a')
-        exc = pytest.raises(ResourceConflict, context.add_resource, 2, 'foo', context_var='a')
+        yield from context.add_lazy_resource(lambda ctx: 2, int, context_var='a')
+        with pytest.raises(ResourceConflict) as exc:
+            yield from context.add_resource(2, 'foo', context_var='a')
+
         assert str(exc.value) == (
             "Resource(types=('int',), alias='foo', value=2, context_var='a', lazy=False) "
             "conflicts with an existing lazy resource")
 
+    @pytest.mark.asyncio
     def test_add_lazy_resource_duplicate(self, context):
-        context.add_lazy_resource(lambda ctx: None, str, context_var='foo')
-        exc = pytest.raises(ResourceConflict, context.add_lazy_resource, lambda ctx: None,
-                            str, context_var='foo')
+        yield from context.add_lazy_resource(lambda ctx: None, str, context_var='foo')
+        with pytest.raises(ResourceConflict) as exc:
+            yield from context.add_lazy_resource(lambda ctx: None, str, context_var='foo')
+
         assert (str(exc.value) ==
                 "\"default\" conflicts with Resource(types=('str',), alias='default', value=None, "
                 "context_var='foo', lazy=True)")
@@ -265,7 +271,7 @@ class TestContext:
 
         child_context = Context(context)
         request = asyncio.async(child_context.request_resource(int))
-        context.add_resource(6)
+        yield from context.add_resource(6)
         resource = yield from request
         assert resource == 6
 
@@ -273,17 +279,18 @@ class TestContext:
     def test_request_lazy_resource_context_var(self, context):
         """Tests that requesting a lazy resource also sets the context variable."""
 
-        context.add_lazy_resource(lambda ctx: 6, int, context_var='foo')
+        yield from context.add_lazy_resource(lambda ctx: 6, int, context_var='foo')
         yield from context.request_resource(int)
         assert context.__dict__['foo'] == 6
 
+    @pytest.mark.asyncio
     def test_remove_lazy_resource(self, context):
         """
         Tests that the lazy resource is no longer created when it has been removed and its
         context variable is accessed.
         """
 
-        resource = context.add_lazy_resource(lambda ctx: 6, int, context_var='foo')
-        context.remove_resource(resource)
+        resource = yield from context.add_lazy_resource(lambda ctx: 6, int, context_var='foo')
+        yield from context.remove_resource(resource)
         exc = pytest.raises(AttributeError, getattr, context, 'foo')
         assert str(exc.value) == 'no such context variable: foo'
