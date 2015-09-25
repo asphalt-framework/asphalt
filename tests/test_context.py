@@ -49,7 +49,7 @@ async def use_contextmanager(context, exception):
 class TestContext:
     @pytest.fixture
     def context(self):
-        return Context()
+        return Context(default_timeout=2)
 
     @pytest.mark.parametrize('raise_exception', [True, False], ids=['exception', 'no_exception'])
     def test_contextmanager(self, context, raise_exception):
@@ -115,7 +115,7 @@ class TestContext:
         else:
             context.add_resource(6, 'foo', 'foo.bar', types=(int, float))
 
-        value = yield from context.request_resource(int, 'foo', timeout=2)
+        value = yield from context.request_resource(int, 'foo')
         assert value == 6
 
         yield from trigger.wait()
@@ -264,7 +264,7 @@ class TestContext:
         """
 
         child_context = Context(context)
-        request = asyncio.async(child_context.request_resource(int, timeout=1))
+        request = asyncio.async(child_context.request_resource(int))
         context.add_resource(6)
         resource = yield from request
         assert resource == 6

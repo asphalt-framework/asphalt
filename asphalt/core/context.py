@@ -1,4 +1,4 @@
-from typing import Optional, Callable, Any, Union, Iterable, Tuple
+from typing import Optional, Callable, Any, Union, Iterable, Container
 from asyncio import get_event_loop, coroutine, iscoroutinefunction
 from collections import defaultdict
 import asyncio
@@ -7,10 +7,12 @@ import time
 from .util import qualified_name, asynchronous
 from .event import EventSource, Event
 
-__all__ = 'ResourceEvent', 'ResourceConflict', 'ResourceNotFound', 'Context'
+__all__ = 'Resource', 'ResourceEvent', 'ResourceConflict', 'ResourceNotFound', 'Context'
 
 
 class Resource:
+    """A handle that can be used to remove a resource from a context."""
+
     __slots__ = 'value', 'types', 'alias', 'context_var', 'creator'
 
     def __init__(self, value, types: tuple, alias: str, context_var: Optional[str],
@@ -41,15 +43,15 @@ class ResourceEvent(Event):
     """
     Dispatched when a resource has been added or removed to a context.
 
-    :ivar source: the relevant context
-    :ivar types: names of the types for the resource
-    :ivar alias: the alias of the resource
-    :ivar lazy: ``True`` if this is a lazily created resource, ``False`` if not
+    :ivar Context source: the relevant context
+    :ivar Container[str] types: names of the types for the resource
+    :ivar str alias: the alias of the resource
+    :ivar bool lazy: ``True`` if this is a lazily created resource, ``False`` if not
     """
 
     __slots__ = 'types', 'alias', 'lazy'
 
-    def __init__(self, source: 'Context', topic: str, types: Tuple[str], alias: str,
+    def __init__(self, source: 'Context', topic: str, types: Container[str], alias: str,
                  lazy: bool):
         super().__init__(source, topic)
         self.types = types
@@ -85,29 +87,33 @@ class Context(EventSource):
     attribute is found (or ``AttributeError`` is raised).
 
     Supported events:
-
       * started (:class:`~asphalt.core.event.Event`): the context has been activated
-      * finished (:class:`~asphalt.core.event.Event`): the context has served its purpose and is \
+      * finished (:class:`~asphalt.core.event.Event`): the context has served its purpose and is
         being discarded
       * resource_added (:class:`ResourceEvent`): a resource has been added to this context
       * resource_removed (:class:`ResourceEvent`): a resource has been removed from this context
 
+    :param parent: the parent context, if any
+    :param default_timeout: default timeout for :meth:`request_resource` if omitted from the
+                            call arguments
     :ivar Exception exception: the exception that occurred before exiting this context
                                (available to finish callbacks)
     """
 
     exception = None  # type: BaseException
 
-    def __init__(self, parent: 'Context'=None):
+    def __init__(self, parent: 'Context'=None, default_timeout: int=10):
         super().__init__()
         self._register_topics({
             'finished': Event,
             'resource_added': ResourceEvent,
             'resource_removed': ResourceEvent
         })
+
         self._parent = parent
         self._resources = defaultdict(dict)  # type: Dict[str, Dict[str, Resource]]
         self._resource_creators = {}  # type: Dict[str, Callable[[Context], Any]
+        self.default_timeout = default_timeout
 
         # Forward resource events from the parent(s)
         if parent is not None:
@@ -192,7 +198,7 @@ class Context(EventSource):
             self, value, alias: str='default', context_var: str=None, *,
             types: Union[Union[str, type], Iterable[Union[str, type]]]=()) -> Resource:
         """
-        Adds a resource to the collection and dispatches a "resource_added" event.
+        Adds a resource to the collection and dispatches a ``resource_added`` event.
 
         :param value: the actual resource value
         :param alias: an identifier for this resource (unique among all its registered types)
@@ -211,11 +217,12 @@ class Context(EventSource):
                           types: Union[Union[str, type], Iterable[Union[str, type]]],
                           alias: str='default', context_var: str=None) -> Resource:
         """
-        Adds a "lazy" or "contextual" resource. Instead of a concrete resource value, you supply a
-        creator callable which is called with a context (either this context or a subcontext) as
-        its argument when there is either a matching resource request or the given context variable
-        is accessed. The value will be cached so the creator callable will only be called once per
-        context instance.
+        Adds a "lazy" or "contextual" resource and dispatches a ``resource_added`` event.
+        Instead of a concrete resource value, you supply a creator callable which is called with a
+        context object as its argument when the resource is being requested either via
+        :meth:`request_resource` or by context attribute access.
+        The return value of the creator callable will be cached so the creator will only be called
+        once per context instance.
 
         The creator callable can **NOT** be a coroutine function.
 
@@ -234,7 +241,7 @@ class Context(EventSource):
     @asynchronous
     def remove_resource(self, resource: Resource):
         """
-        Removes the given resource from the collection and dispatches a "resource_removed" event.
+        Removes the given resource from the collection and dispatches a ``resource_removed`` event.
 
         :param resource: the resource to be removed
         :raises LookupError: the given resource was not in the collection
@@ -256,7 +263,7 @@ class Context(EventSource):
 
         self.dispatch('resource_removed', resource.types, resource.alias, False)
 
-    def _get_resource(self, resource_type: str, alias: str):
+    def _get_resource(self, resource_type: str, alias: str) -> Optional[Resource]:
         resource = self._resources.get(resource_type, {}).get(alias)
         if resource is None and self._parent is not None:
             resource = self._parent._get_resource(resource_type, alias)
@@ -265,7 +272,7 @@ class Context(EventSource):
 
     @asynchronous
     def request_resource(self, type: Union[str, type], alias: str='default', *,
-                         timeout: Union[int, float, None]=10, optional: bool=False):
+                         timeout: Union[int, float, None]=None, optional: bool=False):
         """
         Requests a resource matching the given type and alias.
         If no such resource was found, this method will wait ``timeout`` seconds for it to become
@@ -273,10 +280,11 @@ class Context(EventSource):
 
         :param type: type of the requested resource
         :param alias: alias of the requested resource
-        :param timeout: the timeout in seconds
+        :param timeout: the timeout (in seconds; omit to use the default timeout)
         :param optional: if ``True``, return None instead of raising an exception if no matching \
                          resource becomes available within the timeout period
-        :return: the value contained by the requested resource (**NOT** a Resource instance)
+        :return: the value contained by the requested resource
+                 (**NOT** a :class:`Resource` instance)
         :raises ResourceNotFound: if the requested resource does not become available in the \
                                   allotted time
         """
@@ -286,7 +294,9 @@ class Context(EventSource):
         if not alias:
             raise ValueError('alias must be a nonempty string')
 
-        assert timeout is None or timeout >= 0, 'timeout cannot be negative'
+        timeout = timeout if timeout is not None else self.default_timeout
+        assert timeout >= 0, 'timeout must be a positive integer'
+
         resource_type = qualified_name(type) if not isinstance(type, str) else type
         handle = event = start_time = None
         resource = self._get_resource(resource_type, alias)
