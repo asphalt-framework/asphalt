@@ -7,7 +7,7 @@ from pkg_resources import EntryPoint
 import pytest
 
 from asphalt.core.util import (
-    resolve_reference, qualified_name, synchronous, asynchronous, PluginContainer)
+    resolve_reference, qualified_name, blocking, asynchronous, PluginContainer)
 
 
 class BaseDummyPlugin:
@@ -50,7 +50,7 @@ def test_qualified_name(inputval, expected):
 @pytest.mark.asyncio
 @pytest.mark.parametrize('run_in_threadpool', [False, True], ids=['eventloop', 'threadpool'])
 def test_wrap_blocking_callable(event_loop, run_in_threadpool):
-    @synchronous
+    @blocking
     def func(x, y):
         assert threading.current_thread() is not threading.main_thread()
         return x + y

@@ -7,7 +7,7 @@ from functools import wraps, partial
 
 from pkg_resources import EntryPoint, iter_entry_points
 
-__all__ = 'resolve_reference', 'qualified_name', 'synchronous', 'asynchronous', 'PluginContainer'
+__all__ = 'resolve_reference', 'qualified_name', 'blocking', 'asynchronous', 'PluginContainer'
 
 event_loop = event_loop_thread_id = None
 
@@ -57,7 +57,7 @@ def qualified_name(obj) -> str:
     return qualname if module in ('typing', 'builtins') else '{}.{}'.format(module, qualname)
 
 
-def synchronous(func: Callable[..., Any]):
+def blocking(func: Callable[..., Any]):
     """
     Returns a wrapper that guarantees that the target callable will be run in a thread other than
     the event loop thread. If the call comes from the event loop thread, it schedules the callable
