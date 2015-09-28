@@ -23,14 +23,20 @@ class Event:
 class EventListener:
     """A handle that can be used to remove an event listener from its :class:`EventSource`."""
 
-    __slots__ = 'topic', 'callback', 'args', 'kwargs'
+    __slots__ = 'source', 'topic', 'callback', 'args', 'kwargs'
 
-    def __init__(self, topic: str, callback: Callable[[Event], Any],
+    def __init__(self, source: 'EventSource', topic: str, callback: Callable[[Event], Any],
                  args: Sequence[Any], kwargs: Dict[str, Any]):
+        self.source = source
         self.topic = topic
         self.callback = callback
         self.args = args
         self.kwargs = kwargs
+
+    def remove(self):
+        """Removes this listener from its event source."""
+
+        self.source.remove_listener(self)
 
     def __repr__(self):
         return ('{0.__class__.__name__}(topic={0.topic!r}, callback={1}, args={0.args!r}, '
@@ -76,7 +82,7 @@ class EventSource:
         if topic not in self._topics:
             raise LookupError('no such topic registered: {}'.format(topic))
 
-        handle = EventListener(topic, callback, args, kwargs or {})
+        handle = EventListener(self, topic, callback, args, kwargs or {})
         handles = self._topics[topic]['listeners']
         handles.append(handle)
         return handle

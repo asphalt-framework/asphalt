@@ -16,7 +16,7 @@ class DummyEvent(Event):
 class TestEventListener:
     @pytest.fixture
     def handle(self):
-        return EventListener('foo', lambda: None, (), {})
+        return EventListener(EventSource(), 'foo', lambda: None, (), {})
 
     def test_repr(self, handle):
         assert repr(handle) == (
@@ -87,7 +87,7 @@ class TestEventSource:
     @pytest.mark.parametrize('topic', ['event_a', 'foo'],
                              ids=['existing_event', 'nonexistent_event'])
     def test_remove_noexistent_listener(self, source, topic):
-        handle = EventListener(topic, lambda: None, (), {})
+        handle = EventListener(source, topic, lambda: None, (), {})
         exc = pytest.raises(LookupError, source.remove_listener, handle)
         assert str(exc.value) == 'listener not found'
 
