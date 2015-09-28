@@ -50,54 +50,32 @@ class TestContext:
     def context(self):
         return Context(default_timeout=2)
 
+    @pytest.mark.parametrize('async_contextmanager', [
+        pytest.mark.skipif('sys.version_info < (3, 5)')(True),
+        False
+    ], ids=['async', 'normal'])
     @pytest.mark.parametrize('raise_exception', [True, False], ids=['exception', 'no_exception'])
-    def test_contextmanager(self, context, raise_exception):
+    def test_contextmanager(self, event_loop, context, async_contextmanager, raise_exception):
         """
         Tests that "with context:" dispatches both started and finished events and sets the
         exception variable when an exception is raised during the context lifetime.
         """
 
-        def finished_listener(event):
-            nonlocal finished_called
-            finished_called = True
-
         exception = RuntimeError('test') if raise_exception else None
-        finished_called = False
-        context.add_listener('finished', finished_listener)
+        events = []
+        context.add_listener('finished', events.append)
         try:
-            with context:
-                if exception:
-                    raise exception
+            if async_contextmanager:
+                event_loop.run_until_complete(use_contextmanager(context, exception))
+            else:
+                with context:
+                    if exception:
+                        raise exception
         except RuntimeError:
             pass
 
-        assert finished_called
-        assert context.exception == exception
-
-    @pytest.mark.asyncio
-    @pytest.mark.skipif('sys.version_info < (3, 5)')
-    @pytest.mark.parametrize('raise_exception', [True, False], ids=['exception', 'no_exception'])
-    @coroutine
-    def test_async_contextmanager(self, context, raise_exception):
-        """
-        Tests that "async with context:" dispatches both started and finished events and sets the
-        exception variable when an exception is raised during the context lifetime.
-        """
-
-        def finished_listener(event):
-            nonlocal finished_called
-            finished_called = True
-
-        exception = RuntimeError('test') if raise_exception else None
-        finished_called = False
-        context.add_listener('finished', finished_listener)
-        try:
-            yield from use_contextmanager(context, exception)
-        except RuntimeError:
-            pass
-
-        assert finished_called
-        assert context.exception == exception
+        assert len(events) == 1
+        assert events[0].exception is exception
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize('delay', [False, True], ids=['immediate', 'delayed'])

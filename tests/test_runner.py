@@ -18,7 +18,7 @@ class ShutdownComponent(Component):
 
     def finish_callback(self, event):
         self.finish_callback_called = True
-        self.exception = event.source.exception
+        self.exception = event.exception
 
     def start(self, ctx: Context):
         ctx.add_listener('finished', self.finish_callback)

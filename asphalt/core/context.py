@@ -7,7 +7,8 @@ import time
 from .util import qualified_name, asynchronous
 from .event import EventSource, Event
 
-__all__ = 'Resource', 'ResourceEvent', 'ResourceConflict', 'ResourceNotFound', 'Context'
+__all__ = ('Resource', 'ResourceEvent', 'ResourceConflict', 'ResourceNotFound',
+           'ContextFinishEvent', 'Context')
 
 
 class Resource:
@@ -78,6 +79,20 @@ class ResourceNotFound(LookupError):
         return 'no matching resource was found for type={0.type!r} alias={0.alias!r}'.format(self)
 
 
+class ContextFinishEvent(Event):
+    """
+    Dispatched when a context has served its purpose and is being torn down.
+
+    :ivar BaseException exception: the exception that caused the context to finish (or ``None``)
+    """
+
+    __slots__ = 'exception'
+
+    def __init__(self, source: 'Context', topic: str, exception: Optional[BaseException]):
+        super().__init__(source, topic)
+        self.exception = exception
+
+
 class Context(EventSource):
     """
     Contexts give request handlers and callbacks access to resources.
@@ -95,16 +110,12 @@ class Context(EventSource):
     :param parent: the parent context, if any
     :param default_timeout: default timeout for :meth:`request_resource` if omitted from the
                             call arguments
-    :ivar Exception exception: the exception that occurred before exiting this context
-                               (available to finish callbacks)
     """
-
-    exception = None  # type: BaseException
 
     def __init__(self, parent: 'Context'=None, default_timeout: int=10):
         super().__init__()
         self._register_topics({
-            'finished': Event,
+            'finished': ContextFinishEvent,
             'resource_published': ResourceEvent,
             'resource_removed': ResourceEvent
         })
@@ -135,8 +146,7 @@ class Context(EventSource):
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        self.exception = exc_val
-        get_event_loop().run_until_complete(self.dispatch('finished'))
+        get_event_loop().run_until_complete(self.dispatch('finished', exc_val))
 
     @coroutine
     def __aenter__(self):
@@ -144,8 +154,7 @@ class Context(EventSource):
 
     @coroutine
     def __aexit__(self, exc_type, exc_val, exc_tb):
-        self.exception = exc_val
-        yield from self.dispatch('finished')
+        yield from self.dispatch('finished', exc_val)
 
     @coroutine
     def _publish_resource(self, value, alias: str, context_attr: str,
