@@ -108,8 +108,8 @@ class TestContext:
         with pytest.raises(ResourceConflict) as exc:
             yield from context.publish_resource(4, 'foo')
 
-        assert str(exc.value) == ('"foo" conflicts with Resource(types=(\'int\',), alias=\'foo\', '
-                                  'value=5, context_attr=None, lazy=False)')
+        assert str(exc.value) == (
+            'this context has an existing resource of type int using the alias "foo"')
 
     @pytest.mark.asyncio
     def test_remove_resource(self, context):
@@ -193,9 +193,7 @@ class TestContext:
         with pytest.raises(ResourceConflict) as exc:
             yield from context.publish_resource(2, context_attr='a')
 
-        assert str(exc.value) == (
-            "Resource(types=('int',), alias='default', value=2, context_attr='a', lazy=False) "
-            "conflicts with an existing context attribute")
+        assert str(exc.value) == 'this context already has an attribute "a"'
 
         with pytest.raises(ResourceNotFound):
             yield from context.request_resource(int, timeout=0)
@@ -207,8 +205,7 @@ class TestContext:
             yield from context.publish_resource(2, 'foo', context_attr='a')
 
         assert str(exc.value) == (
-            "Resource(types=('int',), alias='foo', value=2, context_attr='a', lazy=False) "
-            "conflicts with an existing lazy resource")
+            'this context has an existing lazy resource using the attribute "a"')
 
     @pytest.mark.asyncio
     def test_publish_lazy_resource_duplicate(self, context):
@@ -217,8 +214,7 @@ class TestContext:
             yield from context.publish_lazy_resource(lambda ctx: None, str, context_attr='foo')
 
         assert (str(exc.value) ==
-                "\"default\" conflicts with Resource(types=('str',), alias='default', value=None, "
-                "context_attr='foo', lazy=True)")
+                'this context has an existing resource of type str using the alias "default"')
 
     def test_attribute_error(self, context):
         exc = pytest.raises(AttributeError, getattr, context, 'foo')

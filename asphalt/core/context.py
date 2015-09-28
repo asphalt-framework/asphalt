@@ -16,7 +16,7 @@ class Resource:
 
     __slots__ = 'value', 'types', 'alias', 'context_attr', 'creator'
 
-    def __init__(self, value, types: tuple, alias: str, context_attr: Optional[str],
+    def __init__(self, value, types: Iterable[str], alias: str, context_attr: Optional[str],
                  creator: Callable[['Context'], Any]=None):
         self.value = value
         self.types = types
@@ -158,37 +158,38 @@ class Context(EventSource):
 
     @coroutine
     def _publish_resource(self, value, alias: str, context_attr: str,
-                          types: Union[Union[str, type], Iterable[Union[str, type]]],
+                          types: Iterable[Union[str, type]],
                           creator: Optional[Callable[['Context'], Any]]):
         assert isinstance(alias, str) and alias, 'alias must be a nonempty string'
         assert context_attr is None or isinstance(context_attr, str),\
             'context_attr must be a nonempty string or None'
 
-        if not types and value is not None:
-            types = (qualified_name(type(value)),)
-        else:
-            types = (types,) if isinstance(types, (str, type)) else types
-            types = tuple(t if isinstance(t, str) else qualified_name(t) for t in types)
+        if isinstance(types, (str, type)):
+            types = (types,)
 
-        # Check for name conflicts with existing resources
+        # Check for alias conflicts with existing resources
+        types = tuple(t if isinstance(t, str) else qualified_name(t) for t in types)
         for typename in types:
-            conflicting = self._resources[typename].get(alias)
-            if conflicting is not None:
-                raise ResourceConflict('"{}" conflicts with {!r}'.format(alias, conflicting))
+            if alias in self._resources[typename]:
+                raise ResourceConflict(
+                    'this context has an existing resource of type {} using the alias "{}"'
+                    .format(typename, alias))
 
-        resource = Resource(value, types, alias, context_attr, creator)
-        if resource.context_attr:
+        # Check for context attribute conflicts
+        if context_attr:
             # Check that there is no existing attribute by that name
-            if resource.context_attr in dir(self):
+            if context_attr in dir(self):
                 raise ResourceConflict(
-                    '{!r} conflicts with an existing context attribute'.format(resource))
+                    'this context already has an attribute "{}"'.format(context_attr))
 
-            # Check that there is no existing resource creator by that name
-            if resource.context_attr in self._resource_creators:
+            # Check that there is no existing lazy resource using the same context attribute
+            if context_attr in self._resource_creators:
                 raise ResourceConflict(
-                    '{!r} conflicts with an existing lazy resource'.format(resource))
+                    'this context has an existing lazy resource using the attribute "{}"'
+                    .format(context_attr))
 
         # Register the resource
+        resource = Resource(value, types, alias, context_attr, creator)
         for typename in types:
             self._resources[typename][resource.alias] = resource
 
@@ -218,6 +219,9 @@ class Context(EventSource):
         """
 
         assert value is not None, 'value must not be None'
+        if not types:
+            types = [type(value)]
+
         return self._publish_resource(value, alias, context_attr, types, None)
 
     @asynchronous
@@ -236,7 +240,7 @@ class Context(EventSource):
         be run as a side effect of attribute access.
 
         :param creator: a callable taking a context instance as argument
-        :param types: type name, class or an iterable of either
+        :param types: type(s) to register the resource as
         :param context_attr: name of the context attribute this resource will be accessible as
         :return: the resource handle
         :raises ResourceConflict: if there is an existing resource creator for the given
