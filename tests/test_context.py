@@ -28,11 +28,11 @@ class TestResource:
 
     def test_repr(self, resource: Resource):
         assert repr(resource) == ("Resource(types=('int', 'object'), alias='foo', "
-                                  "value=6, context_var='bar.foo', lazy=False)")
+                                  "value=6, context_attr='bar.foo', lazy=False)")
 
     def test_str(self, resource: Resource):
         assert str(resource) == ("types=('int', 'object'), alias='foo', "
-                                 "value=6, context_var='bar.foo', lazy=False")
+                                 "value=6, context_attr='bar.foo', lazy=False")
 
 
 use_contextmanager = None
@@ -101,15 +101,18 @@ class TestContext:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize('delay', [False, True], ids=['immediate', 'delayed'])
-    def test_add_resource(self, context, event_loop, delay):
-        """Tests that a resource is properly added to the collection and listeners are notified."""
+    def test_publish_resource(self, context, event_loop, delay):
+        """
+        Tests that a resource is properly published in the context and listeners are
+        notified.
+        """
 
         events = []
-        context.add_listener('resource_added', events.append)
+        context.add_listener('resource_published', events.append)
         if delay:
-            async(context.add_resource(6, 'foo', 'foo.bar', types=(int, float)))
+            async(context.publish_resource(6, 'foo', 'foo.bar', types=(int, float)))
         else:
-            yield from context.add_resource(6, 'foo', 'foo.bar', types=(int, float))
+            yield from context.publish_resource(6, 'foo', 'foo.bar', types=(int, float))
 
         value = yield from context.request_resource(int, 'foo')
         assert value == 6
@@ -121,14 +124,14 @@ class TestContext:
 
     @pytest.mark.asyncio
     def test_add_name_conflict(self, context):
-        """Tests that add() won't let replace existing resources."""
+        """Tests that publishing a resource won't replace any existing resources."""
 
-        yield from context.add_resource(5, 'foo')
+        yield from context.publish_resource(5, 'foo')
         with pytest.raises(ResourceConflict) as exc:
-            yield from context.add_resource(4, 'foo')
+            yield from context.publish_resource(4, 'foo')
 
         assert str(exc.value) == ('"foo" conflicts with Resource(types=(\'int\',), alias=\'foo\', '
-                                  'value=5, context_var=None, lazy=False)')
+                                  'value=5, context_attr=None, lazy=False)')
 
     @pytest.mark.asyncio
     def test_remove_resource(self, context):
@@ -136,7 +139,7 @@ class TestContext:
 
         events = []
         context.add_listener('resource_removed', events.append)
-        resource = yield from context.add_resource(4)
+        resource = yield from context.publish_resource(4)
         yield from context.remove_resource(resource)
 
         assert len(events) == 1
@@ -152,7 +155,7 @@ class TestContext:
             yield from context.remove_resource(resource)
 
         assert str(exc.value) == ("Resource(types=('int',), alias='default', value=5, "
-                                  "context_var=None, lazy=False) not found in this context")
+                                  "context_attr=None, lazy=False) not found in this context")
 
     @pytest.mark.asyncio
     def test_request_timeout(self, context):
@@ -174,7 +177,7 @@ class TestContext:
         assert str(exc.value) == errormsg
 
     @pytest.mark.asyncio
-    def test_add_lazy_resource(self, context):
+    def test_publish_lazy_resource(self, context):
         """Tests that lazy resources are only created once per context instance."""
 
         def creator(ctx):
@@ -182,7 +185,7 @@ class TestContext:
             return next(counter)
 
         counter = count(1)
-        yield from context.add_lazy_resource(creator, int, context_var='foo')
+        yield from context.publish_lazy_resource(creator, int, context_attr='foo')
         assert context.foo == 1
         assert context.foo == 1
         assert context.__dict__['foo'] == 1
@@ -190,54 +193,54 @@ class TestContext:
     @pytest.mark.asyncio
     def test_resource_added_removed(self, context):
         """
-        Tests that when resources are added, they are also set as properties of the context.
+        Tests that when resources are published, they are also set as properties of the context.
         Likewise, when they are removed, they are deleted from the context.
         """
 
-        resource = yield from context.add_resource(1, context_var='foo')
+        resource = yield from context.publish_resource(1, context_attr='foo')
         assert context.foo == 1
         yield from context.remove_resource(resource)
         assert 'foo' not in context.__dict__
 
-    def test_add_lazy_resource_coroutine(self, context):
+    def test_publish_lazy_resource_coroutine(self, context):
         """Tests that coroutine functions are not accepted as lazy resource creators."""
 
-        exc = pytest.raises(AssertionError, context.add_lazy_resource,
+        exc = pytest.raises(AssertionError, context.publish_lazy_resource,
                             coroutine(lambda ctx: None), 'foo')
         assert str(exc.value) == 'creator cannot be a coroutine function'
 
     @pytest.mark.asyncio
-    def test_add_resource_conflicting_attribute(self, context):
+    def test_publish_resource_conflicting_attribute(self, context):
         context.a = 2
         with pytest.raises(ResourceConflict) as exc:
-            yield from context.add_resource(2, context_var='a')
+            yield from context.publish_resource(2, context_attr='a')
 
         assert str(exc.value) == (
-            "Resource(types=('int',), alias='default', value=2, context_var='a', lazy=False) "
+            "Resource(types=('int',), alias='default', value=2, context_attr='a', lazy=False) "
             "conflicts with an existing context attribute")
 
         with pytest.raises(ResourceNotFound):
             yield from context.request_resource(int, timeout=0)
 
     @pytest.mark.asyncio
-    def test_add_lazy_resource_conflicting_resource(self, context):
-        yield from context.add_lazy_resource(lambda ctx: 2, int, context_var='a')
+    def test_publish_lazy_resource_conflicting_resource(self, context):
+        yield from context.publish_lazy_resource(lambda ctx: 2, int, context_attr='a')
         with pytest.raises(ResourceConflict) as exc:
-            yield from context.add_resource(2, 'foo', context_var='a')
+            yield from context.publish_resource(2, 'foo', context_attr='a')
 
         assert str(exc.value) == (
-            "Resource(types=('int',), alias='foo', value=2, context_var='a', lazy=False) "
+            "Resource(types=('int',), alias='foo', value=2, context_attr='a', lazy=False) "
             "conflicts with an existing lazy resource")
 
     @pytest.mark.asyncio
-    def test_add_lazy_resource_duplicate(self, context):
-        yield from context.add_lazy_resource(lambda ctx: None, str, context_var='foo')
+    def test_publish_lazy_resource_duplicate(self, context):
+        yield from context.publish_lazy_resource(lambda ctx: None, str, context_attr='foo')
         with pytest.raises(ResourceConflict) as exc:
-            yield from context.add_lazy_resource(lambda ctx: None, str, context_var='foo')
+            yield from context.publish_lazy_resource(lambda ctx: None, str, context_attr='foo')
 
         assert (str(exc.value) ==
                 "\"default\" conflicts with Resource(types=('str',), alias='default', value=None, "
-                "context_var='foo', lazy=True)")
+                "context_attr='foo', lazy=True)")
 
     def test_attribute_error(self, context):
         exc = pytest.raises(AttributeError, getattr, context, 'foo')
@@ -265,21 +268,21 @@ class TestContext:
     @pytest.mark.asyncio
     def test_request_resource_parent_add(self, context):
         """
-        Tests that adding a resource to the parent context will satisfy a resource request in a
+        Tests that publishing a resource to the parent context will satisfy a resource request in a
         child context.
         """
 
         child_context = Context(context)
         request = asyncio.async(child_context.request_resource(int))
-        yield from context.add_resource(6)
+        yield from context.publish_resource(6)
         resource = yield from request
         assert resource == 6
 
     @pytest.mark.asyncio
-    def test_request_lazy_resource_context_var(self, context):
+    def test_request_lazy_resource_context_attr(self, context):
         """Tests that requesting a lazy resource also sets the context variable."""
 
-        yield from context.add_lazy_resource(lambda ctx: 6, int, context_var='foo')
+        yield from context.publish_lazy_resource(lambda ctx: 6, int, context_attr='foo')
         yield from context.request_resource(int)
         assert context.__dict__['foo'] == 6
 
@@ -290,7 +293,7 @@ class TestContext:
         context variable is accessed.
         """
 
-        resource = yield from context.add_lazy_resource(lambda ctx: 6, int, context_var='foo')
+        resource = yield from context.publish_lazy_resource(lambda ctx: 6, int, context_attr='foo')
         yield from context.remove_resource(resource)
         exc = pytest.raises(AttributeError, getattr, context, 'foo')
         assert str(exc.value) == 'no such context variable: foo'

@@ -18,19 +18,18 @@ class Component(metaclass=ABCMeta):
     @abstractmethod
     def start(self, ctx: Context):
         """
-        This method is called on application start. It can be a coroutine.
+        This method is the entry point to a component. It can be a coroutine.
 
         The context can be used to:
-          * add context event listeners (:meth:`~Context.add_event_listener`)
-          * add resources (:meth:`~Context.add_resource`)
-          * add lazily created resources (:meth:`~Context.add_lazy_resource`)
+          * add context event listeners (:meth:`~Context.add_listener`)
+          * publish resources (:meth:`~Context.publish_resource` and
+            :meth:`~Context.publish_lazy_resource`)
           * request resources (:meth:`~Context.request_resource`)
 
-        If the component requests any resources, it is advisable to first add all the resources
-        it can before requesting any. This will speed up the dependency resolution and prevent
-        deadlocks.
+        It is advisable for Components to first publish all the resources they can before
+        requesting any. This will speed up the dependency resolution and prevent deadlocks.
 
-        :param ctx: the context for which the component was created
+        :param ctx: the containing context for this component
         """
 
 

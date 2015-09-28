@@ -13,21 +13,21 @@ __all__ = 'Resource', 'ResourceEvent', 'ResourceConflict', 'ResourceNotFound', '
 class Resource:
     """A handle that can be used to remove a resource from a context."""
 
-    __slots__ = 'value', 'types', 'alias', 'context_var', 'creator'
+    __slots__ = 'value', 'types', 'alias', 'context_attr', 'creator'
 
-    def __init__(self, value, types: tuple, alias: str, context_var: Optional[str],
+    def __init__(self, value, types: tuple, alias: str, context_attr: Optional[str],
                  creator: Callable[['Context'], Any]=None):
         self.value = value
         self.types = types
         self.alias = alias
-        self.context_var = context_var
+        self.context_attr = context_attr
         self.creator = creator
 
     def get_value(self, ctx: 'Context'):
         if self.value is None and self.creator is not None:
             self.value = self.creator(ctx)
-            if self.context_var:
-                setattr(ctx, self.context_var, self.value)
+            if self.context_attr:
+                setattr(ctx, self.context_attr, self.value)
 
         return self.value
 
@@ -36,12 +36,12 @@ class Resource:
 
     def __str__(self):
         return ('types={0.types!r}, alias={0.alias!r}, value={0.value!r}, '
-                'context_var={0.context_var!r}, lazy={1}'.format(self, self.creator is not None))
+                'context_attr={0.context_attr!r}, lazy={1}'.format(self, self.creator is not None))
 
 
 class ResourceEvent(Event):
     """
-    Dispatched when a resource has been added or removed to a context.
+    Dispatched when a resource has been published to or removed from a context.
 
     :ivar Context source: the relevant context
     :ivar Container[str] types: names of the types for the resource
@@ -61,8 +61,8 @@ class ResourceEvent(Event):
 
 class ResourceConflict(Exception):
     """
-    Raised when a new resource that is being added conflicts with an existing resource or context
-    variable.
+    Raised when a new resource that is being published conflicts with an existing resource or
+    context variable.
     """
 
 
@@ -87,10 +87,9 @@ class Context(EventSource):
     attribute is found (or ``AttributeError`` is raised).
 
     Supported events:
-      * started (:class:`~asphalt.core.event.Event`): the context has been activated
       * finished (:class:`~asphalt.core.event.Event`): the context has served its purpose and is
         being discarded
-      * resource_added (:class:`ResourceEvent`): a resource has been added to this context
+      * resource_published (:class:`ResourceEvent`): a resource has been published in this context
       * resource_removed (:class:`ResourceEvent`): a resource has been removed from this context
 
     :param parent: the parent context, if any
@@ -106,7 +105,7 @@ class Context(EventSource):
         super().__init__()
         self._register_topics({
             'finished': Event,
-            'resource_added': ResourceEvent,
+            'resource_published': ResourceEvent,
             'resource_removed': ResourceEvent
         })
 
@@ -117,7 +116,7 @@ class Context(EventSource):
 
         # Forward resource events from the parent(s)
         if parent is not None:
-            parent.add_listener('resource_added', self.dispatch)
+            parent.add_listener('resource_published', self.dispatch)
             parent.add_listener('resource_removed', self.dispatch)
 
     def __getattr__(self, name):
@@ -149,12 +148,12 @@ class Context(EventSource):
         yield from self.dispatch('finished')
 
     @coroutine
-    def _add_resource(self, value, alias: str, context_var: str,
-                      types: Union[Union[str, type], Iterable[Union[str, type]]],
-                      creator: Optional[Callable[['Context'], Any]]):
+    def _publish_resource(self, value, alias: str, context_attr: str,
+                          types: Union[Union[str, type], Iterable[Union[str, type]]],
+                          creator: Optional[Callable[['Context'], Any]]):
         assert isinstance(alias, str) and alias, 'alias must be a nonempty string'
-        assert context_var is None or isinstance(context_var, str),\
-            'context_var must be a nonempty string or None'
+        assert context_attr is None or isinstance(context_attr, str),\
+            'context_attr must be a nonempty string or None'
 
         if not types and value is not None:
             types = (qualified_name(type(value)),)
@@ -168,15 +167,15 @@ class Context(EventSource):
             if conflicting is not None:
                 raise ResourceConflict('"{}" conflicts with {!r}'.format(alias, conflicting))
 
-        resource = Resource(value, types, alias, context_var, creator)
-        if resource.context_var:
+        resource = Resource(value, types, alias, context_attr, creator)
+        if resource.context_attr:
             # Check that there is no existing attribute by that name
-            if resource.context_var in dir(self):
+            if resource.context_attr in dir(self):
                 raise ResourceConflict(
                     '{!r} conflicts with an existing context attribute'.format(resource))
 
             # Check that there is no existing resource creator by that name
-            if resource.context_var in self._resource_creators:
+            if resource.context_attr in self._resource_creators:
                 raise ResourceConflict(
                     '{!r} conflicts with an existing lazy resource'.format(resource))
 
@@ -184,60 +183,60 @@ class Context(EventSource):
         for typename in types:
             self._resources[typename][resource.alias] = resource
 
-        if creator is not None and context_var is not None:
-            self._resource_creators[context_var] = creator
+        if creator is not None and context_attr is not None:
+            self._resource_creators[context_attr] = creator
 
-        # Add the resource as an attribute of this context if context_var is defined
-        if creator is None and resource.context_var:
-            setattr(self, context_var, value)
+        # Add the resource as an attribute of this context if context_attr is defined
+        if creator is None and resource.context_attr:
+            setattr(self, context_attr, value)
 
-        yield from self.dispatch('resource_added', types, alias, False)
+        yield from self.dispatch('resource_published', types, alias, False)
         return resource
 
     @asynchronous
-    def add_resource(
-            self, value, alias: str='default', context_var: str=None, *,
+    def publish_resource(
+            self, value, alias: str='default', context_attr: str=None, *,
             types: Union[Union[str, type], Iterable[Union[str, type]]]=()) -> Resource:
         """
-        Adds a resource to the collection and dispatches a ``resource_added`` event.
+        Publishes a resource and dispatches a ``resource_published`` event.
 
         :param value: the actual resource value
-        :param alias: an identifier for this resource (unique among all its registered types)
-        :param context_var: if not ``None``, make ``value`` available on the application context
-                             with this name
+        :param alias: name of this resource (unique among all its registered types)
+        :param context_attr: name of the context attribute this resource will be accessible as
         :param types: type(s) to register the resource as (omit to use the type of ``value``)
-        :return: the resource object
+        :return: the resource handle
         :raises ResourceConflict: if the resource conflicts with an existing one in any way
         """
 
         assert value is not None, 'value must not be None'
-        return self._add_resource(value, alias, context_var, types, None)
+        return self._publish_resource(value, alias, context_attr, types, None)
 
     @asynchronous
-    def add_lazy_resource(self, creator: Callable[['Context'], Any],
-                          types: Union[Union[str, type], Iterable[Union[str, type]]],
-                          alias: str='default', context_var: str=None) -> Resource:
+    def publish_lazy_resource(self, creator: Callable[['Context'], Any],
+                              types: Union[Union[str, type], Iterable[Union[str, type]]],
+                              alias: str='default', context_attr: str=None) -> Resource:
         """
-        Adds a "lazy" or "contextual" resource and dispatches a ``resource_added`` event.
+        Publishes a "lazy" or "contextual" resource and dispatches a ``resource_published`` event.
         Instead of a concrete resource value, you supply a creator callable which is called with a
         context object as its argument when the resource is being requested either via
         :meth:`request_resource` or by context attribute access.
         The return value of the creator callable will be cached so the creator will only be called
         once per context instance.
 
-        The creator callable can **NOT** be a coroutine function.
+        .. note:: The creator callable can **NOT** be a coroutine function, as coroutines cannot
+        be run as a side effect of attribute access.
 
         :param creator: a callable taking a context instance as argument
         :param types: type name, class or an iterable of either
-        :param context_var: name of the context property
-        :return: the resource object
+        :param context_attr: name of the context attribute this resource will be accessible as
+        :return: the resource handle
         :raises ResourceConflict: if there is an existing resource creator for the given
                                   types or context variable
         """
 
         assert callable(creator), 'creator must be callable'
         assert not iscoroutinefunction(creator), 'creator cannot be a coroutine function'
-        return self._add_resource(None, alias, context_var, types, creator)
+        return self._publish_resource(None, alias, context_attr, types, creator)
 
     @asynchronous
     def remove_resource(self, resource: Resource):
@@ -256,11 +255,11 @@ class Context(EventSource):
 
         # Remove the creator from the resource creators
         if resource.creator is not None:
-            del self._resource_creators[resource.context_var]
+            del self._resource_creators[resource.context_attr]
 
         # Remove the attribute from this context
-        if resource.context_var and resource.context_var in self.__dict__:
-            delattr(self, resource.context_var)
+        if resource.context_attr and resource.context_attr in self.__dict__:
+            delattr(self, resource.context_attr)
 
         yield from self.dispatch('resource_removed', resource.types, resource.alias, False)
 
@@ -305,7 +304,7 @@ class Context(EventSource):
             if not handle:
                 event = asyncio.Event()
                 start_time = time.monotonic()
-                handle = self.add_listener('resource_added', lambda e: event.set())
+                handle = self.add_listener('resource_published', lambda e: event.set())
             try:
                 delay = timeout - (time.monotonic() - start_time) if timeout is not None else None
                 yield from asyncio.wait_for(event.wait(), delay)
