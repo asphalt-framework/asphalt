@@ -1,8 +1,9 @@
+from asyncio.futures import Future
+
 from typing import Optional, Callable, Any, Union, Iterable, Sequence
 from asyncio import get_event_loop, coroutine, iscoroutinefunction
 from collections import defaultdict
 import asyncio
-import time
 
 from .util import qualified_name, asynchronous
 from .event import EventSource, Event
@@ -128,11 +129,6 @@ class Context(EventSource):
         self._resources = defaultdict(dict)  # type: Dict[str, Dict[str, Resource]]
         self._resource_creators = {}  # type: Dict[str, Callable[[Context], Any]
         self.default_timeout = default_timeout
-
-        # Forward resource events from the parent(s)
-        if parent is not None:
-            parent.add_listener('resource_published', self.dispatch)
-            parent.add_listener('resource_removed', self.dispatch)
 
     def __getattr__(self, name):
         creator = self._resource_creators.get(name)
@@ -280,13 +276,6 @@ class Context(EventSource):
 
         yield from self.dispatch('resource_removed', resource)
 
-    def _get_resource(self, resource_type: str, alias: str) -> Optional[Resource]:
-        resource = self._resources.get(resource_type, {}).get(alias)
-        if resource is None and self._parent is not None:
-            resource = self._parent._get_resource(resource_type, alias)
-
-        return resource
-
     @asynchronous
     def request_resource(self, type: Union[str, type], alias: str='default', *,
                          timeout: Union[int, float, None]=None, optional: bool=False):
@@ -311,30 +300,39 @@ class Context(EventSource):
         if not alias:
             raise ValueError('alias must be a nonempty string')
 
+        resource_type = qualified_name(type) if not isinstance(type, str) else type
         timeout = timeout if timeout is not None else self.default_timeout
         assert timeout >= 0, 'timeout must be a positive integer'
 
-        resource_type = qualified_name(type) if not isinstance(type, str) else type
-        handle = event = start_time = None
-        resource = self._get_resource(resource_type, alias)
-        while resource is None:
-            if not handle:
-                event = asyncio.Event()
-                start_time = time.monotonic()
-                handle = self.add_listener('resource_published', lambda e: event.set())
-            try:
-                delay = timeout - (time.monotonic() - start_time) if timeout is not None else None
-                yield from asyncio.wait_for(event.wait(), delay)
-            except asyncio.TimeoutError:
-                self.remove_listener(handle)
-                if optional:
-                    return None
-                else:
-                    raise ResourceNotFound(resource_type, alias)
+        # Build a context chain from this context and its parents
+        context_chain = [self]
+        while context_chain[-1]._parent:
+            context_chain.append(context_chain[-1]._parent)
 
-            resource = self._get_resource(resource_type, alias)
+        # First try to look up the resource in the context chain
+        for ctx in context_chain:
+            resource = ctx._resources.get(resource_type, {}).get(alias)
+            if resource is not None:
+                return resource.get_value(self)
 
-        if handle:
-            self.remove_listener(handle)
+        # Listen to resource publish events in the whole chain and wait for the right kind of
+        # resource to be published
+        def resource_listener(event: ResourceEvent):
+            if event.resource.alias == alias and resource_type in event.resource.types:
+                future.set_result(event.resource)
 
-        return resource.get_value(self)
+        future = Future()
+        listeners = [ctx.add_listener('resource_published', resource_listener) for
+                     ctx in context_chain]
+        try:
+            resource = yield from asyncio.wait_for(future, timeout)
+        except asyncio.TimeoutError:
+            if optional:
+                return None
+            else:
+                raise ResourceNotFound(resource_type, alias)
+        else:
+            return resource.get_value(self)
+        finally:
+            for listener in listeners:
+                listener.remove()
