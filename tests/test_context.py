@@ -28,11 +28,11 @@ class TestResource:
 
     def test_repr(self, resource: Resource):
         assert repr(resource) == ("Resource(types=('int', 'object'), alias='foo', "
-                                  "value=6, context_attr='bar.foo', lazy=False)")
+                                  "value=6, context_attr='bar.foo', creator=None)")
 
     def test_str(self, resource: Resource):
         assert str(resource) == ("types=('int', 'object'), alias='foo', "
-                                 "value=6, context_attr='bar.foo', lazy=False")
+                                 "value=6, context_attr='bar.foo', creator=None")
 
 
 use_contextmanager = None
@@ -96,9 +96,9 @@ class TestContext:
         assert value == 6
 
         assert len(events) == 1
-        event = events[0]
-        assert event.types == ('int', 'float')
-        assert event.alias == 'foo'
+        resource = events[0].resource
+        assert resource.types == ('int', 'float')
+        assert resource.alias == 'foo'
 
     @pytest.mark.asyncio
     def test_add_name_conflict(self, context):
@@ -121,7 +121,7 @@ class TestContext:
         yield from context.remove_resource(resource)
 
         assert len(events) == 1
-        assert events[0].types == ('int',)
+        assert events[0].resource.types == ('int',)
 
         with pytest.raises(ResourceNotFound):
             yield from context.request_resource(int, timeout=0)
@@ -133,7 +133,7 @@ class TestContext:
             yield from context.remove_resource(resource)
 
         assert str(exc.value) == ("Resource(types=('int',), alias='default', value=5, "
-                                  "context_attr=None, lazy=False) not found in this context")
+                                  "context_attr=None, creator=None) not found in this context")
 
     @pytest.mark.asyncio
     def test_request_timeout(self, context):

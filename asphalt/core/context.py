@@ -1,4 +1,4 @@
-from typing import Optional, Callable, Any, Union, Iterable, Container
+from typing import Optional, Callable, Any, Union, Iterable, Sequence
 from asyncio import get_event_loop, coroutine, iscoroutinefunction
 from collections import defaultdict
 import asyncio
@@ -12,11 +12,19 @@ __all__ = ('Resource', 'ResourceEvent', 'ResourceConflict', 'ResourceNotFound',
 
 
 class Resource:
-    """A handle that can be used to remove a resource from a context."""
+    """
+    Contains the resource value or its creator callable, plus some metadata.
+
+    :ivar str alias: alias of the resource
+    :ivar Sequence[str] types: type names the resource was registered with
+    :ivar str context_attr: the context attribute of the resource
+    :ivar Callable[['Context'], Any] creator: callable to create the value
+                                              (in case of a lazy resource)
+    """
 
     __slots__ = 'value', 'types', 'alias', 'context_attr', 'creator'
 
-    def __init__(self, value, types: Iterable[str], alias: str, context_attr: Optional[str],
+    def __init__(self, value, types: Sequence[str], alias: str, context_attr: Optional[str],
                  creator: Callable[['Context'], Any]=None):
         self.value = value
         self.types = types
@@ -37,7 +45,8 @@ class Resource:
 
     def __str__(self):
         return ('types={0.types!r}, alias={0.alias!r}, value={0.value!r}, '
-                'context_attr={0.context_attr!r}, lazy={1}'.format(self, self.creator is not None))
+                'context_attr={0.context_attr!r}, creator={1}'
+                .format(self, qualified_name(self.creator) if self.creator else None))
 
 
 class ResourceEvent(Event):
@@ -45,19 +54,14 @@ class ResourceEvent(Event):
     Dispatched when a resource has been published to or removed from a context.
 
     :ivar Context source: the relevant context
-    :ivar Container[str] types: names of the types for the resource
-    :ivar str alias: the alias of the resource
-    :ivar bool lazy: ``True`` if this is a lazily created resource, ``False`` if not
+    :ivar Resource resource: the resource that was published or removed
     """
 
-    __slots__ = 'types', 'alias', 'lazy'
+    __slots__ = 'resource'
 
-    def __init__(self, source: 'Context', topic: str, types: Container[str], alias: str,
-                 lazy: bool):
+    def __init__(self, source: 'Context', topic: str, resource: Resource):
         super().__init__(source, topic)
-        self.types = types
-        self.alias = alias
-        self.lazy = lazy
+        self.resource = resource
 
 
 class ResourceConflict(Exception):
@@ -200,7 +204,7 @@ class Context(EventSource):
         if creator is None and resource.context_attr:
             setattr(self, context_attr, value)
 
-        yield from self.dispatch('resource_published', types, alias, False)
+        yield from self.dispatch('resource_published', resource)
         return resource
 
     @asynchronous
@@ -274,7 +278,7 @@ class Context(EventSource):
         if resource.context_attr and resource.context_attr in self.__dict__:
             delattr(self, resource.context_attr)
 
-        yield from self.dispatch('resource_removed', resource.types, resource.alias, False)
+        yield from self.dispatch('resource_removed', resource)
 
     def _get_resource(self, resource_type: str, alias: str) -> Optional[Resource]:
         resource = self._resources.get(resource_type, {}).get(alias)
