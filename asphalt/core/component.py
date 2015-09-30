@@ -4,7 +4,7 @@ from collections import OrderedDict
 from typing import Dict, Any, Union
 import asyncio
 
-from .util import PluginContainer
+from .util import PluginContainer, merge_config
 from .context import Context
 
 __all__ = 'Component', 'ContainerComponent', 'component_types'
@@ -60,7 +60,7 @@ class ContainerComponent(Component):
             raise ValueError('there is already a child component named "{}"'.format(alias))
 
         # Allow the external configuration to override the constructor arguments
-        kwargs.update(self.component_config.get(alias, {}))
+        kwargs = merge_config(kwargs, self.component_config.get(alias, {}))
 
         component = component_types.create_object(type or alias, **kwargs)
         self.child_components[alias] = component

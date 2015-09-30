@@ -7,7 +7,7 @@ from pkg_resources import EntryPoint
 import pytest
 
 from asphalt.core.util import (
-    resolve_reference, qualified_name, blocking, asynchronous, PluginContainer)
+    resolve_reference, qualified_name, blocking, asynchronous, PluginContainer, merge_config)
 
 
 class BaseDummyPlugin:
@@ -36,6 +36,17 @@ def test_resolve_reference(inputval):
 def test_resolve_reference_error(inputval, error_type, error_text):
     exc = pytest.raises(error_type, resolve_reference, inputval)
     assert str(exc.value) == error_text
+
+
+@pytest.mark.parametrize('overrides', [
+    {'a': 2, 'foo': 6, 'b': {'x': 5, 'z': {'r': 'bar', 's': [6, 7]}}},
+    {'a': 2, 'foo': 6, 'b.x': 5, 'b.z': {'r': 'bar', 's': [6, 7]}},
+    {'a': 2, 'foo': 6, 'b.x': 5, 'b.z.r': 'bar', 'b.z.s': [6, 7]}
+], ids=['nested_dicts', 'part_nested', 'dotted_paths'])
+def test_merge_config(overrides):
+    original = {'a': 1, 'b': {'x': 2, 'y': 3, 'z': {'r': [1, 2], 's': [3, 4]}}}
+    expected = {'a': 2, 'foo': 6, 'b': {'x': 5, 'y': 3, 'z': {'r': 'bar', 's': [6, 7]}}}
+    assert merge_config(original, overrides) == expected
 
 
 @pytest.mark.parametrize('inputval, expected', [

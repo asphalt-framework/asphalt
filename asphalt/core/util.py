@@ -7,7 +7,8 @@ from functools import wraps, partial
 
 from pkg_resources import EntryPoint, iter_entry_points
 
-__all__ = 'resolve_reference', 'qualified_name', 'blocking', 'asynchronous', 'PluginContainer'
+__all__ = ('resolve_reference', 'qualified_name', 'merge_config', 'blocking', 'asynchronous',
+           'PluginContainer')
 
 event_loop = event_loop_thread_id = None
 
@@ -55,6 +56,35 @@ def qualified_name(obj) -> str:
         qualname = type_.__qualname__
 
     return qualname if module in ('typing', 'builtins') else '{}.{}'.format(module, qualname)
+
+
+def merge_config(original: dict, overrides: dict) -> dict:
+    """
+    Returns a copy of the ``original`` configuration dictionary, with overrides from ``overrides``
+    applied. This similar to what :meth:`dict.update` does, but when a dictionary is about to be
+    replaced with another dictionary, it instead merges the contents.
+
+    If a key in ``overrides`` is a dotted path (ie. ``foo.bar.baz: value``), it is assumed to be a
+    shorthand for ``foo: {bar: {baz: value}}``.
+
+    :param original: a configuration dictionary
+    :param overrides: a dictionary containing overriding values to the configuration
+    :return: the merge result
+    """
+
+    copied = original.copy()
+    for key, value in overrides.items():
+        if '.' in key:
+            key, rest = key.split('.', 1)
+            value = {rest: value}
+
+        orig_value = copied.get(key)
+        if isinstance(orig_value, dict) and isinstance(value, dict):
+            copied[key] = merge_config(orig_value, value)
+        else:
+            copied[key] = value
+
+    return copied
 
 
 def blocking(func: Callable[..., Any]):
