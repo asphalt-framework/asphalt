@@ -117,7 +117,7 @@ class Context(EventSource):
                             call arguments
     """
 
-    def __init__(self, parent: 'Context'=None, default_timeout: int=10):
+    def __init__(self, parent: 'Context'=None, default_timeout: int=5):
         super().__init__()
         self._register_topics({
             'finished': ContextFinishEvent,
