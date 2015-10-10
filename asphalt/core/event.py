@@ -131,7 +131,7 @@ class EventSource:
             event_class = registration['event_class']
             event = event_class(self, topic, *args, **kwargs)
 
-        for listener in registration['listeners']:
+        for listener in list(registration['listeners']):
             retval = listener.callback(event, *listener.args, **listener.kwargs)
             if retval is not None:
                 yield from retval
