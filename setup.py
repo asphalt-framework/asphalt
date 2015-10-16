@@ -14,7 +14,7 @@ setup(
     use_scm_version={
         'local_scheme': 'dirty-tag'
     },
-    description='An asyncio based microframework for service oriented applications',
+    description='A microframework for network oriented applications',
     long_description=readme,
     author='Alex Grönholm',
     author_email='alex.gronholm@nextday.fi',
