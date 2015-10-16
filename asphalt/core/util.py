@@ -2,7 +2,7 @@ from asyncio import coroutine, iscoroutinefunction, iscoroutine, async
 from concurrent.futures import Future
 from importlib import import_module
 from threading import get_ident
-from typing import Callable, Any, Union
+from typing import Callable, Any, Union, List
 from functools import wraps, partial
 
 from pkg_resources import EntryPoint, iter_entry_points
@@ -198,6 +198,21 @@ class PluginContainer:
                 qualified_name(plugin_class), qualified_name(self.base_class)))
 
         return plugin_class(**constructor_kwargs)
+
+    def all(self) -> List[Any]:
+        """
+        Loads all entry points (if not already loaded) in this namespace and returns the resulting
+        objects as a list.
+        """
+
+        values = []
+        for name, value in self._entrypoints.items():
+            if isinstance(value, EntryPoint):
+                value = self._entrypoints[name] = value.load()
+
+            values.append(value)
+
+        return values
 
     def __repr__(self):
         return ('{0.__class__.__name__}(namespace={0.namespace!r}, base_class={1})'

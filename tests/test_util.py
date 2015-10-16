@@ -143,6 +143,9 @@ class TestPluginContainer:
         exc = pytest.raises(TypeError, container.create_object, int)
         assert str(exc.value) == 'int is not a subclass of test_util.BaseDummyPlugin'
 
+    def test_all(self, container):
+        assert container.all() == [DummyPlugin]
+
     def test_repr(self, container):
         assert repr(container) == (
             "PluginContainer(namespace='asphalt.core.test_plugin_container', "
