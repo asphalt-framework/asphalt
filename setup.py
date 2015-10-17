@@ -50,6 +50,10 @@ setup(
         ],
         'asphalt.core.runners': [
             'asyncio = asphalt.core.runner:run_application'
+        ],
+        'asphalt.core.connectors': [
+            'tcp = asphalt.core.connectors:TCPConnector',
+            'unix = asphalt.core.connectors:UnixSocketConnector'
         ]
     }
 )
