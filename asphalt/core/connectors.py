@@ -75,12 +75,13 @@ class TCPConnector(Connector):
 
     The endpoint value can be one of the following:
       * a string prefixed with ``tcp://`` or ``tcp+ssl://``
-      * a :class:``~ipaddress.IPv4Address`` or :class:``~ipaddress.IPv6Address``
+      * an :class:`~ipaddress.IPv4Address` or :class:`~ipaddress.IPv6Address`
       * a dictionary containing the following keys:
+
         * ``host``: string, :class:`~ipaddress.IPv4Address` or :class:`~ipaddress.IPv6Address`
         * ``port`` (optional): an integer between 1 and 65535
         * ``ssl`` (optional): either a boolean or an :class:`~ssl.SSLContext`
-        * ``timeout`` (optional): the number of seconds to wait for a connection to be established
+        * ``timeout`` (optional): the number of seconds to wait for a connection to be established\
           before raising :class:`~asyncio.TimeoutError`
 
     TLS is enabled for this connection if any of these conditions are met:
@@ -89,7 +90,7 @@ class TCPConnector(Connector):
       #. ``ssl`` is ``True`` in ``defaults`` and ssl is not explicitly disabled for this connection
 
     For raw IPv6 address:port combinations, use the standard [...]:port format.
-    For example, [::1]:1234 connects to localhost on port 1234 with IPv6.
+    For example, ``[::1]:1234`` connects to localhost on port 1234 with IPv6.
     """
 
     __slots__ = 'host', 'port', 'ssl', 'timeout'
@@ -168,6 +169,7 @@ class UnixSocketConnector(Connector):
       * a string starting with either ``unix://`` or ``unix+ssl://`` followed by the socket
         pathname (absolute or relative to current working directory)
       * a dictionary containing the following keys:
+
         * ``path``: a string or :class:`~pathlib.Path`, specifying the target socket
         * ``ssl``: either a boolean or an :class:`~ssl.SSLContext`
 
