@@ -1,10 +1,9 @@
-from asyncio import coroutine
 from abc import ABCMeta, abstractmethod
 from collections import OrderedDict
 from typing import Dict, Any, Union
 import asyncio
 
-from .util import PluginContainer, merge_config
+from .util import PluginContainer, merge_config, asynchronous
 from .context import Context
 
 __all__ = 'Component', 'ContainerComponent', 'component_types'
@@ -65,7 +64,7 @@ class ContainerComponent(Component):
         component = component_types.create_object(type or alias, **kwargs)
         self.child_components[alias] = component
 
-    @coroutine
+    @asynchronous
     def start(self, ctx: Context):
         """
         Creates child components that have been configured but not yet created and then calls their
