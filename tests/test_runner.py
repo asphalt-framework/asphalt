@@ -8,6 +8,7 @@ import pytest
 from asphalt.core.component import Component
 from asphalt.core.context import Context
 from asphalt.core.runner import run_application
+from asphalt.core.util import stop_event_loop
 
 
 class ShutdownComponent(Component):
@@ -24,7 +25,7 @@ class ShutdownComponent(Component):
         ctx.add_listener('finished', self.finish_callback)
 
         if self.method == 'stop':
-            get_event_loop().stop()
+            stop_event_loop()
         elif self.method == 'exit':
             get_event_loop().call_later(0.1, sys.exit)
         elif self.method == 'exception':

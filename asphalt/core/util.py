@@ -140,6 +140,17 @@ def asynchronous(func: Callable[..., Any]):
     return wrapper
 
 
+def stop_event_loop():
+    """
+    Schedules the current event loop to stop on the next iteration.
+
+    This function is the only supported way to stop the event loop
+    from a non-eventloop thread.
+    """
+
+    event_loop.call_soon_threadsafe(event_loop.stop)
+
+
 class PluginContainer:
     """
     A convenience class for loading and instantiating plugins through the use of entry points.
