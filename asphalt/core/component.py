@@ -47,7 +47,7 @@ class ContainerComponent(Component):
         If the second argument is omitted, the value of ``alias`` is used as its value.
 
         The locally given configuration can be overridden by component configuration parameters
-        supplied to the Application constructor (the ``components`` argument).
+        supplied to the constructor (the ``components`` argument).
 
         :param alias: a name for the component instance, unique within this container
         :param type: entry point name or :cls:`Component` subclass or a textual reference to one
