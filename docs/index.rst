@@ -10,6 +10,7 @@ Contents:
    events
    building
    testing
+   versionhistory
    acknowledgements
 
 .. warning::
