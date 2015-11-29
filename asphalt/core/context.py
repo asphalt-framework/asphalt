@@ -14,13 +14,15 @@ __all__ = ('Resource', 'ResourceEvent', 'ResourceConflict', 'ResourceNotFound',
 
 class Resource:
     """
-    Contains the resource value or its creator callable, plus some metadata.
+    Contains the resource value or its creator callable, plus some
+    metadata.
 
     :ivar str alias: alias of the resource
-    :ivar Sequence[str] types: type names the resource was registered with
+    :ivar Sequence[str] types: type names the resource was registered
+        with
     :ivar str context_attr: the context attribute of the resource
-    :ivar Callable[['Context'], Any] creator: callable to create the value
-                                              (in case of a lazy resource)
+    :ivar Callable[['Context'], Any] creator: callable to create the
+        value (in case of a lazy resource)
     """
 
     __slots__ = 'value', 'types', 'alias', 'context_attr', 'creator'
@@ -52,7 +54,8 @@ class Resource:
 
 class ResourceEvent(Event):
     """
-    Dispatched when a resource has been published to or removed from a context.
+    Dispatched when a resource has been published to or removed from a
+    context.
 
     :ivar Context source: the relevant context
     :ivar Resource resource: the resource that was published or removed
@@ -67,13 +70,16 @@ class ResourceEvent(Event):
 
 class ResourceConflict(Exception):
     """
-    Raised when a new resource that is being published conflicts with an existing resource or
-    context variable.
+    Raised when a new resource that is being published conflicts with
+    an existing resource or context variable.
     """
 
 
 class ResourceNotFound(LookupError):
-    """Raised when a resource request cannot be fulfilled within the allotted time."""
+    """
+    Raised when a resource request cannot be fulfilled within the
+    allotted time.
+    """
 
     def __init__(self, type: str, alias: str):
         super().__init__(type, alias)
@@ -102,19 +108,22 @@ class Context(EventSource):
     """
     Contexts give request handlers and callbacks access to resources.
 
-    Contexts are stacked in a way that accessing an attribute that is not present in the current
-    context causes the attribute to be looked up in the parent instance and so on, until the
-    attribute is found (or ``AttributeError`` is raised).
+    Contexts are stacked in a way that accessing an attribute that is
+    not present in the current context causes the attribute to be
+    looked up in the parent instance and so on, until the attribute is
+    found (or ``AttributeError`` is raised).
 
     Supported events:
-      * finished (:class:`~asphalt.core.event.Event`): the context has served its purpose and is
-        being discarded
-      * resource_published (:class:`ResourceEvent`): a resource has been published in this context
-      * resource_removed (:class:`ResourceEvent`): a resource has been removed from this context
+      * finished (:class:`~asphalt.core.event.Event`): the context has
+        served its purpose and is being discarded
+      * resource_published (:class:`ResourceEvent`): a resource has
+        been published in this context
+      * resource_removed (:class:`ResourceEvent`): a resource has been
+        removed from this context
 
     :param parent: the parent context, if any
-    :param default_timeout: default timeout for :meth:`request_resource` if omitted from the
-                            call arguments
+    :param default_timeout: default timeout for
+        :meth:`request_resource` if omitted from the call arguments
     """
 
     def __init__(self, parent: 'Context'=None, default_timeout: int=5):
@@ -182,7 +191,8 @@ class Context(EventSource):
                 raise ResourceConflict(
                     'this context already has an attribute "{}"'.format(context_attr))
 
-            # Check that there is no existing lazy resource using the same context attribute
+            # Check that there is no existing lazy resource using the
+            # same context attribute
             if context_attr in self._resource_creators:
                 raise ResourceConflict(
                     'this context has an existing lazy resource using the attribute "{}"'
@@ -196,7 +206,8 @@ class Context(EventSource):
         if creator is not None and context_attr is not None:
             self._resource_creators[context_attr] = creator
 
-        # Add the resource as an attribute of this context if context_attr is defined
+        # Add the resource as an attribute of this context if
+        # context_attr is defined
         if creator is None and resource.context_attr:
             setattr(self, context_attr, value)
 
@@ -208,16 +219,21 @@ class Context(EventSource):
             self, value, alias: str='default', context_attr: str=None, *,
             types: Union[Union[str, type], Iterable[Union[str, type]]]=()) -> Resource:
         """
-        Publishes a resource and dispatches a ``resource_published`` event.
+        Publishes a resource and dispatches a ``resource_published``
+        event.
 
         :param value: the actual resource value
-        :param alias: name of this resource (unique among all its registered types)
-        :param context_attr: name of the context attribute this resource will be accessible as
-        :param types: type(s) to register the resource as (omit to use the type of ``value``)
+        :param alias: name of this resource (unique among all its
+            registered types)
+        :param context_attr: name of the context attribute this
+            resource will be accessible as
+        :param types: type(s) to register the resource as (omit to use
+            the type of ``value``)
         :return: the resource handle
-        :raises ResourceConflict: if the resource conflicts with an existing one in any way
-        """
+        :raises ResourceConflict: if the resource conflicts with an
+            existing one in any way
 
+        """
         assert value is not None, 'value must not be None'
         if not types:
             types = [type(value)]
@@ -229,24 +245,28 @@ class Context(EventSource):
                               types: Union[Union[str, type], Iterable[Union[str, type]]],
                               alias: str='default', context_attr: str=None) -> Resource:
         """
-        Publishes a "lazy" or "contextual" resource and dispatches a ``resource_published`` event.
-        Instead of a concrete resource value, you supply a creator callable which is called with a
-        context object as its argument when the resource is being requested either via
-        :meth:`request_resource` or by context attribute access.
-        The return value of the creator callable will be cached so the creator will only be called
-        once per context instance.
+        Publishes a "lazy" or "contextual" resource and dispatches a
+        ``resource_published`` event. Instead of a concrete resource
+        value, you supply a creator callable which is called with a
+        context object as its argument when the resource is being
+        requested either via :meth:`request_resource` or by context
+        attribute access. The return value of the creator callable will
+        be cached so the creator will only be called once per context
+        instance.
 
-        .. note:: The creator callable can **NOT** be a coroutine function, as coroutines cannot
-        be run as a side effect of attribute access.
+        .. note:: The creator callable can **NOT** be a coroutine
+        function, as coroutines cannot be run as a side effect of
+        attribute access.
 
         :param creator: a callable taking a context instance as argument
         :param types: type(s) to register the resource as
-        :param context_attr: name of the context attribute this resource will be accessible as
+        :param context_attr: name of the context attribute this resource
+            will be accessible as
         :return: the resource handle
-        :raises ResourceConflict: if there is an existing resource creator for the given
-                                  types or context variable
-        """
+        :raises ResourceConflict: if there is an existing resource
+            creator for the given types or context variable
 
+        """
         assert callable(creator), 'creator must be callable'
         assert not iscoroutinefunction(creator), 'creator cannot be a coroutine function'
         return self._publish_resource(None, alias, context_attr, types, creator)
@@ -254,12 +274,14 @@ class Context(EventSource):
     @asynchronous
     def remove_resource(self, resource: Resource):
         """
-        Removes the given resource from the collection and dispatches a ``resource_removed`` event.
+        Removes the given resource from the collection and dispatches a
+        ``resource_removed`` event.
 
         :param resource: the resource to be removed
-        :raises LookupError: the given resource was not in the collection
-        """
+        :raises LookupError: the given resource was not in the
+            collection
 
+        """
         try:
             for typename in resource.types:
                 del self._resources[typename][resource.alias]
@@ -281,20 +303,22 @@ class Context(EventSource):
                          timeout: Union[int, float, None]=None, optional: bool=False):
         """
         Requests a resource matching the given type and alias.
-        If no such resource was found, this method will wait ``timeout`` seconds for it to become
-        available.
+        If no such resource was found, this method will wait
+        `timeout`` seconds for it to become available.
 
         :param type: type of the requested resource
         :param alias: alias of the requested resource
-        :param timeout: the timeout (in seconds; omit to use the default timeout)
-        :param optional: if ``True``, return None instead of raising an exception if no matching \
-                         resource becomes available within the timeout period
+        :param timeout: the timeout (in seconds; omit to use the
+            default timeout)
+        :param optional: if ``True``, return None instead of raising an
+            exception if no matching  resource becomes available within
+            the timeout period
         :return: the value contained by the requested resource
                  (**NOT** a :class:`Resource` instance)
-        :raises ResourceNotFound: if the requested resource does not become available in the \
-                                  allotted time
-        """
+        :raises ResourceNotFound: if the requested resource does not
+            become available in the allotted time
 
+        """
         if not type:
             raise ValueError('type must be a type or a nonempty string')
         if not alias:
@@ -315,8 +339,8 @@ class Context(EventSource):
             if resource is not None:
                 return resource.get_value(self)
 
-        # Listen to resource publish events in the whole chain and wait for the right kind of
-        # resource to be published
+        # Listen to resource publish events in the whole chain and wait
+        # for the right kind of resource to be published
         def resource_listener(event: ResourceEvent):
             if event.resource.alias == alias and resource_type in event.resource.types:
                 future.set_result(event.resource)

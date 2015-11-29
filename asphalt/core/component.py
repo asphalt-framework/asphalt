@@ -17,7 +17,8 @@ class Component(metaclass=ABCMeta):
     @abstractmethod
     def start(self, ctx: Context):
         """
-        This method is the entry point to a component. It can be a coroutine.
+        This method is the entry point to a component.
+        It can be a coroutine.
 
         The context can be used to:
           * add context event listeners (:meth:`~Context.add_listener`)
@@ -25,8 +26,9 @@ class Component(metaclass=ABCMeta):
             :meth:`~Context.publish_lazy_resource`)
           * request resources (:meth:`~Context.request_resource`)
 
-        It is advisable for Components to first publish all the resources they can before
-        requesting any. This will speed up the dependency resolution and prevent deadlocks.
+        It is advisable for Components to first publish all the
+        resources they can before requesting any. This will speed up
+        the dependency resolution and prevent deadlocks.
 
         :param ctx: the containing context for this component
         """
@@ -41,18 +43,22 @@ class ContainerComponent(Component):
 
     def add_component(self, alias: str, type: Union[str, type]=None, **kwargs):
         """
-        Instantiates a component using :func:`create_component` and adds it as a child component
-        of this container.
+        Instantiates a component using :func:`create_component` and
+        adds it as a child component of this container.
 
-        If the second argument is omitted, the value of ``alias`` is used as its value.
+        If the second argument is omitted, the value of ``alias`` is
+        used as its value.
 
-        The locally given configuration can be overridden by component configuration parameters
-        supplied to the constructor (the ``components`` argument).
+        The locally given configuration can be overridden by component
+        configuration parameters supplied to the constructor (the
+        ``components`` argument).
 
-        :param alias: a name for the component instance, unique within this container
-        :param type: entry point name or :cls:`Component` subclass or a textual reference to one
+        :param alias: a name for the component instance, unique within
+            this container
+        :param type: entry point name or :cls:`Component` subclass or a
+            textual reference to one
+
         """
-
         if not isinstance(alias, str) or not alias:
             raise TypeError('component_alias must be a nonempty string')
         if alias in self.child_components:
@@ -67,10 +73,11 @@ class ContainerComponent(Component):
     @asynchronous
     def start(self, ctx: Context):
         """
-        Creates child components that have been configured but not yet created and then calls their
-        :meth:`Component.start` methods in separate tasks and waits until they have completed.
-        """
+        Creates child components that have been configured but not yet
+        created and then calls their :meth:`Component.start` methods in
+        separate tasks and waits until they have completed.
 
+        """
         for alias in self.component_config:
             if alias not in self.child_components:
                 self.add_component(alias)

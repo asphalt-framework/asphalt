@@ -16,8 +16,11 @@ runners = PluginContainer('asphalt.core.runners')
 
 
 def quickstart_application():
-    """Asks a few questions and builds a skeleton application directory structure."""
+    """
+    Asks a few questions and builds a skeleton application directory
+    structure.
 
+    """
     current_version = pkg_resources.get_distribution('asphalt').parsed_version.public
     next_major_version = '{}.0.0'.format(int(current_version.split('.')[0]) + 1)
 
@@ -103,12 +106,13 @@ setup(
 
 def run_from_config_file(config_file: Union[str, Path], runner: str='asyncio', unsafe: bool=False):
     """
-    Runs an application using configuration from the given configuration file.
+    Runs an application using configuration from the given
+    configuration file.
 
     :param config_file: path to a YAML configuration file
     :param unsafe: ``True`` to load the YAML file in unsafe mode
-    """
 
+    """
     # Read the configuration from the supplied YAML file
     with Path(config_file).open() as stream:
         config = yaml.load(stream) if unsafe else yaml.safe_load(stream)

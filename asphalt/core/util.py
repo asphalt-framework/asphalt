@@ -15,16 +15,19 @@ event_loop = event_loop_thread_id = None
 
 def resolve_reference(ref):
     """
-    Returns the object pointed to by ``ref``. If ``ref`` is not a string, it is returned as is.
-    References must be in the form <modulename>:<varname> where <modulename> is the fully
-    qualified module name and varname is the path to the variable inside that module.
+    Returns the object pointed to by ``ref``. If ``ref`` is not a
+    string, it is returned as is. References must be in the form
+    <modulename>:<varname> where <modulename> is the fully qualified
+    module name and varname is the path to the variable inside that
+    module.
 
-    For example, "concurrent.futures:Future" would give you the Future class.
+    For example, "concurrent.futures:Future" would give you the Future
+    class.
 
     :raises ValueError: if there was no : in the reference string
     :raises LookupError: if the reference could not be resolved
-    """
 
+    """
     if not isinstance(ref, str):
         return ref
     if ':' not in ref:
@@ -45,8 +48,11 @@ def resolve_reference(ref):
 
 
 def qualified_name(obj) -> str:
-    """Returns the qualified name (e.g. package.module.Type) for the given object."""
+    """
+    Returns the qualified name (e.g. package.module.Type) for the given
+    object.
 
+    """
     try:
         module = obj.__module__
         qualname = obj.__qualname__
@@ -60,18 +66,21 @@ def qualified_name(obj) -> str:
 
 def merge_config(original: dict, overrides: dict) -> dict:
     """
-    Returns a copy of the ``original`` configuration dictionary, with overrides from ``overrides``
-    applied. This similar to what :meth:`dict.update` does, but when a dictionary is about to be
+    Returns a copy of the ``original`` configuration dictionary, with
+    overrides from ``overrides`` applied. This similar to what
+    :meth:`dict.update` does, but when a dictionary is about to be
     replaced with another dictionary, it instead merges the contents.
 
-    If a key in ``overrides`` is a dotted path (ie. ``foo.bar.baz: value``), it is assumed to be a
-    shorthand for ``foo: {bar: {baz: value}}``.
+    If a key in ``overrides`` is a dotted path (ie.
+    ``foo.bar.baz: value``), it is assumed to be a shorthand for
+    ``foo: {bar: {baz: value}}``.
 
     :param original: a configuration dictionary
-    :param overrides: a dictionary containing overriding values to the configuration
+    :param overrides: a dictionary containing overriding values to the
+        configuration
     :return: the merge result
-    """
 
+    """
     copied = original.copy()
     for key, value in overrides.items():
         if '.' in key:
@@ -89,12 +98,13 @@ def merge_config(original: dict, overrides: dict) -> dict:
 
 def blocking(func: Callable[..., Any]):
     """
-    Returns a wrapper that guarantees that the target callable will be run in a thread other than
-    the event loop thread. If the call comes from the event loop thread, it schedules the callable
-    to be run in the default executor and returns the corresponding Future. If the call comes from
-    any other thread, the callable is run directly.
-    """
+    Returns a wrapper that guarantees that the target callable will be
+    run in a thread other than the event loop thread. If the call comes
+    from the event loop thread, it schedules the callable to be run in
+    the default executor and returns the corresponding Future. If the
+    call comes from any other thread, the callable is run directly.
 
+    """
     @wraps(func, updated=())
     def wrapper(*args, **kwargs):
         if get_ident() == event_loop_thread_id:
@@ -109,11 +119,12 @@ def blocking(func: Callable[..., Any]):
 
 def asynchronous(func: Callable[..., Any]):
     """
-    Wraps a callable so that it is guaranteed to be called in the event loop.
-    If it returns a coroutine or a Future and the call came from another thread, the coroutine
-    or Future is first resolved before returning the result to the caller.
-    """
+    Wraps a callable so that it is guaranteed to be called in the event
+    loop. If it returns a coroutine or a Future and the call came from
+    another thread, the coroutine or Future is first resolved before
+    returning the result to the caller.
 
+    """
     @wraps(func, updated=())
     def wrapper(*args, **kwargs):
         @coroutine
@@ -146,18 +157,19 @@ def stop_event_loop():
 
     This function is the only supported way to stop the event loop
     from a non-eventloop thread.
-    """
 
+    """
     event_loop.call_soon_threadsafe(event_loop.stop)
 
 
 class PluginContainer:
     """
-    A convenience class for loading and instantiating plugins through the use of entry points.
+    A convenience class for loading and instantiating plugins through
+    the use of entry points.
 
     :param namespace: a setuptools entry points namespace
-    :param base_class: the base class for plugins of this type \
-                       (or ``None`` if the entry points don't point to classes)
+    :param base_class: the base class for plugins of this type
+       (or ``None`` if the entry points don't point to classes)
     """
 
     __slots__ = 'namespace', 'base_class', '_entrypoints'
@@ -169,15 +181,20 @@ class PluginContainer:
 
     def resolve(self, obj):
         """
-        If ``obj`` is a textual reference to an object (contains ":"), returns the resolved
-        reference using :func:`resolve_reference`. If it is a string of any other kind, loads the
-        named entry point in this container's namespace. Otherwise, ``obj`` is returned as is.
+        If ``obj`` is a textual reference to an object (contains ":"),
+        returns the resolved reference using :func:`resolve_reference`.
+        If it is a string of any other kind, loads the named entry
+        point in this container's namespace. Otherwise, ``obj`` is
+        returned as is.
 
-        :param obj: an entry point identifier, an object reference or an arbitrary object
-        :return: the loaded entry point, resolved object or the unchanged input value
-        :raises LookupError: if ``obj`` was a string but the named entry point was not found
+        :param obj: an entry point identifier, an object reference or
+            an arbitrary object
+        :return: the loaded entry point, resolved object or the
+            unchanged input value
+        :raises LookupError: if ``obj`` was a string but the named
+            entry point was not found
+
         """
-
         if not isinstance(obj, str):
             return obj
         if ':' in obj:
@@ -194,11 +211,14 @@ class PluginContainer:
 
     def create_object(self, type: Union[type, str], **constructor_kwargs):
         """
-        Instantiates a plugin. The entry points in this namespace must point to subclasses of
-        the ``base_class`` parameter passed to this container.
+        Instantiates a plugin. The entry points in this namespace must
+        point to subclasses of the ``base_class`` parameter passed to
+        this container.
 
-        :param type: an entry point identifier, a textual reference to a class or an actual class
-        :param constructor_kwargs: keyword arguments passed to the constructor of the plugin class
+        :param type: an entry point identifier, a textual reference to
+            a class or an actual class
+        :param constructor_kwargs: keyword arguments passed to the
+            constructor of the plugin class
         :return: the plugin instance
         """
 
@@ -212,8 +232,8 @@ class PluginContainer:
 
     def all(self) -> List[Any]:
         """
-        Loads all entry points (if not already loaded) in this namespace and returns the resulting
-        objects as a list.
+        Loads all entry points (if not already loaded) in this
+        namespace and returns the resulting objects as a list.
         """
 
         values = []

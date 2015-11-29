@@ -16,8 +16,8 @@ logger = logging.getLogger(__name__)
 
 class ConnectorError(LookupError):
     """
-    Raised by :func:`create_connector` when the requested connector could not be created or
-    looked up.
+    Raised by :func:`create_connector` when the requested connector
+    could not be created orlooked up.
 
     :ivar endpoint: the endpoint value
     """
@@ -33,8 +33,9 @@ class ConnectorError(LookupError):
 
 class Connector(metaclass=ABCMeta):
     """
-    The base class for all connectors. Each connector class contains logic for making a connection
-    to some endpoint, usually over the network or inter-process communication channels.
+    The base class for all connectors. Each connector class contains
+    logic for making a connection to some endpoint, usually over the
+    network or inter-process communication channels.
     """
 
     __slots__ = ()
@@ -51,15 +52,17 @@ class Connector(metaclass=ABCMeta):
     @abstractmethod
     def parse(cls, endpoint, defaults: Dict[str, Any]) -> Optional['Connector']:
         """
-        Returns an instance of this connector class if the type and value of ``endpoint`` are
-        compatible with this connector type.
+        Returns an instance of this connector class if the type and
+        value of ``endpoint`` are compatible with this connector type.
 
-        Subclasses should indicate what keys in ``defaults`` they can use.
+        Subclasses should indicate what keys in ``defaults`` they can
+        use.
 
         :param endpoint: connector specific
-        :param defaults: a dictionary of default values, some specific to certain connector types
-        :return: an instance of this class or ``None`` if ``endpoint`` was not compatible with this
-                 connector
+        :param defaults: a dictionary of default values, some specific
+            to certain connector types
+        :return: an instance of this class or ``None`` if ``endpoint``
+            was not compatible with this connector
         """
 
     @abstractmethod
@@ -69,28 +72,35 @@ class Connector(metaclass=ABCMeta):
 
 class TCPConnector(Connector):
     """
-    Connects to the specified host/port over TCP/IP, optionally using TLS.
+    Connects to the specified host/port over TCP/IP, optionally using
+    TLS.
 
     The port can be omitted if one has been specified in the defaults.
 
     The endpoint value can be one of the following:
       * a string prefixed with ``tcp://`` or ``tcp+ssl://``
-      * an :class:`~ipaddress.IPv4Address` or :class:`~ipaddress.IPv6Address`
+      * an :class:`~ipaddress.IPv4Address` or
+        :class:`~ipaddress.IPv6Address`
       * a dictionary containing the following keys:
 
-        * ``host``: string, :class:`~ipaddress.IPv4Address` or :class:`~ipaddress.IPv6Address`
+        * ``host``: string, :class:`~ipaddress.IPv4Address` or \
+          :class:`~ipaddress.IPv6Address`
         * ``port`` (optional): an integer between 1 and 65535
-        * ``ssl`` (optional): either a boolean or an :class:`~ssl.SSLContext`
-        * ``timeout`` (optional): the number of seconds to wait for a connection to be established\
-          before raising :class:`~asyncio.TimeoutError`
+        * ``ssl`` (optional): either a boolean or an \
+          :class:`~ssl.SSLContext`
+        * ``timeout`` (optional): the number of seconds to wait for a \
+          connection to be established before raising \
+          :class:`~asyncio.TimeoutError`
 
     TLS is enabled for this connection if any of these conditions are met:
       #. The endpoint is a string that starts with ``tcp+ssl://``
       #. The endpoint is a dict where ``ssl`` is set to a truthy value
-      #. ``ssl`` is ``True`` in ``defaults`` and ssl is not explicitly disabled for this connection
+      #. ``ssl`` is ``True`` in ``defaults`` and ssl is not explicitly \
+        disabled for this connection
 
-    For raw IPv6 address:port combinations, use the standard [...]:port format.
-    For example, ``[::1]:1234`` connects to localhost on port 1234 with IPv6.
+    For raw IPv6 address:port combinations, use the standard [...]:port
+    format. For example, ``[::1]:1234`` connects to localhost on port
+    1234 with IPv6.
     """
 
     __slots__ = 'host', 'port', 'ssl', 'timeout'
@@ -163,20 +173,24 @@ class TCPConnector(Connector):
 
 class UnixSocketConnector(Connector):
     """
-    A connector that connects to a UNIX domain socket, optionally using TLS.
+    A connector that connects to a UNIX domain socket, optionally using
+    TLS.
 
     The endpoint value can be one of the following:
-      * a string starting with either ``unix://`` or ``unix+ssl://`` followed by the socket
+      * a string starting with either ``unix://`` or ``unix+ssl://``
+        followed by the socket
         pathname (absolute or relative to current working directory)
       * a dictionary containing the following keys:
 
-        * ``path``: a string or :class:`~pathlib.Path`, specifying the target socket
+        * ``path``: a string or :class:`~pathlib.Path`, specifying the
+          target socket
         * ``ssl``: either a boolean or an :class:`~ssl.SSLContext`
 
     TLS is enabled for this connection if any of these conditions are met:
       #. The endpoint is a string that starts with ``unix+ssl://``
       #. The endpoint is a dict where ``ssl`` is set to a truthy value
-      #. ``ssl`` is ``True`` in ``defaults`` and ssl is not explicitly disabled for this connection
+      #. ``ssl`` is ``True`` in ``defaults`` and ssl is not explicitly
+        disabled for this connection
     """
 
     __slots__ = 'path', 'ssl', 'timeout'
@@ -223,23 +237,25 @@ def create_connector(endpoint, defaults: Dict[str, Any]=None, ctx: Context=None,
                      timeout: int=None) -> Connector:
     """
     Creates or looks up a connector from the given endpoint.
-    The endpoint is offered to each connector class in turn until one of them produces a connector
-    instance, which is then returned.
+    The endpoint is offered to each connector class in turn until one
+    of them produces a connector instance, which is then returned.
 
-    It is also possible to resolve named connectors by providing a context as the ``ctx`` argument.
-    Then supply an ``endpoint`` in the ``resource://<name>`` format (e.g. ``resource://foo`` to
-    get the connector resource named "foo").
+    It is also possible to resolve named connectors by providing a
+    context as the ``ctx`` argument. Then supply an ``endpoint`` in
+    the ``resource://<name>`` format (e.g. ``resource://foo`` to get
+    the connector resource named "foo").
 
-    :param endpoint: a connector specific value representing the endpoint of the connection
-    :param defaults: a dictionary of default values (see the documentation of each connector
-                     type)
+    :param endpoint: a connector specific value representing the
+        endpoint of the connection
+    :param defaults: a dictionary of default values (see the
+        documentation of each connector type)
     :param ctx: a context for resolving connector names
-    :param timeout: timeout for resource lookup (if endpoint refers to a resource; omit to use the
-                    default timeout)
-    :raises ConnectorError: if all the connector types reject this endpoint or the named connector
-                            resource could not be found
-    """
+    :param timeout: timeout for resource lookup (if endpoint refers to
+        a resource; omit to use the default timeout)
+    :raises ConnectorError: if all the connector types reject this
+        endpoint or the named connector resource could not be found
 
+    """
     if isinstance(endpoint, str) and endpoint.startswith('resource://'):
         if ctx is None:
             raise ConnectorError(endpoint, 'named connector resource requested but no context '
