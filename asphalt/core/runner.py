@@ -2,13 +2,12 @@ from concurrent.futures import ThreadPoolExecutor
 from typing import Union, Dict, Any
 from logging.config import dictConfig
 from logging import basicConfig, getLogger, INFO
-import threading
 import asyncio
 import os
 
+from .concurrency import set_event_loop
 from .component import Component
 from .context import Context
-from . import util
 
 
 def run_application(component: Component, *, max_threads: int=None,
@@ -52,10 +51,7 @@ def run_application(component: Component, *, max_threads: int=None,
     max_threads = max_threads if max_threads is not None else os.cpu_count()
     event_loop = asyncio.get_event_loop()
     event_loop.set_default_executor(ThreadPoolExecutor(max_threads))
-
-    # This is a necessary evil to make @asynchronous work
-    util.event_loop = event_loop
-    util.event_loop_thread_id = threading.get_ident()
+    set_event_loop(event_loop)
 
     logger = getLogger(__name__)
     logger.info('Starting application')

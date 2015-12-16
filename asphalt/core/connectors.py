@@ -7,7 +7,8 @@ import asyncio
 import logging
 
 from .context import ResourceNotFound, Context
-from .util import asynchronous, PluginContainer
+from .concurrency import asynchronous
+from .util import PluginContainer
 
 __all__ = 'ConnectorError', 'Connector', 'TCPConnector', 'UnixSocketConnector', 'create_connector'
 

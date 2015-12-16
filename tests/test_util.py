@@ -1,13 +1,10 @@
-from asyncio import coroutine
 from unittest.mock import Mock
 import asyncio
-import threading
-from pkg_resources import EntryPoint
 
+from pkg_resources import EntryPoint
 import pytest
 
-from asphalt.core.util import (
-    resolve_reference, qualified_name, blocking, asynchronous, PluginContainer, merge_config)
+from asphalt.core.util import resolve_reference, qualified_name, PluginContainer, merge_config
 
 
 class BaseDummyPlugin:
@@ -56,53 +53,6 @@ def test_merge_config(overrides):
 ], ids=['func', 'instance', 'builtintype'])
 def test_qualified_name(inputval, expected):
     assert qualified_name(inputval) == expected
-
-
-@pytest.mark.asyncio
-@pytest.mark.parametrize('run_in_threadpool', [False, True], ids=['eventloop', 'threadpool'])
-def test_wrap_blocking_callable(event_loop, run_in_threadpool):
-    @blocking
-    def func(x, y):
-        assert threading.current_thread() is not threading.main_thread()
-        return x + y
-
-    if run_in_threadpool:
-        retval = yield from event_loop.run_in_executor(None, func, 1, 2)
-    else:
-        retval = yield from func(1, 2)
-
-    assert retval == 3
-
-
-@pytest.mark.asyncio
-@pytest.mark.parametrize('run_in_threadpool', [False, True], ids=['eventloop', 'threadpool'])
-def test_wrap_async_callable(event_loop, run_in_threadpool):
-    @asynchronous
-    @coroutine
-    def func(x, y):
-        assert threading.current_thread() is threading.main_thread()
-        yield from asyncio.sleep(0.2)
-        return x + y
-
-    if run_in_threadpool:
-        retval = yield from event_loop.run_in_executor(None, func, 1, 2)
-    else:
-        retval = yield from func(1, 2)
-
-    assert retval == 3
-
-
-@pytest.mark.asyncio
-def test_wrap_async_callable_exception(event_loop):
-    @coroutine
-    def async_func():
-        yield from asyncio.sleep(0.2)
-        raise ValueError('test')
-
-    wrapped_async_func = asynchronous(async_func)
-    with pytest.raises(ValueError) as exc:
-        yield from event_loop.run_in_executor(None, wrapped_async_func)
-    assert str(exc.value) == 'test'
 
 
 class TestPluginContainer:

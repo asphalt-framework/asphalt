@@ -1,16 +1,13 @@
-from asyncio import coroutine, iscoroutinefunction, iscoroutine, async
-from concurrent.futures import Future
 from importlib import import_module
-from threading import get_ident
-from typing import Callable, Any, Union, List
-from functools import wraps, partial
+from typing import Any, Union, List
 
 from pkg_resources import EntryPoint, iter_entry_points
 
+# Import for backwards compatibility; remove in 2.0
+from .concurrency import blocking, asynchronous, stop_event_loop  # flake8: noqa
+
 __all__ = ('resolve_reference', 'qualified_name', 'merge_config', 'blocking', 'asynchronous',
            'PluginContainer')
-
-event_loop = event_loop_thread_id = None
 
 
 def resolve_reference(ref):
@@ -94,72 +91,6 @@ def merge_config(original: dict, overrides: dict) -> dict:
             copied[key] = value
 
     return copied
-
-
-def blocking(func: Callable[..., Any]):
-    """
-    Returns a wrapper that guarantees that the target callable will be
-    run in a thread other than the event loop thread. If the call comes
-    from the event loop thread, it schedules the callable to be run in
-    the default executor and returns the corresponding Future. If the
-    call comes from any other thread, the callable is run directly.
-
-    """
-    @wraps(func, updated=())
-    def wrapper(*args, **kwargs):
-        if get_ident() == event_loop_thread_id:
-            callback = partial(func, *args, **kwargs)
-            return event_loop.run_in_executor(None, callback)
-        else:
-            return func(*args, **kwargs)
-
-    assert not iscoroutinefunction(func), 'Cannot wrap coroutine functions as blocking callables'
-    return wrapper
-
-
-def asynchronous(func: Callable[..., Any]):
-    """
-    Wraps a callable so that it is guaranteed to be called in the event
-    loop. If it returns a coroutine or a Future and the call came from
-    another thread, the coroutine or Future is first resolved before
-    returning the result to the caller.
-
-    """
-    @wraps(func, updated=())
-    def wrapper(*args, **kwargs):
-        @coroutine
-        def callback():
-            try:
-                retval = func(*args, **kwargs)
-                if iscoroutine(retval) or isinstance(retval, Future):
-                    retval = yield from retval
-            except Exception as e:
-                f.set_exception(e)
-            except BaseException as e:  # pragma: no cover
-                f.set_exception(e)
-                raise
-            else:
-                f.set_result(retval)
-
-        if event_loop_thread_id in (get_ident(), None):
-            return func(*args, **kwargs)
-        else:
-            f = Future()
-            event_loop.call_soon_threadsafe(async, callback())
-            return f.result()
-
-    return wrapper
-
-
-def stop_event_loop():
-    """
-    Schedules the current event loop to stop on the next iteration.
-
-    This function is the only supported way to stop the event loop
-    from a non-eventloop thread.
-
-    """
-    event_loop.call_soon_threadsafe(event_loop.stop)
 
 
 class PluginContainer:
