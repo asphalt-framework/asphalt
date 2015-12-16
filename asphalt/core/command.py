@@ -10,17 +10,13 @@ from .util import PluginContainer
 from .component import ContainerComponent, component_types
 from .context import Context
 
-__all__ = 'runners', 'quickstart_application', 'run_from_config_file'
+__all__ = ('runners', 'quickstart_application', 'run_from_config_file')
 
 runners = PluginContainer('asphalt.core.runners')
 
 
 def quickstart_application():
-    """
-    Asks a few questions and builds a skeleton application directory
-    structure.
-
-    """
+    """Interactively build a skeleton application directory structure."""
     current_version = pkg_resources.get_distribution('asphalt').parsed_version.public
     next_major_version = '{}.0.0'.format(int(current_version.split('.')[0]) + 1)
 
@@ -106,8 +102,7 @@ setup(
 
 def run_from_config_file(config_file: Union[str, Path], runner: str='asyncio', unsafe: bool=False):
     """
-    Runs an application using configuration from the given
-    configuration file.
+    Run an application using configuration from the given configuration file.
 
     :param config_file: path to a YAML configuration file
     :param unsafe: ``True`` to load the YAML file in unsafe mode

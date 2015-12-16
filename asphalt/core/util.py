@@ -12,14 +12,14 @@ __all__ = ('resolve_reference', 'qualified_name', 'merge_config', 'blocking', 'a
 
 def resolve_reference(ref):
     """
-    Returns the object pointed to by ``ref``. If ``ref`` is not a
-    string, it is returned as is. References must be in the form
-    <modulename>:<varname> where <modulename> is the fully qualified
-    module name and varname is the path to the variable inside that
-    module.
+    Return the object pointed to by ``ref``.
 
-    For example, "concurrent.futures:Future" would give you the Future
-    class.
+    If ``ref`` is not a string, it is returned as is.
+    References must be in the form  <modulename>:<varname> where <modulename> is the fully
+    qualified module name and varname is the path to the variable inside that module.
+
+    For example, "concurrent.futures:Future" would give you the
+    :class:`~concurrent.futures.Future` class.
 
     :raises ValueError: if there was no : in the reference string
     :raises LookupError: if the reference could not be resolved
@@ -45,11 +45,7 @@ def resolve_reference(ref):
 
 
 def qualified_name(obj) -> str:
-    """
-    Returns the qualified name (e.g. package.module.Type) for the given
-    object.
-
-    """
+    """Return the qualified name (e.g. package.module.Type) for the given object."""
     try:
         module = obj.__module__
         qualname = obj.__qualname__
@@ -63,18 +59,17 @@ def qualified_name(obj) -> str:
 
 def merge_config(original: dict, overrides: dict) -> dict:
     """
-    Returns a copy of the ``original`` configuration dictionary, with
-    overrides from ``overrides`` applied. This similar to what
-    :meth:`dict.update` does, but when a dictionary is about to be
+    Return a copy of the ``original`` configuration dictionary, with overrides from ``overrides``
+    applied.
+
+    This similar to what :meth:`dict.update` does, but when a dictionary is about to be
     replaced with another dictionary, it instead merges the contents.
 
-    If a key in ``overrides`` is a dotted path (ie.
-    ``foo.bar.baz: value``), it is assumed to be a shorthand for
-    ``foo: {bar: {baz: value}}``.
+    If a key in ``overrides`` is a dotted path (ie. ``foo.bar.baz: value``), it is assumed to be a
+    shorthand for ``foo: {bar: {baz: value}}``.
 
     :param original: a configuration dictionary
-    :param overrides: a dictionary containing overriding values to the
-        configuration
+    :param overrides: a dictionary containing overriding values to the configuration
     :return: the merge result
 
     """
@@ -95,12 +90,11 @@ def merge_config(original: dict, overrides: dict) -> dict:
 
 class PluginContainer:
     """
-    A convenience class for loading and instantiating plugins through
-    the use of entry points.
+    A convenience class for loading and instantiating plugins through the use of entry points.
 
     :param namespace: a setuptools entry points namespace
-    :param base_class: the base class for plugins of this type
-       (or ``None`` if the entry points don't point to classes)
+    :param base_class: the base class for plugins of this type (or ``None`` if the entry points
+        don't point to classes)
     """
 
     __slots__ = 'namespace', 'base_class', '_entrypoints'
@@ -118,12 +112,9 @@ class PluginContainer:
         point in this container's namespace. Otherwise, ``obj`` is
         returned as is.
 
-        :param obj: an entry point identifier, an object reference or
-            an arbitrary object
-        :return: the loaded entry point, resolved object or the
-            unchanged input value
-        :raises LookupError: if ``obj`` was a string but the named
-            entry point was not found
+        :param obj: an entry point identifier, an object reference or an arbitrary object
+        :return: the loaded entry point, resolved object or the unchanged input value
+        :raises LookupError: if ``obj`` was a string but the named entry point was not found
 
         """
         if not isinstance(obj, str):
@@ -142,14 +133,11 @@ class PluginContainer:
 
     def create_object(self, type: Union[type, str], **constructor_kwargs):
         """
-        Instantiates a plugin. The entry points in this namespace must
-        point to subclasses of the ``base_class`` parameter passed to
-        this container.
+        Instantiates a plugin. The entry points in this namespace must point to subclasses of the
+        ``base_class`` parameter passed to this container.
 
-        :param type: an entry point identifier, a textual reference to
-            a class or an actual class
-        :param constructor_kwargs: keyword arguments passed to the
-            constructor of the plugin class
+        :param type: an entry point identifier, a textual reference to a class or an actual class
+        :param constructor_kwargs: keyword arguments passed to the constructor of the plugin class
         :return: the plugin instance
         """
 
@@ -163,8 +151,8 @@ class PluginContainer:
 
     def all(self) -> List[Any]:
         """
-        Loads all entry points (if not already loaded) in this
-        namespace and returns the resulting objects as a list.
+        Load all entry points (if not already loaded) in this namespace and return the resulting
+        objects as a list.
         """
 
         values = []

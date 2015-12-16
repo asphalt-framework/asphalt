@@ -5,7 +5,7 @@ import concurrent.futures
 
 from typing import Callable, Any
 
-__all__ = 'set_event_loop', 'is_event_loop_thread', 'blocking', 'asynchronous', 'stop_event_loop'
+__all__ = ('set_event_loop', 'is_event_loop_thread', 'blocking', 'asynchronous', 'stop_event_loop')
 
 event_loop = None
 event_loop_thread_id = main_thread().ident
@@ -13,7 +13,7 @@ event_loop_thread_id = main_thread().ident
 
 def set_event_loop(loop: AbstractEventLoop, thread: Thread=None):
     """
-    Sets the event loop to be used by Asphalt applications.
+    Set the event loop to be used by Asphalt applications.
 
     This is necessary in order for :func:`blocking` and :func:`asynchronous` to work.
 
@@ -29,7 +29,7 @@ def set_event_loop(loop: AbstractEventLoop, thread: Thread=None):
 
 def is_event_loop_thread() -> bool:
     """
-    Returns ``True`` if the current thread is the event loop thread.
+    Return ``True`` if the current thread is the event loop thread.
 
     .. seealso:: :func:`set_event_loop`
 
@@ -39,11 +39,12 @@ def is_event_loop_thread() -> bool:
 
 def blocking(func: Callable[..., Any]):
     """
-    Returns a wrapper that guarantees that the target callable will be
-    run in a thread other than the event loop thread. If the call comes
-    from the event loop thread, it schedules the callable to be run in
-    the default executor and returns the corresponding Future. If the
-    call comes from any other thread, the callable is run directly.
+    Return a wrapper that guarantees that the target callable will be run in a thread other than
+    the event loop thread.
+
+    If the call comes from the event loop thread, it schedules the callable
+    to be run in the default executor and returns the corresponding Future. If the call comes from
+    any other thread, the callable is run directly.
 
     """
     @wraps(func, updated=())
@@ -60,10 +61,11 @@ def blocking(func: Callable[..., Any]):
 
 def asynchronous(func: Callable[..., Any]):
     """
-    Wraps a callable so that it is guaranteed to be called in the event
-    loop. If it returns a coroutine or a Future and the call came from
-    another thread, the coroutine or Future is first resolved before
-    returning the result to the caller.
+    Wrap a callable so that it is guaranteed to be called in the event loop.
+
+    If it returns a coroutine or a :class:`~asyncio.Future` and the call came from another thread,
+    the coroutine or :class:`~asyncio.Future` is first resolved before returning the result to the
+    caller.
 
     """
     @wraps(func, updated=())
@@ -94,10 +96,9 @@ def asynchronous(func: Callable[..., Any]):
 
 def stop_event_loop():
     """
-    Schedules the current event loop to stop on the next iteration.
+    Schedule the current event loop to stop on the next iteration.
 
-    This function is the only supported way to stop the event loop
-    from a non-eventloop thread.
+    This function is the only supported way to stop the event loop from a non-eventloop thread.
 
     """
     event_loop.call_soon_threadsafe(event_loop.stop)

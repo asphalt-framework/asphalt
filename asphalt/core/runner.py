@@ -9,35 +9,33 @@ from .concurrency import set_event_loop
 from .component import Component
 from .context import Context
 
+__all__ = ('run_application',)
+
 
 def run_application(component: Component, *, max_threads: int=None,
                     logging: Union[Dict[str, Any], int, None]=INFO):
     """
-    Starts the given top level component in the default asyncio event
-    loop and keeps the event loop running until the process is
-    terminated.
+    Start the given top level component in the default asyncio event loop and keeps the event loop
+    running until the process is terminated.
 
-    Initializes the logging system first based on the value of
-    ``logging``:
-      * If the value is a dictionary, it is passed to
-        :func:`logging.config.dictConfig` as argument.
-      * If the value is an integer, it is passed to
-        :func:`logging.basicConfig` as the logging  level.
+    Initializes the logging system first based on the value of ``logging``:
+      * If the value is a dictionary, it is passed to :func:`logging.config.dictConfig` as
+        argument.
+      * If the value is an integer, it is passed to :func:`logging.basicConfig` as the logging
+        level.
       * If the value is ``None``, logging setup is skipped entirely.
 
-    By default, the logging system is initialized using
-    :func:`~logging.basicConfig` using the INFO logging level.
+    By default, the logging system is initialized using :func:`~logging.basicConfig` using the INFO
+    logging level.
 
     The default executor in the event loop is replaced with a new
-    :class:`~concurrent.futures.ThreadPoolExecutor` where the maximum
-    number of threads is set to the value of ``max_threads`` or, if
-    omitted, the return value of :func:`os.cpu_count()`.
+    :class:`~concurrent.futures.ThreadPoolExecutor` where the maximum number of threads is set to
+    the value of ``max_threads`` or, if omitted, the return value of :func:`os.cpu_count()`.
 
     :param component: the top level component
-    :param max_threads: the maximum number of threads in the thread
-        pool
-    :param logging: a logging configuration dictionary,
-        :ref:`logging level <python:levels>` or ``None``
+    :param max_threads: the maximum number of threads in the thread pool
+    :param logging: a logging configuration dictionary, :ref:`logging level <python:levels>` or
+        ``None``
 
     """
     # Configure the logging system
