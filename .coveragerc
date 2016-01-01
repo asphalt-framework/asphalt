@@ -1,0 +1,5 @@
+[run]
+source = asphalt.core
+
+[report]
+show_missing = true
