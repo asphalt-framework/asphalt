@@ -1,4 +1,6 @@
 from concurrent.futures import ThreadPoolExecutor
+
+from typeguard import check_argument_types
 from typing import Union, Dict, Any
 from logging.config import dictConfig
 from logging import basicConfig, getLogger, INFO
@@ -38,6 +40,8 @@ def run_application(component: Component, *, max_threads: int=None,
         ``None``
 
     """
+    assert check_argument_types()
+
     # Configure the logging system
     if isinstance(logging, dict):
         dictConfig(logging)

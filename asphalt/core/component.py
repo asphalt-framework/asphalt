@@ -3,6 +3,8 @@ from collections import OrderedDict
 from typing import Dict, Any, Union
 import asyncio
 
+from typeguard import check_argument_types
+
 from .util import PluginContainer, merge_config, asynchronous
 from .context import Context
 
@@ -55,6 +57,7 @@ class ContainerComponent(Component):
         :param type: entry point name or :cls:`Component` subclass or a textual reference to one
 
         """
+        assert check_argument_types()
         if not isinstance(alias, str) or not alias:
             raise TypeError('component_alias must be a nonempty string')
         if alias in self.child_components:

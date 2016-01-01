@@ -1,6 +1,8 @@
 from importlib import import_module
 from typing import Any, Union, List
 
+from typeguard import check_argument_types
+
 from pkg_resources import EntryPoint, iter_entry_points
 
 # Import for backwards compatibility; remove in 2.0
@@ -73,6 +75,7 @@ def merge_config(original: dict, overrides: dict) -> dict:
     :return: the merge result
 
     """
+    assert check_argument_types()
     copied = original.copy()
     for key, value in overrides.items():
         if '.' in key:
@@ -141,6 +144,7 @@ class PluginContainer:
         :return: the plugin instance
         """
 
+        assert check_argument_types()
         assert self.base_class, 'base class has not been defined'
         plugin_class = self.resolve(type)
         if not issubclass(plugin_class, self.base_class):

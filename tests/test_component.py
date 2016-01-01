@@ -43,11 +43,10 @@ class TestContainerComponent:
 
     @pytest.mark.parametrize('alias, cls, exc_cls, message', [
         ('', None, TypeError, 'component_alias must be a nonempty string'),
-        (6, None, TypeError, 'component_alias must be a nonempty string'),
         ('foo', None, LookupError, 'no such entry point in asphalt.components: foo'),
         ('foo', int, TypeError,
          'int is not a subclass of asphalt.core.component.Component')
-    ], ids=['empty_alias', 'alias_type', 'bogus_entry_point', 'wrong_subclass'])
+    ], ids=['empty_alias', 'bogus_entry_point', 'wrong_subclass'])
     def test_add_component_errors(self, container, alias, cls, exc_cls, message):
         exc = pytest.raises(exc_cls, container.add_component, alias, cls)
         assert str(exc.value) == message

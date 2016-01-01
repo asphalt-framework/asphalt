@@ -1,3 +1,4 @@
+from typeguard import check_argument_types
 from typing import Tuple, Optional, Dict, Any, Union
 from asyncio import StreamReader, StreamWriter
 from ipaddress import IPv4Address, IPv6Address
@@ -105,6 +106,7 @@ class TCPConnector(Connector):
 
     def __init__(self, host: str, port: int, ssl: Union[bool, SSLContext]=False,
                  timeout: Union[int, float]=30):
+        assert check_argument_types()
         if not isinstance(port, int) or port < 1 or port > 65535:
             raise ValueError('port must be an integer between 1 and 65535, not {}'.format(port))
 
@@ -115,6 +117,7 @@ class TCPConnector(Connector):
 
     @classmethod
     def parse(cls, endpoint, defaults: Dict[str, Any]):
+        assert check_argument_types()
         if isinstance(endpoint, str):
             new_endpoint = {}
             if endpoint.startswith('tcp+ssl://'):
@@ -197,6 +200,7 @@ class UnixSocketConnector(Connector):
 
     @classmethod
     def parse(cls, endpoint, defaults: Dict[str, Any]):
+        assert check_argument_types()
         if isinstance(endpoint, str):
             if endpoint.startswith('unix://'):
                 endpoint = {'path': endpoint[7:], 'ssl': False}
@@ -248,6 +252,7 @@ def create_connector(endpoint, defaults: Dict[str, Any]=None, ctx: Context=None,
         resource could not be found
 
     """
+    assert check_argument_types()
     if isinstance(endpoint, str) and endpoint.startswith('resource://'):
         if ctx is None:
             raise ConnectorError(endpoint, 'named connector resource requested but no context '

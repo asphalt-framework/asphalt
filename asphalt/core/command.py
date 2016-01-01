@@ -3,6 +3,7 @@ from typing import Union
 import argparse
 import sys
 
+from typeguard import check_argument_types
 import pkg_resources
 import yaml
 
@@ -108,6 +109,8 @@ def run_from_config_file(config_file: Union[str, Path], runner: str='asyncio', u
     :param unsafe: ``True`` to load the YAML file in unsafe mode
 
     """
+    assert check_argument_types()
+
     # Read the configuration from the supplied YAML file
     with Path(config_file).open() as stream:
         config = yaml.load(stream) if unsafe else yaml.safe_load(stream)

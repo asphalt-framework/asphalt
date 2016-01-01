@@ -1,9 +1,10 @@
-from asyncio.futures import Future
-
 from typing import Optional, Callable, Any, Union, Iterable, Sequence
 from asyncio import get_event_loop, coroutine, iscoroutinefunction
+from asyncio.futures import Future
 from collections import defaultdict
 import asyncio
+
+from typeguard import check_argument_types
 
 from .util import qualified_name, asynchronous
 from .event import EventSource, Event
@@ -27,6 +28,7 @@ class Resource:
 
     def __init__(self, value, types: Sequence[str], alias: str, context_attr: Optional[str],
                  creator: Callable[['Context'], Any]=None):
+        assert check_argument_types()
         self.value = value
         self.types = types
         self.alias = alias
@@ -34,6 +36,7 @@ class Resource:
         self.creator = creator
 
     def get_value(self, ctx: 'Context'):
+        assert check_argument_types()
         if self.value is None and self.creator is not None:
             self.value = self.creator(ctx)
             if self.context_attr:
@@ -61,6 +64,7 @@ class ResourceEvent(Event):
     __slots__ = 'resource'
 
     def __init__(self, source: 'Context', topic: str, resource: Resource):
+        assert check_argument_types()
         super().__init__(source, topic)
         self.resource = resource
 
@@ -76,6 +80,7 @@ class ResourceNotFound(LookupError):
     """Raised when a resource request cannot be fulfilled within the allotted time."""
 
     def __init__(self, type: str, alias: str):
+        assert check_argument_types()
         super().__init__(type, alias)
         self.type = type
         self.alias = alias
@@ -94,6 +99,7 @@ class ContextFinishEvent(Event):
     __slots__ = 'exception'
 
     def __init__(self, source: 'Context', topic: str, exception: Optional[BaseException]):
+        assert check_argument_types()
         super().__init__(source, topic)
         self.exception = exception
 
@@ -118,6 +124,7 @@ class Context(EventSource):
     """
 
     def __init__(self, parent: 'Context'=None, default_timeout: int=5):
+        assert check_argument_types()
         super().__init__()
         self._register_topics({
             'finished': ContextFinishEvent,
@@ -220,6 +227,7 @@ class Context(EventSource):
         :raises ResourceConflict: if the resource conflicts with an existing one in any way
 
         """
+        assert check_argument_types()
         assert value is not None, 'value must not be None'
         if not types:
             types = [type(value)]
@@ -250,6 +258,7 @@ class Context(EventSource):
             context variable
 
         """
+        assert check_argument_types()
         assert callable(creator), 'creator must be callable'
         assert not iscoroutinefunction(creator), 'creator cannot be a coroutine function'
         return self._publish_resource(None, alias, context_attr, types, creator)
@@ -263,6 +272,7 @@ class Context(EventSource):
         :raises LookupError: the given resource was not in the collection
 
         """
+        assert check_argument_types()
         try:
             for typename in resource.types:
                 del self._resources[typename][resource.alias]
@@ -299,6 +309,7 @@ class Context(EventSource):
             allotted time
 
         """
+        assert check_argument_types()
         if not type:
             raise ValueError('type must be a type or a nonempty string')
         if not alias:

@@ -1,5 +1,7 @@
 from typing import Dict, Callable, Any, Sequence, Union
 
+from typeguard import check_argument_types
+
 from .util import qualified_name, asynchronous
 
 __all__ = ('Event', 'EventListener', 'EventSource')
@@ -25,8 +27,9 @@ class EventListener:
 
     __slots__ = 'source', 'topic', 'callback', 'args', 'kwargs'
 
-    def __init__(self, source: 'EventSource', topic: str, callback: Callable[[Event], Any],
-                 args: Sequence[Any], kwargs: Dict[str, Any]):
+    def __init__(self, source: 'EventSource', topic: str, callback: Callable, args: Sequence,
+                 kwargs: Dict[str, Any]):
+        assert check_argument_types()
         self.source = source
         self.topic = topic
         self.callback = callback
@@ -64,8 +67,8 @@ class EventSource:
             self._topics[topic] = {'event_class': event_class, 'listeners': []}
 
     @asynchronous
-    def add_listener(self, topic: str, callback: Callable[[Any], Any],
-                     args: Sequence[Any]=(), kwargs: Dict[str, Any]=None) -> EventListener:
+    def add_listener(self, topic: str, callback: Callable, args: Sequence=(),
+                     kwargs: Dict[str, Any]=None) -> EventListener:
         """
         Start listening to events specified by ``topic``.
 
@@ -81,6 +84,7 @@ class EventSource:
         :raises LookupError: if the named event has not been registered in this event source
 
         """
+        assert check_argument_types()
         if topic not in self._topics:
             raise LookupError('no such topic registered: {}'.format(topic))
 
@@ -98,6 +102,7 @@ class EventSource:
         :raises LookupError: if the handle was not found among the registered listeners
 
         """
+        assert check_argument_types()
         try:
             self._topics[handle.topic]['listeners'].remove(handle)
         except (KeyError, ValueError):
@@ -120,6 +125,7 @@ class EventSource:
         :raises LookupError: if the topic has not been registered in this event source
 
         """
+        assert check_argument_types()
         topic = event.topic if isinstance(event, Event) else event
         try:
             registration = self._topics[topic]

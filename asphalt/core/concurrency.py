@@ -3,6 +3,7 @@ from functools import wraps, partial
 from threading import Thread, main_thread, get_ident
 import concurrent.futures
 
+from typeguard import check_argument_types
 from typing import Callable, Any
 
 __all__ = ('set_event_loop', 'is_event_loop_thread', 'blocking', 'asynchronous', 'stop_event_loop')
@@ -22,6 +23,7 @@ def set_event_loop(loop: AbstractEventLoop, thread: Thread=None):
 
     """
     global event_loop, event_loop_thread_id
+    assert check_argument_types()
 
     event_loop = loop
     event_loop_thread_id = thread.ident if thread else get_ident()
@@ -37,7 +39,7 @@ def is_event_loop_thread() -> bool:
     return get_ident() == event_loop_thread_id
 
 
-def blocking(func: Callable[..., Any]):
+def blocking(func: Callable):
     """
     Return a wrapper that guarantees that the target callable will be run in a thread other than
     the event loop thread.
@@ -55,6 +57,7 @@ def blocking(func: Callable[..., Any]):
         else:
             return func(*args, **kwargs)
 
+    assert check_argument_types()
     assert not iscoroutinefunction(func), 'Cannot wrap coroutine functions as blocking callables'
     return wrapper
 
@@ -91,6 +94,7 @@ def asynchronous(func: Callable[..., Any]):
             event_loop.call_soon_threadsafe(async, callback())
             return f.result()
 
+    assert check_argument_types()
     return wrapper
 
 

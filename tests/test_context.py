@@ -148,8 +148,8 @@ class TestContext:
         ('alias', 'alias must be a nonempty string')
     ], ids=['bad_type', 'bad_alias'])
     def test_bad_request(self, context, bad_arg, errormsg):
-        type_ = None if bad_arg == 'type' else 'foo'
-        alias = None if bad_arg == 'alias' else 'foo'
+        type_ = '' if bad_arg == 'type' else 'foo'
+        alias = '' if bad_arg == 'alias' else 'foo'
         with pytest.raises(ValueError) as exc:
             yield from context.request_resource(type_, alias)
         assert str(exc.value) == errormsg

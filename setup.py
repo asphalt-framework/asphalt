@@ -39,11 +39,9 @@ setup(
     ],
     install_requires=[
         'setuptools',  # this is here to tell downstream packagers that it needs pkg_resources
-        'PyYAML >= 3.11'
+        'PyYAML >= 3.11',
+        'typeguard >= 1.0.2'
     ],
-    extras_require={
-        ':python_version == "3.4"': 'typing >= 3.5.0b1'
-    },
     entry_points={
         'console_scripts': [
             'asphalt = asphalt.core.command:main'
