@@ -1,5 +1,6 @@
 [run]
 source = asphalt.core
+omit = asphalt/core/pytest_plugin.py
 
 [report]
 show_missing = true
