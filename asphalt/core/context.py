@@ -1,5 +1,5 @@
-from typing import Optional, Callable, Any, Union, Iterable, Sequence
-from asyncio import get_event_loop, coroutine, iscoroutinefunction
+from typing import Optional, Callable, Any, Union, Iterable, Sequence, Dict
+from asyncio import get_event_loop, coroutine, iscoroutinefunction, iscoroutine
 from asyncio.futures import Future
 from collections import defaultdict
 import asyncio
@@ -153,7 +153,11 @@ class Context(EventSource):
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        get_event_loop().run_until_complete(self.dispatch('finished', exc_val))
+        coro = self.dispatch('finished', exc_val)
+        if iscoroutine(coro):
+            # The context manager was used in the event loop thread --
+            # assume the event loop is not running.
+            get_event_loop().run_until_complete(coro)
 
     @coroutine
     def __aenter__(self):

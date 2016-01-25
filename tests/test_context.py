@@ -5,6 +5,7 @@ import sys
 
 import pytest
 
+from asphalt.core.concurrency import blocking, is_event_loop_thread
 from asphalt.core.context import ResourceConflict, ResourceNotFound, Resource, Context
 
 
@@ -59,11 +60,12 @@ class TestContext:
         """
         Tests that "with context:" dispatches both started and finished events and sets the
         exception variable when an exception is raised during the context lifetime.
-        """
 
+        """
         exception = RuntimeError('test') if raise_exception else None
         events = []
         context.add_listener('finished', events.append)
+        assert is_event_loop_thread()
         try:
             if async_contextmanager:
                 event_loop.run_until_complete(use_contextmanager(context, exception))
@@ -71,6 +73,29 @@ class TestContext:
                 with context:
                     if exception:
                         raise exception
+        except RuntimeError:
+            pass
+
+        assert len(events) == 1
+        assert events[0].exception is exception
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize('raise_exception', [True, False], ids=['exception', 'no_exception'])
+    @blocking
+    def test_contextmanager_thread(self, event_loop, context, raise_exception):
+        """
+        Tests that "with context:" works outside the event loop thread (assuming the event loop is
+        running).
+
+        """
+        exception = RuntimeError('test') if raise_exception else None
+        events = []
+        context.add_listener('finished', events.append)
+        assert not is_event_loop_thread()
+        try:
+            with context:
+                if exception:
+                    raise exception
         except RuntimeError:
             pass
 
