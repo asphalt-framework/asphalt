@@ -1,4 +1,4 @@
-import os.path
+from pathlib import Path
 import sys
 
 from setuptools import setup
@@ -6,16 +6,13 @@ from setuptools import setup
 if sys.version_info < (3, 4):
     raise Exception('Asphalt requires at least Python 3.4')
 
-here = os.path.dirname(__file__)
-readme = open(os.path.join(here, 'README.rst')).read()
-
 setup(
     name='asphalt',
     use_scm_version={
         'local_scheme': 'dirty-tag'
     },
     description='A microframework for network oriented applications',
-    long_description=readme,
+    long_description=Path(__file__).parent.joinpath('README.rst').open().read(),
     author='Alex Grönholm',
     author_email='alex.gronholm@nextday.fi',
     url='https://github.com/asphalt-framework/asphalt',
