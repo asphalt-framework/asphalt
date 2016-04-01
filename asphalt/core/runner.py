@@ -1,5 +1,7 @@
 from concurrent.futures import ThreadPoolExecutor
 
+import sys
+
 from typeguard import check_argument_types
 from typing import Union, Dict, Any
 from logging.config import dictConfig
@@ -63,9 +65,9 @@ def run_application(component: Component, *, max_threads: int=None,
             retval = component.start(context)
             if retval is not None:
                 event_loop.run_until_complete(retval)
-        except BaseException:
+        except:
             logger.exception('Error during application startup')
-            raise
+            sys.exit(1)
 
         # Finally, run the event loop until the process is terminated
         # or Ctrl+C is pressed
