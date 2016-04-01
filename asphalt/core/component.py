@@ -1,12 +1,13 @@
+import asyncio
 from abc import ABCMeta, abstractmethod
 from collections import OrderedDict
 from typing import Dict, Any, Union
-import asyncio
 
 from typeguard import check_argument_types
 
-from .util import PluginContainer, merge_config, asynchronous
-from .context import Context
+from asphalt.core.concurrency import asynchronous
+from asphalt.core.context import Context
+from asphalt.core.util import PluginContainer, merge_config
 
 __all__ = ('Component', 'ContainerComponent', 'component_types')
 
@@ -70,7 +71,7 @@ class ContainerComponent(Component):
         self.child_components[alias] = component
 
     @asynchronous
-    def start(self, ctx: Context):
+    async def start(self, ctx: Context):
         """
         Create child components that have been configured but not yet created and then calls their
         :meth:`Component.start` methods in separate tasks and waits until they have completed.
@@ -88,7 +89,7 @@ class ContainerComponent(Component):
                     tasks.append(retval)
 
             if tasks:
-                yield from asyncio.gather(*tasks)
+                await asyncio.gather(*tasks)
 
 
 component_types = PluginContainer('asphalt.components', Component)

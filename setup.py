@@ -3,12 +3,13 @@ import sys
 
 from setuptools import setup
 
-if sys.version_info < (3, 4):
-    raise Exception('Asphalt requires at least Python 3.4')
+if sys.version_info < (3, 5):
+    raise Exception('Asphalt requires at least Python 3.5')
 
 setup(
     name='asphalt',
     use_scm_version={
+        'version_scheme': 'post-release',
         'local_scheme': 'dirty-tag'
     },
     description='A microframework for network oriented applications',
@@ -23,13 +24,13 @@ setup(
         'Topic :: Software Development :: Libraries :: Application Frameworks',
         'Programming Language :: Python',
         'Programming Language :: Python :: 3',
-        'Programming Language :: Python :: 3.4',
         'Programming Language :: Python :: 3.5'
     ],
     license='Apache License 2.0',
     zip_safe=False,
     packages=[
-        'asphalt.core'
+        'asphalt.core',
+        'asphalt.core.concurrency'
     ],
     setup_requires=[
         'setuptools_scm >= 1.7.0'

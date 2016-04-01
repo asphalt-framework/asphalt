@@ -2,14 +2,9 @@ from importlib import import_module
 from typing import Any, Union, List
 
 from typeguard import check_argument_types
-
 from pkg_resources import EntryPoint, iter_entry_points
 
-# Import for backwards compatibility; remove in 2.0
-from .concurrency import blocking, asynchronous, stop_event_loop  # flake8: noqa
-
-__all__ = ('resolve_reference', 'qualified_name', 'merge_config', 'blocking', 'asynchronous',
-           'PluginContainer')
+__all__ = ('resolve_reference', 'qualified_name', 'merge_config', 'PluginContainer')
 
 
 def resolve_reference(ref):

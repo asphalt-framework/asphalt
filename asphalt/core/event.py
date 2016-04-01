@@ -2,7 +2,8 @@ from typing import Dict, Callable, Any, Sequence, Union
 
 from typeguard import check_argument_types
 
-from .util import qualified_name, asynchronous
+from asphalt.core.concurrency import asynchronous
+from asphalt.core.util import qualified_name
 
 __all__ = ('Event', 'EventListener', 'EventSource')
 
@@ -109,7 +110,7 @@ class EventSource:
             raise LookupError('listener not found') from None
 
     @asynchronous
-    def dispatch(self, event: Union[str, Event], *args, **kwargs):
+    async def dispatch(self, event: Union[str, Event], *args, **kwargs):
         """
         Dispatch an event, optionally constructing one first.
 
@@ -142,4 +143,4 @@ class EventSource:
         for listener in list(registration['listeners']):
             retval = listener.callback(event, *listener.args, **listener.kwargs)
             if retval is not None:
-                yield from retval
+                await retval

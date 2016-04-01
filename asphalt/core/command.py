@@ -7,9 +7,9 @@ from typeguard import check_argument_types
 import pkg_resources
 import yaml
 
-from .util import PluginContainer
-from .component import ContainerComponent, component_types
-from .context import Context
+from asphalt.core.util import PluginContainer
+from asphalt.core.component import ContainerComponent, component_types
+from asphalt.core.context import Context
 
 __all__ = ('runners', 'quickstart_application', 'run_from_config_file')
 
@@ -38,17 +38,14 @@ def quickstart_application():
 
     with (top_package / 'application.py').open('w') as f:
         f.write("""\
-from asyncio import coroutine
-
 from {component_cls.__module__} import {component_cls.__name__}
 from {context_cls.__module__} import {context_cls.__name__}
 
 
 class {component_subclass}({component_cls.__name__}):
-    @coroutine
-    def start(ctx: Context):
+    async def start(ctx: Context):
         # Add components and resources here as needed
-        yield from super().start(ctx)
+        await super().start(ctx)
         # The components have started now
 """.format(component_cls=ContainerComponent, context_cls=Context,
            component_subclass=component_subclass))

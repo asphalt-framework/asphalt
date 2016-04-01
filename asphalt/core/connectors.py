@@ -7,9 +7,9 @@ from ssl import SSLContext
 import asyncio
 import logging
 
-from .context import ResourceNotFound, Context
-from .concurrency import asynchronous
-from .util import PluginContainer
+from asphalt.core.context import ResourceNotFound, Context
+from asphalt.core.concurrency import asynchronous
+from asphalt.core.util import PluginContainer
 
 __all__ = ('ConnectorError', 'Connector', 'TCPConnector', 'UnixSocketConnector',
            'create_connector')
@@ -159,10 +159,10 @@ class TCPConnector(Connector):
             return cls(host, port, ssl, timeout)
 
     @asynchronous
-    def connect(self):
+    async def connect(self):
         try:
             coro = asyncio.open_connection(self.host, self.port, ssl=self.ssl)
-            return (yield from asyncio.wait_for(coro, self.timeout))
+            return await asyncio.wait_for(coro, self.timeout)
         except Exception as e:
             logger.error('Error connecting to %s:%d: %s', self.host, self.port, e)
             raise ConnectionError('Error connecting to {}: {}'.format(self, e)) from e
@@ -217,10 +217,10 @@ class UnixSocketConnector(Connector):
             return cls(path, ssl, timeout)
 
     @asynchronous
-    def connect(self):
+    async def connect(self):
         try:
             coro = asyncio.open_unix_connection(self.path, ssl=self.ssl)
-            return (yield from asyncio.wait_for(coro, self.timeout))
+            return await asyncio.wait_for(coro, self.timeout)
         except Exception as e:
             logger.error('Error connecting to %s: %s', self.path, e)
             raise ConnectionError('Error connecting to {}: {}'.format(self, e)) from e
@@ -231,8 +231,8 @@ class UnixSocketConnector(Connector):
 
 
 @asynchronous
-def create_connector(endpoint, defaults: Dict[str, Any]=None, ctx: Context=None, *,
-                     timeout: int=None) -> Connector:
+async def create_connector(endpoint, defaults: Dict[str, Any]=None, ctx: Context=None, *,
+                           timeout: int=None) -> Connector:
     """
     Create or look up a connector from the given endpoint.
 
@@ -260,7 +260,7 @@ def create_connector(endpoint, defaults: Dict[str, Any]=None, ctx: Context=None,
 
         alias = endpoint[11:]
         try:
-            return (yield from ctx.request_resource(Connector, alias, timeout=timeout))
+            return await ctx.request_resource(Connector, alias, timeout=timeout)
         except ResourceNotFound as e:
             raise ConnectorError(
                 endpoint, 'connector resource "{}" could not be found'.format(alias)) from e

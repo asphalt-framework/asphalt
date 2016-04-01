@@ -9,9 +9,9 @@ from logging import basicConfig, getLogger, INFO
 import asyncio
 import os
 
-from .concurrency import set_event_loop
-from .component import Component
-from .context import Context
+from asphalt.core.concurrency import set_event_loop
+from asphalt.core.component import Component
+from asphalt.core.context import Context
 
 __all__ = ('run_application',)
 

@@ -1,13 +1,14 @@
-from typing import Optional, Callable, Any, Union, Iterable, Sequence, Dict
-from asyncio import get_event_loop, coroutine, iscoroutinefunction, iscoroutine
+import asyncio
+from asyncio import get_event_loop, iscoroutinefunction, iscoroutine
 from asyncio.futures import Future
 from collections import defaultdict
-import asyncio
+from typing import Optional, Callable, Any, Union, Iterable, Sequence, Dict
 
 from typeguard import check_argument_types
 
-from .util import qualified_name, asynchronous
-from .event import EventSource, Event
+from asphalt.core.concurrency import asynchronous
+from asphalt.core.event import EventSource, Event
+from asphalt.core.util import qualified_name
 
 __all__ = ('Resource', 'ResourceEvent', 'ResourceConflict', 'ResourceNotFound',
            'ContextFinishEvent', 'Context')
@@ -159,18 +160,15 @@ class Context(EventSource):
             # assume the event loop is not running.
             get_event_loop().run_until_complete(coro)
 
-    @coroutine
-    def __aenter__(self):
+    async def __aenter__(self):
         return self
 
-    @coroutine
-    def __aexit__(self, exc_type, exc_val, exc_tb):
-        yield from self.dispatch('finished', exc_val)
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        await self.dispatch('finished', exc_val)
 
-    @coroutine
-    def _publish_resource(self, value, alias: str, context_attr: str,
-                          types: Iterable[Union[str, type]],
-                          creator: Optional[Callable[['Context'], Any]]):
+    async def _publish_resource(self, value, alias: str, context_attr: str,
+                                types: Iterable[Union[str, type]],
+                                creator: Optional[Callable[['Context'], Any]]):
         assert isinstance(alias, str) and alias, 'alias must be a nonempty string'
         assert context_attr is None or isinstance(context_attr, str),\
             'context_attr must be a nonempty string or None'
@@ -213,11 +211,11 @@ class Context(EventSource):
         if creator is None and resource.context_attr:
             setattr(self, context_attr, value)
 
-        yield from self.dispatch('resource_published', resource)
+        await self.dispatch('resource_published', resource)
         return resource
 
     @asynchronous
-    def publish_resource(
+    async def publish_resource(
             self, value, alias: str='default', context_attr: str=None, *,
             types: Union[Union[str, type], Iterable[Union[str, type]]]=()) -> Resource:
         """
@@ -236,12 +234,12 @@ class Context(EventSource):
         if not types:
             types = [type(value)]
 
-        return self._publish_resource(value, alias, context_attr, types, None)
+        return await self._publish_resource(value, alias, context_attr, types, None)
 
     @asynchronous
-    def publish_lazy_resource(self, creator: Callable[['Context'], Any],
-                              types: Union[Union[str, type], Iterable[Union[str, type]]],
-                              alias: str='default', context_attr: str=None) -> Resource:
+    async def publish_lazy_resource(self, creator: Callable[['Context'], Any],
+                                    types: Union[Union[str, type], Iterable[Union[str, type]]],
+                                    alias: str='default', context_attr: str=None) -> Resource:
         """
         Publish a "lazy" or "contextual" resource and dispatch a ``resource_published`` event.
 
@@ -256,6 +254,7 @@ class Context(EventSource):
 
         :param creator: a callable taking a context instance as argument
         :param types: type(s) to register the resource as
+        :param alias: name of this resource (unique among all its registered types)
         :param context_attr: name of the context attribute this resource will be accessible as
         :return: the resource handle
         :raises ResourceConflict: if there is an existing resource creator for the given types or
@@ -265,10 +264,10 @@ class Context(EventSource):
         assert check_argument_types()
         assert callable(creator), 'creator must be callable'
         assert not iscoroutinefunction(creator), 'creator cannot be a coroutine function'
-        return self._publish_resource(None, alias, context_attr, types, creator)
+        return await self._publish_resource(None, alias, context_attr, types, creator)
 
     @asynchronous
-    def remove_resource(self, resource: Resource):
+    async def remove_resource(self, resource: Resource):
         """
         Remove the given resource from the collection and dispatch a ``resource_removed`` event.
 
@@ -291,11 +290,11 @@ class Context(EventSource):
         if resource.context_attr and resource.context_attr in self.__dict__:
             delattr(self, resource.context_attr)
 
-        yield from self.dispatch('resource_removed', resource)
+        await self.dispatch('resource_removed', resource)
 
     @asynchronous
-    def request_resource(self, type: Union[str, type], alias: str='default', *,
-                         timeout: Union[int, float, None]=None, optional: bool=False):
+    async def request_resource(self, type: Union[str, type], alias: str='default', *,
+                               timeout: Union[int, float, None]=None, optional: bool=False):
         """
         Request a resource matching the given type and alias.
 
@@ -344,7 +343,7 @@ class Context(EventSource):
         listeners = [ctx.add_listener('resource_published', resource_listener) for
                      ctx in context_chain]
         try:
-            resource = yield from asyncio.wait_for(future, timeout)
+            resource = await asyncio.wait_for(future, timeout)
         except asyncio.TimeoutError:
             if optional:
                 return None
