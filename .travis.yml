@@ -15,5 +15,7 @@ notifications:
   irc:
     channels:
       - "chat.freenode.net#asphalt"
+    on_success: change
+    on_failure: change
     use_notice: true
     skip_join: true
