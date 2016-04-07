@@ -20,7 +20,8 @@ class TestThreadpool:
 
         event_loop_thread = threading.current_thread()
         func_thread = None
-        callback = event_loop.run_in_executor(None, func, 1, 2) if already_in_thread else func(1, 2)
+        callback = (event_loop.run_in_executor(None, func, 1, 2) if already_in_thread else
+                    func(1, 2))
         assert await callback == 3
         assert func_thread is not event_loop_thread
 
