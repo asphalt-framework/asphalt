@@ -82,7 +82,7 @@ class _AsyncYieldValue:
         yield self
 
 
-def yield_async(value):
+def yield_async(value=None):
     """The equivalent of ``yield`` in an asynchronous context manager or asynchronous generator."""
     return _AsyncYieldValue(value)
 
