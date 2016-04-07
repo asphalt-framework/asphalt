@@ -8,7 +8,6 @@ import asyncio
 import logging
 
 from asphalt.core.context import ResourceNotFound, Context
-from asphalt.core.concurrency import asynchronous
 from asphalt.core.util import PluginContainer
 
 __all__ = ('ConnectorError', 'Connector', 'TCPConnector', 'UnixSocketConnector',
@@ -158,7 +157,6 @@ class TCPConnector(Connector):
 
             return cls(host, port, ssl, timeout)
 
-    @asynchronous
     async def connect(self):
         try:
             coro = asyncio.open_connection(self.host, self.port, ssl=self.ssl)
@@ -216,7 +214,6 @@ class UnixSocketConnector(Connector):
             timeout = endpoint.get('timeout', defaults.get('timeout', 30))
             return cls(path, ssl, timeout)
 
-    @asynchronous
     async def connect(self):
         try:
             coro = asyncio.open_unix_connection(self.path, ssl=self.ssl)
@@ -230,7 +227,6 @@ class UnixSocketConnector(Connector):
         return prefix + self.path
 
 
-@asynchronous
 async def create_connector(endpoint, defaults: Dict[str, Any]=None, ctx: Context=None, *,
                            timeout: int=None) -> Connector:
     """

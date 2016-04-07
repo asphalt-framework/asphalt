@@ -91,7 +91,7 @@ setup(
         '{package}'
     ],
     install_requires=[
-        'asphalt >= {current_version}, < {next_major_version}'
+        'asphalt'
     ]
 )
 """.format(package=package, project_name=project_name, current_version=current_version,

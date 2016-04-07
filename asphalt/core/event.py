@@ -2,7 +2,6 @@ from typing import Dict, Callable, Any, Sequence, Union
 
 from typeguard import check_argument_types
 
-from asphalt.core.concurrency import asynchronous
 from asphalt.core.util import qualified_name
 
 __all__ = ('Event', 'EventListener', 'EventSource')
@@ -67,7 +66,6 @@ class EventSource:
         for topic, event_class in topics.items():
             self._topics[topic] = {'event_class': event_class, 'listeners': []}
 
-    @asynchronous
     def add_listener(self, topic: str, callback: Callable, args: Sequence=(),
                      kwargs: Dict[str, Any]=None) -> EventListener:
         """
@@ -94,7 +92,6 @@ class EventSource:
         handles.append(handle)
         return handle
 
-    @asynchronous
     def remove_listener(self, handle: EventListener):
         """
         Remove an event listener previously added via :meth:`add_listener`.
@@ -109,7 +106,6 @@ class EventSource:
         except (KeyError, ValueError):
             raise LookupError('listener not found') from None
 
-    @asynchronous
     async def dispatch(self, event: Union[str, Event], *args, **kwargs):
         """
         Dispatch an event, optionally constructing one first.

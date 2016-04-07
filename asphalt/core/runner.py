@@ -1,16 +1,16 @@
-from concurrent.futures import ThreadPoolExecutor
-
-import sys
-
-from typeguard import check_argument_types
-from typing import Union, Dict, Any
-from logging.config import dictConfig
-from logging import basicConfig, getLogger, INFO
 import asyncio
 import os
+import sys
+from concurrent.futures import ThreadPoolExecutor
+from inspect import isawaitable
+from logging import basicConfig, getLogger, INFO
+from logging.config import dictConfig
+from typing import Union, Dict, Any
 
-from asphalt.core.concurrency import set_event_loop
+from typeguard import check_argument_types
+
 from asphalt.core.component import Component
+from asphalt.core.concurrency import set_event_loop
 from asphalt.core.context import Context
 
 __all__ = ('run_application',)
@@ -50,8 +50,7 @@ def run_application(component: Component, *, max_threads: int=None,
     elif isinstance(logging, int):
         basicConfig(level=logging)
 
-    # Assign a new default executor with the given max worker thread
-    # limit
+    # Assign a new default executor with the given max worker thread limit
     max_threads = max_threads if max_threads is not None else os.cpu_count()
     event_loop = asyncio.get_event_loop()
     event_loop.set_default_executor(ThreadPoolExecutor(max_threads))
@@ -59,23 +58,29 @@ def run_application(component: Component, *, max_threads: int=None,
 
     logger = getLogger(__name__)
     logger.info('Starting application')
-    with Context() as context:
+    context = Context()
+    exception = None
+    try:
         try:
-            # retval should be an awaitable or None
             retval = component.start(context)
-            if retval is not None:
+            if isawaitable(retval):
                 event_loop.run_until_complete(retval)
-        except:
+        except Exception:
             logger.exception('Error during application startup')
-            sys.exit(1)
+            raise
 
         # Finally, run the event loop until the process is terminated
         # or Ctrl+C is pressed
         logger.info('Application started')
-        try:
-            event_loop.run_forever()
-        except (KeyboardInterrupt, SystemExit):
-            pass
+        event_loop.run_forever()
+    except (KeyboardInterrupt, SystemExit):
+        pass
+    except BaseException as e:
+        exception = e
 
+    event_loop.run_until_complete(context.dispatch('finished', exception))
     logger.info('Application stopped')
     event_loop.close()
+
+    if exception is not None:
+        sys.exit(1)

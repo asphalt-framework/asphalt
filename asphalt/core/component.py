@@ -5,7 +5,6 @@ from typing import Dict, Any, Union
 
 from typeguard import check_argument_types
 
-from asphalt.core.concurrency import asynchronous
 from asphalt.core.context import Context
 from asphalt.core.util import PluginContainer, merge_config
 
@@ -70,7 +69,6 @@ class ContainerComponent(Component):
         component = component_types.create_object(type or alias, **kwargs)
         self.child_components[alias] = component
 
-    @asynchronous
     async def start(self, ctx: Context):
         """
         Create child components that have been configured but not yet created and then calls their

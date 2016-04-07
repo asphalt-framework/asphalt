@@ -30,17 +30,14 @@ def test_quickstart_application(monkeypatch, tmpdir, capsys):
     # Check that example/application.py was properly generated
     with projectdir.join('example').join('application.py').open() as f:
         assert f.read() == """\
-from asyncio import coroutine
-
 from asphalt.core.component import ContainerComponent
 from asphalt.core.context import Context
 
 
 class ExampleProjectApplication(ContainerComponent):
-    @coroutine
-    def start(ctx: Context):
+    async def start(ctx: Context):
         # Add components and resources here as needed
-        yield from super().start(ctx)
+        await super().start(ctx)
         # The components have started now
 """
 
@@ -88,7 +85,7 @@ setup(
         'example'
     ],
     install_requires=[
-        'asphalt >= 1.0.0, < 2.0.0'
+        'asphalt'
     ]
 )
 """

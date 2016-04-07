@@ -1,20 +1,21 @@
 import concurrent.futures
 import gc
 import inspect
+from asyncio.futures import Future
 from asyncio.tasks import ensure_future
 from concurrent.futures import Executor
 from functools import wraps, partial
-from inspect import iscoroutinefunction, isawaitable
 from threading import Event
-from typing import Optional, Callable
+from typing import Optional, Callable, Union
 
-from asphalt.core.concurrency.eventloop import is_event_loop_thread, get_event_loop
 from typeguard import check_argument_types
 
-__all__ = ('executor', 'blocking', 'asynchronous')
+from asphalt.core.concurrency.eventloop import is_event_loop_thread, get_event_loop
+
+__all__ = ('threadpool', 'call_in_thread', 'call_async')
 
 
-class _Switch:
+class _ThreadSwitcher:
     __slots__ = 'executor', 'exited'
 
     def __init__(self, executor: Optional[Executor]):
@@ -51,78 +52,93 @@ class _Switch:
         self.exited = True
         return self
 
+    def __call__(self, func: Callable) -> Callable:
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            if is_event_loop_thread():
+                callback = partial(func, *args, **kwargs)
+                return get_event_loop().run_in_executor(self.executor, callback)
+            else:
+                return func(*args, **kwargs)
 
-def executor(executor: Executor=None):
+        assert check_argument_types()
+        assert not inspect.iscoroutinefunction(func), \
+            'Cannot wrap coroutine functions as blocking callables'
+        return wrapper
+
+
+def threadpool(arg: Union[Executor, Callable] = None):
     """
-    Return an asynchronous context manager that runs the block in an executor.
+    Return a decorator/asynchronous context manager that guarantees that the wrapped function or
+    ``with``block is run in a worker thread.
+
+    Callables wrapped with this must be used with ``await`` when called in the event loop thread.
+    When called in any other thread, the wrapped callables work normally.
 
     If no executor is given, the event loop's default executor is used.
-    Otherwise, the executor must be a thread pool executor and executors must not be nested.
+    Otherwise, the executor must be a PEP 3148 compliant thread pool executor and executors must
+    not be nested.
 
-    :param executor: the executor in which to run the ``with`` block
+    :param arg: either a callable (when used as a decorator) or an executor in which to run the
+        wrapped callable or the ``with`` block (when used as a context manager)
 
     """
     assert check_argument_types()
-    return _Switch(executor)
+    if callable(arg):
+        # When used like @threadpool
+        return _ThreadSwitcher(None)(arg)
+    else:
+        # When used like @threadpool(...) or async with threadpool(...)
+        return _ThreadSwitcher(arg)
 
 
-def blocking(func: Callable, *, executor: Executor = None) -> Callable:
+def call_in_thread(func: Callable, *args, executor: Executor = None, **kwargs) -> Future:
     """
-    Return a wrapper that guarantees that the target callable will be run in a worker thread.
+    Call the given callable in a worker thread.
 
-    If the wrapper is called in the event loop thread, it schedules the wrapped callable to be run
-    in the default executor and returns the corresponding :class:`asyncio.futures.Future`.
-    If the call comes from any other thread, the callable is run directly.
+    This function is meant for one-off invocations of functions that warrant execution in a worker
+    thread because the call would block the event loop for a significant amount of time.
 
-    :param func: the target callable to wrap
-    :param executor: the executor that will run the target callable
+    Calling this function is equivalent to doing ``threadpool(func)(*args, **kwargs)`` or
+    ``threadpool(executor)(func)(*args, **kwargs)``.
+
+    :param func: a function
+    :param args: positional arguments to call with
+    :param executor: the executor to call the function in
+    :param kwargs: keyword arguments to call with
+    :return: a future that will resolve to the function call's return value
 
     """
-    @wraps(func, updated=())
-    def wrapper(*args, **kwargs):
-        if is_event_loop_thread():
-            callback = partial(func, *args, **kwargs)
-            return get_event_loop().run_in_executor(executor, callback)
+    assert check_argument_types()
+    assert is_event_loop_thread(), 'call_in_thread() must be called in the event loop thread'
+    callback = partial(func, *args, **kwargs)
+    return get_event_loop().run_in_executor(executor, callback)
+
+
+def call_async(func: Callable, *args, **kwargs):
+    """
+    Call the given callable in the event loop thread.
+
+    If the call returns an awaitable, it is resolved before returning to the caller.
+
+    :param func: a regular function or a coroutine function
+    :param args: positional arguments to call with
+    :param kwargs: keyword arguments to call with
+    :return: the return value of the function call
+
+    """
+    async def callback():
+        try:
+            retval = func(*args, **kwargs)
+            if inspect.isawaitable(retval):
+                retval = await retval
+        except BaseException as e:
+            f.set_exception(e)
         else:
-            return func(*args, **kwargs)
+            f.set_result(retval)
 
     assert check_argument_types()
-    assert not iscoroutinefunction(func), 'Cannot wrap coroutine functions as blocking callables'
-    return wrapper
-
-
-def asynchronous(func: Callable) -> Callable:
-    """
-    Wrap a callable so that it is guaranteed to be called in the event loop.
-
-    If it returns a coroutine or a :class:`~asyncio.Future` and the call came from another thread,
-    the coroutine or :class:`~asyncio.Future` is first resolved before returning the result to the
-    caller.
-
-    :param func: the target callable to wrap
-
-    """
-    @wraps(func, updated=())
-    def wrapper(*args, **kwargs):
-        async def callback():
-            try:
-                retval = func(*args, **kwargs)
-                if isawaitable(retval):
-                    retval = await retval
-            except Exception as e:
-                f.set_exception(e)
-            except BaseException as e:  # pragma: no cover
-                f.set_exception(e)
-                raise
-            else:
-                f.set_result(retval)
-
-        if is_event_loop_thread():
-            return func(*args, **kwargs)
-        else:
-            f = concurrent.futures.Future()
-            get_event_loop().call_soon_threadsafe(ensure_future, callback())
-            return f.result()
-
-    assert check_argument_types()
-    return wrapper
+    assert not is_event_loop_thread(), 'call_async() must be called in a worker thread'
+    f = concurrent.futures.Future()
+    get_event_loop().call_soon_threadsafe(ensure_future, callback())
+    return f.result()

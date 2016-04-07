@@ -1,4 +1,3 @@
-from asyncio import coroutine
 import asyncio
 
 import pytest
@@ -12,9 +11,8 @@ class DummyComponent(Component):
         self.kwargs = kwargs
         self.started = False
 
-    @coroutine
-    def start(self, ctx):
-        yield from asyncio.sleep(0.1)
+    async def start(self, ctx):
+        await asyncio.sleep(0.1)
         self.started = True
 
 
@@ -57,6 +55,6 @@ class TestContainerComponent:
         assert str(exc.value) == 'there is already a child component named "dummy"'
 
     @pytest.mark.asyncio
-    def test_start(self, container):
-        yield from container.start(Context())
+    async def test_start(self, container):
+        await container.start(Context())
         assert container.child_components['dummy'].started

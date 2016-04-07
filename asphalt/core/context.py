@@ -1,12 +1,11 @@
-import asyncio
-from asyncio import get_event_loop, iscoroutinefunction, iscoroutine
-from asyncio.futures import Future
+from asyncio import iscoroutinefunction
+from asyncio.futures import Future, TimeoutError
+from asyncio.tasks import wait_for
 from collections import defaultdict
-from typing import Optional, Callable, Any, Union, Iterable, Sequence, Dict
+from typing import Optional, Callable, Any, Union, Iterable, Sequence, Dict  # noqa
 
 from typeguard import check_argument_types
 
-from asphalt.core.concurrency import asynchronous
 from asphalt.core.event import EventSource, Event
 from asphalt.core.util import qualified_name
 
@@ -150,16 +149,6 @@ class Context(EventSource):
 
         raise AttributeError('no such context variable: {}'.format(name))
 
-    def __enter__(self):
-        return self
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        coro = self.dispatch('finished', exc_val)
-        if iscoroutine(coro):
-            # The context manager was used in the event loop thread --
-            # assume the event loop is not running.
-            get_event_loop().run_until_complete(coro)
-
     async def __aenter__(self):
         return self
 
@@ -214,7 +203,6 @@ class Context(EventSource):
         await self.dispatch('resource_published', resource)
         return resource
 
-    @asynchronous
     async def publish_resource(
             self, value, alias: str='default', context_attr: str=None, *,
             types: Union[Union[str, type], Iterable[Union[str, type]]]=()) -> Resource:
@@ -236,7 +224,6 @@ class Context(EventSource):
 
         return await self._publish_resource(value, alias, context_attr, types, None)
 
-    @asynchronous
     async def publish_lazy_resource(self, creator: Callable[['Context'], Any],
                                     types: Union[Union[str, type], Iterable[Union[str, type]]],
                                     alias: str='default', context_attr: str=None) -> Resource:
@@ -266,7 +253,6 @@ class Context(EventSource):
         assert not iscoroutinefunction(creator), 'creator cannot be a coroutine function'
         return await self._publish_resource(None, alias, context_attr, types, creator)
 
-    @asynchronous
     async def remove_resource(self, resource: Resource):
         """
         Remove the given resource from the collection and dispatch a ``resource_removed`` event.
@@ -292,7 +278,6 @@ class Context(EventSource):
 
         await self.dispatch('resource_removed', resource)
 
-    @asynchronous
     async def request_resource(self, type: Union[str, type], alias: str='default', *,
                                timeout: Union[int, float, None]=None, optional: bool=False):
         """
@@ -343,8 +328,8 @@ class Context(EventSource):
         listeners = [ctx.add_listener('resource_published', resource_listener) for
                      ctx in context_chain]
         try:
-            resource = await asyncio.wait_for(future, timeout)
-        except asyncio.TimeoutError:
+            resource = await wait_for(future, timeout)
+        except TimeoutError:
             if optional:
                 return None
             else:

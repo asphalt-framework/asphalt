@@ -1,4 +1,3 @@
-from asyncio import coroutine
 import asyncio
 
 import pytest
@@ -47,8 +46,8 @@ class TestEventSource:
         ('event_a', [((1, 2), {'a': 3}), ((7, 3), {'x': 6}), ((6, 1), {'a': 5})]),
         ('event_b', [((4, 5), {'b': 4}), ((9, 4), {'c': 1})])
     ], ids=['event_a', 'event_b'])
-    def test_dispatch_event(self, source: EventSource, topic, results, as_coroutine,
-                            construct_first):
+    async def test_dispatch_event(self, source: EventSource, topic, results, as_coroutine,
+                                  construct_first):
         """
         Tests that firing an event triggers the right listeners.
         Also makes sure that callbacks can be either coroutines or normal callables.
@@ -61,7 +60,7 @@ class TestEventSource:
 
         events = []
         trigger = asyncio.Event()
-        callback = coroutine(callback) if as_coroutine else callback
+        callback = asyncio.coroutine(callback) if as_coroutine else callback
         source.add_listener('event_a', callback, [1, 2], {'a': 3})
         source.add_listener('event_b', callback, [4, 5], {'b': 4})
         source.add_listener('event_a', callback, [7, 3], {'x': 6})
@@ -69,11 +68,11 @@ class TestEventSource:
         source.add_listener('event_b', callback, [9, 4], {'c': 1})
         if construct_first:
             event = DummyEvent(source, topic, 'x', 'y', a=1, b=2)
-            yield from source.dispatch(event)
+            await source.dispatch(event)
         else:
-            yield from source.dispatch(topic, 'x', 'y', a=1, b=2)
+            await source.dispatch(topic, 'x', 'y', a=1, b=2)
 
-        yield from trigger.wait()
+        await trigger.wait()
 
         assert len(events) == len(results)
         for (event, args, kwargs), (expected_args, expected_kwargs) in zip(events, results):
@@ -92,7 +91,7 @@ class TestEventSource:
         assert str(exc.value) == 'listener not found'
 
     @pytest.mark.asyncio
-    def test_dispatch_nonexistent_topic(self, source):
+    async def test_dispatch_nonexistent_topic(self, source):
         with pytest.raises(LookupError) as exc:
-            yield from source.dispatch('blah')
+            await source.dispatch('blah')
         assert str(exc.value) == 'no such topic registered: blah'

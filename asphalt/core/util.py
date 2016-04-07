@@ -1,8 +1,8 @@
-from importlib import import_module
 from typing import Any, Union, List
 
-from typeguard import check_argument_types
+from importlib import import_module
 from pkg_resources import EntryPoint, iter_entry_points
+from typeguard import check_argument_types
 
 __all__ = ('resolve_reference', 'qualified_name', 'merge_config', 'PluginContainer')
 

@@ -41,22 +41,22 @@ class TestTCPConnector:
         assert str(exc.value) == 'port must be an integer between 1 and 65535, not -1'
 
     @pytest.mark.asyncio
-    def test_connect(self):
+    async def test_connect(self):
         connector = TCPConnector('1.2.3.4', 5000)
         future = Future()
         future.set_result((1, 2))
         with patch('asyncio.open_connection', return_value=future) as open_connection:
-            reader, writer = yield from connector.connect()
+            reader, writer = await connector.connect()
 
         open_connection.assert_called_once_with('1.2.3.4', 5000, ssl=False)
         assert (reader, writer) == (1, 2)
 
     @pytest.mark.asyncio
-    def test_connect_error(self):
+    async def test_connect_error(self):
         connector = TCPConnector('1.2.3.4', 5000)
         connection_patch = patch('asyncio.open_connection', side_effect=Exception('foo'))
         with connection_patch, pytest.raises(ConnectionError) as exc:
-            yield from connector.connect()
+            await connector.connect()
 
         assert str(exc.value) == 'Error connecting to tcp://1.2.3.4:5000: foo'
 
@@ -82,22 +82,22 @@ class TestUnixSocketConnector:
             assert getattr(connector, attr) == value
 
     @pytest.mark.asyncio
-    def test_connect(self):
+    async def test_connect(self):
         connector = UnixSocketConnector('/some/path')
         future = Future()
         future.set_result((1, 2))
         with patch('asyncio.open_unix_connection', return_value=future) as open_unix_connection:
-            reader, writer = yield from connector.connect()
+            reader, writer = await connector.connect()
 
         open_unix_connection.assert_called_once_with('/some/path', ssl=False)
         assert (reader, writer) == (1, 2)
 
     @pytest.mark.asyncio
-    def test_connect_error(self):
+    async def test_connect_error(self):
         connector = UnixSocketConnector('/some/path')
         connection_patch = patch('asyncio.open_unix_connection', side_effect=Exception('foo'))
         with connection_patch, pytest.raises(ConnectionError) as exc:
-            yield from connector.connect()
+            await connector.connect()
 
         assert str(exc.value) == 'Error connecting to unix:///some/path: foo'
 
@@ -111,51 +111,51 @@ class TestUnixSocketConnector:
 
 class TestCreateConnector:
     @pytest.mark.asyncio
-    def test_create_connector(self):
+    async def test_create_connector(self):
         """Tests that creating a connector with a URL style endpoint works."""
 
-        result = yield from create_connector('tcp://127.0.0.1:5000')
+        result = await create_connector('tcp://127.0.0.1:5000')
         assert isinstance(result, TCPConnector)
         assert result.host == '127.0.0.1'
         assert result.port == 5000
 
     @pytest.mark.asyncio
-    def test_resource(self):
+    async def test_resource(self):
         """Tests that resource:// connectors work."""
 
         connector = TCPConnector('127.0.0.1', 5000)
         ctx = Context()
-        yield from ctx.publish_resource(connector, 'foo', types=[Connector])
-        result = yield from create_connector('resource://foo', ctx=ctx, timeout=0)
+        await ctx.publish_resource(connector, 'foo', types=[Connector])
+        result = await create_connector('resource://foo', ctx=ctx, timeout=0)
         assert result is connector
 
     @pytest.mark.asyncio
-    def test_resource_not_found(self):
+    async def test_resource_not_found(self):
         """Tests that when a connector resource is not found, ConnectorError is raised."""
 
         with pytest.raises(ConnectorError) as exc:
-            yield from create_connector('resource://foo', ctx=Context(), timeout=0)
+            await create_connector('resource://foo', ctx=Context(), timeout=0)
 
         assert str(exc.value) == 'connector resource "foo" could not be found'
 
     @pytest.mark.asyncio
-    def test_resource_no_context(self):
+    async def test_resource_no_context(self):
         """
         Tests that attempting to look up a connector resource without a context raises the
         appropriate exception.
         """
 
         with pytest.raises(ConnectorError) as exc:
-            yield from create_connector('resource://foo')
+            await create_connector('resource://foo')
 
         assert str(exc.value) == ('named connector resource requested but no context was provided '
                                   'for resource loading')
 
     @pytest.mark.asyncio
-    def test_invalid_endpoint(self):
+    async def test_invalid_endpoint(self):
         """Tests that specifying an invalid endpoint raises the appropriate exception."""
 
         with pytest.raises(ConnectorError) as exc:
-            yield from create_connector('blah://foo')
+            await create_connector('blah://foo')
 
         assert str(exc.value) == "'blah://foo' is not a valid connector endpoint"

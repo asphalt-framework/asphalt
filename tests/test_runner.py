@@ -1,14 +1,14 @@
-from asyncio import new_event_loop, set_event_loop, get_event_loop, coroutine
-from unittest.mock import patch
+import asyncio
 import logging
 import sys
+from asyncio import new_event_loop, set_event_loop, get_event_loop
+from unittest.mock import patch
 
 import pytest
 
 from asphalt.core.component import Component
 from asphalt.core.context import Context
 from asphalt.core.runner import run_application
-from asphalt.core.util import stop_event_loop
 
 
 class ShutdownComponent(Component):
@@ -25,7 +25,7 @@ class ShutdownComponent(Component):
         ctx.add_listener('finished', self.finish_callback)
 
         if self.method == 'stop':
-            stop_event_loop()
+            get_event_loop().stop()
         elif self.method == 'exit':
             get_event_loop().call_later(0.1, sys.exit)
         elif self.method == 'exception':
@@ -65,11 +65,11 @@ def test_run_callbacks(coroutine_start, caplog):
     """
 
     component = ShutdownComponent()
-    component.start = coroutine(component.start) if coroutine_start else component.start
+    component.start = asyncio.coroutine(component.start) if coroutine_start else component.start
     run_application(component)
 
     assert component.finish_callback_called
-    records = [record for record in caplog.records() if record.name == 'asphalt.core.runner']
+    records = [record for record in caplog.records if record.name == 'asphalt.core.runner']
     assert len(records) == 3
     assert records[0].message == 'Starting application'
     assert records[1].message == 'Application started'
@@ -81,7 +81,7 @@ def test_run_sysexit(caplog):
     run_application(component)
 
     assert component.finish_callback_called
-    records = [record for record in caplog.records() if record.name == 'asphalt.core.runner']
+    records = [record for record in caplog.records if record.name == 'asphalt.core.runner']
     assert len(records) == 3
     assert records[0].message == 'Starting application'
     assert records[1].message == 'Application started'
@@ -95,11 +95,11 @@ def test_run_start_exception(caplog):
     """
 
     component = ShutdownComponent(method='exception')
-    exc = pytest.raises(RuntimeError, run_application, component)
+    pytest.raises(SystemExit, run_application, component)
 
-    assert exc.value == component.exception
     assert str(component.exception) == 'this should crash the application'
-    records = [record for record in caplog.records() if record.name == 'asphalt.core.runner']
-    assert len(records) == 2
+    records = [record for record in caplog.records if record.name == 'asphalt.core.runner']
+    assert len(records) == 3
     assert records[0].message == 'Starting application'
     assert records[1].message == 'Error during application startup'
+    assert records[2].message == 'Application stopped'
