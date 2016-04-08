@@ -32,6 +32,9 @@ class _ThreadSwitcher:
             event.wait()
             coro.send(None)
 
+            if not self.exited:
+                raise RuntimeError('attempted to "await" in a worker thread')
+
         if self.exited:
             # This is run in the worker thread
             yield

@@ -1,4 +1,5 @@
 import threading
+from asyncio.futures import Future
 from concurrent.futures.thread import ThreadPoolExecutor
 
 import pytest
@@ -62,6 +63,17 @@ class TestThreadpool:
 
         assert threading.current_thread() is event_loop_thread
         assert str(exc.value) == 'foo'
+
+    @pytest.mark.asyncio
+    async def test_threadpool_await_in_thread(self):
+        """Test that attempting to await in a thread results in a RuntimeError."""
+        future = Future()
+
+        with pytest.raises(RuntimeError) as exc:
+            async with threadpool():
+                await future
+
+        assert str(exc.value) == 'attempted to "await" in a worker thread'
 
 
 class TestCallInThread:
