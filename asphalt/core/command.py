@@ -1,15 +1,14 @@
-from pathlib import Path
-from typing import Union
 import argparse
 import sys
+from pathlib import Path
+from typing import Union
 
-from typeguard import check_argument_types
-import pkg_resources
 import yaml
+from typeguard import check_argument_types
 
-from asphalt.core.util import PluginContainer
 from asphalt.core.component import ContainerComponent, component_types
 from asphalt.core.context import Context
+from asphalt.core.util import PluginContainer
 
 __all__ = ('runners', 'quickstart_application', 'run_from_config_file')
 
@@ -18,9 +17,6 @@ runners = PluginContainer('asphalt.core.runners')
 
 def quickstart_application():
     """Interactively build a skeleton application directory structure."""
-    current_version = pkg_resources.get_distribution('asphalt').parsed_version.public
-    next_major_version = '{}.0.0'.format(int(current_version.split('.')[0]) + 1)
-
     project_name = input('Project name: ')
     package = input('Top level package name: ')
     component_subclass = '{}Application'.format(
@@ -94,8 +90,7 @@ setup(
         'asphalt'
     ]
 )
-""".format(package=package, project_name=project_name, current_version=current_version,
-           next_major_version=next_major_version))
+""".format(package=package, project_name=project_name))
 
 
 def run_from_config_file(config_file: Union[str, Path], runner: str='asyncio', unsafe: bool=False):

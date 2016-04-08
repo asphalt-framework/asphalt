@@ -43,7 +43,7 @@ class _ThreadSwitcher:
                         if inspect.iscoroutine(obj))
             event = Event()
             future = loop.run_in_executor(self.executor, exec_when_ready)
-            future._blocking = True
+            next(future.__await__())  # Make the future think it's being awaited on
             loop.call_soon(event.set)
             yield future
 
