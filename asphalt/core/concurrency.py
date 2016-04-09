@@ -1,4 +1,8 @@
+import concurrent.futures
 from asyncio.events import AbstractEventLoop
+from asyncio.tasks import ensure_future
+from collections import Callable
+from inspect import isawaitable
 from threading import get_ident, main_thread, Thread
 from typing import Optional
 
@@ -47,3 +51,32 @@ def is_event_loop_thread() -> bool:
 
     """
     return get_ident() == _event_loop_thread_id
+
+
+def call_async(func: Callable, *args, **kwargs):
+    """
+    Call the given callable in the event loop thread.
+
+    If the call returns an awaitable, it is resolved before returning to the caller.
+
+    :param func: a regular function or a coroutine function
+    :param args: positional arguments to call with
+    :param kwargs: keyword arguments to call with
+    :return: the return value of the function call
+
+    """
+    async def callback():
+        try:
+            retval = func(*args, **kwargs)
+            if isawaitable(retval):
+                retval = await retval
+        except BaseException as e:
+            f.set_exception(e)
+        else:
+            f.set_result(retval)
+
+    assert check_argument_types()
+    assert not is_event_loop_thread(), 'call_async() must be called in a worker thread'
+    f = concurrent.futures.Future()
+    get_event_loop().call_soon_threadsafe(ensure_future, callback())
+    return f.result()

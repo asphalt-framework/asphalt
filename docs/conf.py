@@ -23,10 +23,12 @@ language = None
 
 exclude_patterns = ['_build']
 pygments_style = 'sphinx'
+highlight_language = 'python3'
 todo_include_todos = False
 
 html_theme = 'classic'
 html_static_path = ['_static']
 htmlhelp_basename = 'asphaltdoc'
 
-intersphinx_mapping = {'python': ('http://docs.python.org/3/', None)}
+intersphinx_mapping = {'python': ('http://docs.python.org/3/', None),
+                       'asyncio_extras': ('http://pythonhosted.org/asyncio_extras/', None)}

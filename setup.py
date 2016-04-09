@@ -29,8 +29,7 @@ setup(
     license='Apache License 2.0',
     zip_safe=False,
     packages=[
-        'asphalt.core',
-        'asphalt.core.concurrency'
+        'asphalt.core'
     ],
     setup_requires=[
         'setuptools_scm >= 1.7.0'
@@ -38,7 +37,8 @@ setup(
     install_requires=[
         'setuptools',  # this is here to tell downstream packagers that it needs pkg_resources
         'PyYAML >= 3.11',
-        'typeguard >= 1.0.2'
+        'typeguard >= 1.0.2',
+        'asyncio_extras'
     ],
     entry_points={
         'console_scripts': [

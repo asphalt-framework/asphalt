@@ -8,16 +8,12 @@ Version history
 - *BACKWARD INCOMPATIBLE* De-emphasized the ability to run code in worker threads.
   It is now recommended to minimize the use of worker threads.
   As a result, the ``@asynchronous`` decorator has been removed.
-- *BACKWARD INCOMPATIBLE* Replaced the ``@blocking`` decorator with the ``threadpool`` function
-  that acts both as a decorator and an asynchronous context manager that executes wrapped code in
-  a worker thread
+- *BACKWARD INCOMPATIBLE* Dropped the ``@blocking`` decorator in favor of the ``@threadpool``
+  decorator from ``asyncio_extras``
 - *BACKWARD INCOMPATIBLE* Removed the deprecated ``blocking`` and ``asynchronous`` aliases from the
   ``asphalt.core.util`` module
 - *BACKWARD INCOMPATIBLE* Removed regular context manager support from the ``Context`` class
   (asynchronous context manager support still remains)
-- Added an asynchronous wrapper for running file I/O operations in a worker thread
-- Added wrappers for easily creating asynchronous generators and context managers
-
 
 **1.3.0**
 
