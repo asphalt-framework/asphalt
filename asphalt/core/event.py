@@ -1,4 +1,6 @@
-from typing import Dict, Callable, Any, Sequence, Union, Iterable
+from asyncio import ensure_future, wait
+from inspect import isawaitable
+from typing import Dict, Callable, Any, Sequence, Union, Iterable, Tuple
 
 from typeguard import check_argument_types
 
@@ -36,13 +38,28 @@ class EventListener:
         self.args = args
         self.kwargs = kwargs
 
-    def remove(self):
+    def remove(self) -> None:
         """Remove this listener from its event source."""
         self.source.remove_listener(self)
 
     def __repr__(self):
         return ('{0.__class__.__name__}(topics={0.topics!r}, callback={1}, args={0.args!r}, '
                 'kwargs={0.kwargs!r})'.format(self, qualified_name(self.callback)))
+
+
+class EventDispatchError(Exception):
+    """
+    Raised when one or more event listener callback raises an exception.
+
+    :ivar Event event: the event
+    :ivar Sequence[Tuple[EventListener, Exception]]: a sequence containing tuples of
+        (listener, exception) for each exception that was raised by a listener callback
+    """
+
+    def __init__(self, event: Event, exceptions: Sequence[Tuple[EventListener, Exception]]):
+        super().__init__('error dispatching event')
+        self.event = event
+        self.exceptions = exceptions
 
 
 class EventSource:
@@ -54,7 +71,7 @@ class EventSource:
         super().__init__(*args, **kwargs)
         self._topics = {}
 
-    def _register_topics(self, topics: Dict[str, Any]):
+    def _register_topics(self, topics: Dict[str, Any]) -> None:
         """
         Register a number of supported topics and their respective event classes.
 
@@ -108,20 +125,22 @@ class EventSource:
         except (KeyError, ValueError):
             raise LookupError('listener not found') from None
 
-    async def dispatch(self, event: Union[str, Event], *args, **kwargs):
+    async def dispatch(self, event: Union[str, Event], *args, **kwargs) -> None:
         """
         Dispatch an event, optionally constructing one first.
 
         This method has two forms: dispatch(``event``) and dispatch(``topic``, ``*args``,
         ``**kwargs``). The former dispatches an existing event object while the latter
         instantiates one, using this object as the source. Any extra positional and keyword
-        arguments are passed directly to the event class constructor.
+        arguments are passed directly to the constructor of the event class.
 
-        Any exceptions raised by the listener callbacks are passed
-        through to the caller.
+        All listeners are always called. If any event listener raises an exception, an
+        :class:`EventDispatchError` is then raised, containing the callbacks and the exceptions
+        they raised.
 
         :param event: an :class:`~asphalt.core.event.Event` instance or an event topic
         :raises LookupError: if the topic has not been registered in this event source
+        :raises EventDispatchError: if any of the listener callbacks raises an exception
 
         """
         assert check_argument_types()
@@ -138,7 +157,24 @@ class EventSource:
             event_class = registration['event_class']
             event = event_class(self, topic, *args, **kwargs)
 
+        futures, exceptions = [], []
         for listener in list(registration['listeners']):
-            retval = listener.callback(event, *listener.args, **listener.kwargs)
-            if retval is not None:
-                await retval
+            try:
+                retval = listener.callback(event, *listener.args, **listener.kwargs)
+            except Exception as e:
+                exceptions.append((listener, e))
+            else:
+                if isawaitable(retval):
+                    future = ensure_future(retval)
+                    futures.append((listener, future))
+
+        # For any callbacks that returned awaitables, wait for their completion and collect any
+        # exceptions they raise
+        for listener, future in futures:
+            try:
+                await future
+            except Exception as e:
+                exceptions.append((listener, e))
+
+        if exceptions:
+            raise EventDispatchError(event, exceptions)

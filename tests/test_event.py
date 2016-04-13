@@ -1,6 +1,11 @@
-import pytest
+from asyncio.queues import Queue
+from typing import Union, Iterable
 
-from asphalt.core.event import EventSource, Event, EventListener
+import pytest
+from asyncio_extras.asyncyield import yield_async
+from asyncio_extras.generator import async_generator
+
+from asphalt.core.event import EventSource, Event, EventListener, EventDispatchError
 
 
 class DummyEvent(Event):
@@ -96,6 +101,32 @@ class TestEventSource:
         assert events[0].kwargs == {'a': 1, 'b': 2}
         assert events[1].args == ('c', 'd')
         assert events[1].kwargs == {'g': 7, 'h': 8}
+
+    @pytest.mark.asyncio
+    async def test_dispatch_listener_exceptions(self, source):
+        """
+        Test that multiple exceptions raised by listeners are combined into one EventDispatchError.
+
+        """
+        def plain_error(event):
+            raise plain_exception
+
+        async def async_error(event):
+            raise async_exception
+
+        plain_exception = ValueError('foo')
+        async_exception = KeyError('bar')
+        plain_listener = source.add_listener('event_a', plain_error)
+        async_listener = source.add_listener('event_a', async_error)
+        event = DummyEvent(source, 'event_a')
+        with pytest.raises(EventDispatchError) as exc:
+            await source.dispatch(event)
+
+        assert exc.value.event is event
+        assert exc.value.exceptions == [
+            (plain_listener, plain_exception),
+            (async_listener, async_exception)
+        ]
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize('from_handle', [True, False],
