@@ -135,7 +135,7 @@ class EventSource:
         arguments are passed directly to the constructor of the event class.
 
         All listeners are always called. If any event listener raises an exception, an
-        :class:`EventDispatchError` is then raised, containing the callbacks and the exceptions
+        :class:`EventDispatchError` is then raised, containing the listeners and the exceptions
         they raised.
 
         :param event: an :class:`~asphalt.core.event.Event` instance or an event topic
