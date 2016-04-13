@@ -1,11 +1,8 @@
-from asyncio.queues import Queue
-from typing import Union, Iterable
+import asyncio
 
 import pytest
-from asyncio_extras.asyncyield import yield_async
-from asyncio_extras.generator import async_generator
 
-from asphalt.core.event import EventSource, Event, EventListener, EventDispatchError
+from asphalt.core.event import EventSource, Event, EventListener, EventDispatchError, stream_events
 
 
 class DummyEvent(Event):
@@ -13,6 +10,13 @@ class DummyEvent(Event):
         super().__init__(source, topic)
         self.args = args
         self.kwargs = kwargs
+
+
+@pytest.fixture
+def source():
+    event_source = EventSource()
+    event_source._register_topics({'event_a': DummyEvent, 'event_b': DummyEvent})
+    return event_source
 
 
 class TestEventListener:
@@ -27,12 +31,6 @@ class TestEventListener:
 
 
 class TestEventSource:
-    @pytest.fixture
-    def source(self):
-        event_source = EventSource()
-        event_source._register_topics({'event_a': DummyEvent, 'event_b': DummyEvent})
-        return event_source
-
     def test_add_listener(self, source):
         handle = source.add_listener('event_a', lambda: None)
         assert isinstance(handle, EventListener)
@@ -43,7 +41,7 @@ class TestEventSource:
         assert str(exc.value) == 'no such topic registered: foo'
 
     @pytest.mark.asyncio
-    async def test_dispatch_event_coroutine(self,  source: EventSource):
+    async def test_dispatch_event_coroutine(self, source: EventSource):
         """Test that a coroutine function can be an event listener."""
         async def callback(event: Event):
             events.append(event)
@@ -173,3 +171,22 @@ class TestEventSource:
         with pytest.raises(AssertionError) as exc:
             await source.dispatch(Event(source, 'event_a'))
         assert str(exc.value) == 'event class mismatch'
+
+
+@pytest.mark.asyncio
+async def test_stream_events(source, event_loop):
+    async def generate_events():
+        await asyncio.sleep(0.2)
+        await source.dispatch('event_a', 1)
+        await asyncio.sleep(0.2)
+        await source.dispatch('event_a', 2)
+        await asyncio.sleep(0.2)
+        await source.dispatch('event_a', 3)
+
+    event_loop.create_task(generate_events())
+    last_number = 0
+    async for event in stream_events(source, 'event_a'):
+        assert event.args[0] == last_number + 1
+        last_number += 1
+        if last_number == 3:
+            break

@@ -18,6 +18,7 @@ Version history
   event listeners even if some listeners raise exceptions. A uniform exception is then raised
   that contains all the exceptions and the listeners who raised them.
 - Added the ability to listen to multiple topics in an EventSource with a single listener
+- Added the ability to stream events from an EventSource
 
 **1.3.0**
 

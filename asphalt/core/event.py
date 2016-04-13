@@ -1,7 +1,10 @@
-from asyncio import ensure_future, wait
+from asyncio import ensure_future
+from asyncio.queues import Queue
 from inspect import isawaitable
 from typing import Dict, Callable, Any, Sequence, Union, Iterable, Tuple
 
+from asyncio_extras.asyncyield import yield_async
+from asyncio_extras.generator import async_generator
 from typeguard import check_argument_types
 
 from asphalt.core.util import qualified_name
@@ -178,3 +181,24 @@ class EventSource:
 
         if exceptions:
             raise EventDispatchError(event, exceptions)
+
+
+@async_generator
+async def stream_events(source: EventSource, topics: Union[str, Iterable[str]]):
+    """
+    Generate event objects to the consumer as they're dispatched.
+
+    This function is meant for use with ``async for``.
+
+    :param source: an event source
+    :param topics: topic or topics to listen to
+
+    """
+    queue = Queue()
+    listener = source.add_listener(topics, queue.put)
+    try:
+        while True:
+            event = await queue.get()
+            await yield_async(event)
+    finally:
+        listener.remove()
