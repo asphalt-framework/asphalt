@@ -6,8 +6,8 @@
 .cache
 .eggs/
 *.egg-info/
-*.pyc
 __pycache__/
 docs/_build/
 dist/
 build/
+virtualenv/
