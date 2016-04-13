@@ -1,4 +1,4 @@
-from typing import Dict, Callable, Any, Sequence, Union
+from typing import Dict, Callable, Any, Sequence, Union, Iterable
 
 from typeguard import check_argument_types
 
@@ -25,26 +25,24 @@ class Event:
 class EventListener:
     """A handle that can be used to remove an event listener from its :class:`EventSource`."""
 
-    __slots__ = 'source', 'topic', 'callback', 'args', 'kwargs'
+    __slots__ = 'source', 'topics', 'callback', 'args', 'kwargs'
 
-    def __init__(self, source: 'EventSource', topic: str, callback: Callable, args: Sequence,
-                 kwargs: Dict[str, Any]):
+    def __init__(self, source: 'EventSource', topics: Sequence[str], callback: Callable,
+                 args: Sequence, kwargs: Dict[str, Any]):
         assert check_argument_types()
         self.source = source
-        self.topic = topic
+        self.topics = topics
         self.callback = callback
         self.args = args
         self.kwargs = kwargs
 
     def remove(self):
         """Remove this listener from its event source."""
-
         self.source.remove_listener(self)
 
     def __repr__(self):
-        return ('{0.__class__.__name__}(topic={0.topic!r}, callback={1}, args={0.args!r}, '
-                'kwargs={0.kwargs!r})'.
-                format(self, qualified_name(self.callback)))
+        return ('{0.__class__.__name__}(topics={0.topics!r}, callback={1}, args={0.args!r}, '
+                'kwargs={0.kwargs!r})'.format(self, qualified_name(self.callback)))
 
 
 class EventSource:
@@ -66,8 +64,8 @@ class EventSource:
         for topic, event_class in topics.items():
             self._topics[topic] = {'event_class': event_class, 'listeners': []}
 
-    def add_listener(self, topic: str, callback: Callable, args: Sequence=(),
-                     kwargs: Dict[str, Any]=None) -> EventListener:
+    def add_listener(self, topics: Union[str, Iterable[str]], callback: Callable,
+                     args: Sequence=(), kwargs: Dict[str, Any]=None) -> EventListener:
         """
         Start listening to events specified by ``topic``.
 
@@ -75,7 +73,7 @@ class EventSource:
         :class:`Event` instance). The exact event class used depends on the event class mappings
         given to the constructor.
 
-        :param topic: the topic to listen to
+        :param topics: the topic(s) to listen to
         :param callback: a callable to call with the event object when the event is dispatched
         :param args: positional arguments to call the callback with (in addition to the event)
         :param kwargs: keyword arguments to call the callback with
@@ -84,12 +82,15 @@ class EventSource:
 
         """
         assert check_argument_types()
-        if topic not in self._topics:
-            raise LookupError('no such topic registered: {}'.format(topic))
+        topics = (topics,) if isinstance(topics, str) else tuple(topics)
+        for topic in topics:
+            if topic not in self._topics:
+                raise LookupError('no such topic registered: {}'.format(topic))
 
-        handle = EventListener(self, topic, callback, args, kwargs or {})
-        handles = self._topics[topic]['listeners']
-        handles.append(handle)
+        handle = EventListener(self, topics, callback, args, kwargs or {})
+        for topic in topics:
+            self._topics[topic]['listeners'].append(handle)
+
         return handle
 
     def remove_listener(self, handle: EventListener):
@@ -102,7 +103,8 @@ class EventSource:
         """
         assert check_argument_types()
         try:
-            self._topics[handle.topic]['listeners'].remove(handle)
+            for topic in handle.topics:
+                self._topics[topic]['listeners'].remove(handle)
         except (KeyError, ValueError):
             raise LookupError('listener not found') from None
 

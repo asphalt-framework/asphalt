@@ -14,6 +14,8 @@ Version history
   ``asphalt.core.util`` module
 - *BACKWARD INCOMPATIBLE* Removed regular context manager support from the ``Context`` class
   (asynchronous context manager support still remains)
+- Added the ability to listen to multiple topics in an EventSource with a single listener
+
 
 **1.3.0**
 
