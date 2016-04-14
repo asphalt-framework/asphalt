@@ -38,7 +38,8 @@ setup(
         'setuptools',  # this is here to tell downstream packagers that it needs pkg_resources
         'PyYAML >= 3.11',
         'typeguard >= 1.0.2',
-        'asyncio_extras'
+        'asyncio_extras',
+        'click >= 6.6'
     ],
     entry_points={
         'console_scripts': [

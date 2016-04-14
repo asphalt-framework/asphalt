@@ -1,33 +1,32 @@
-import argparse
 import sys
 from pathlib import Path
-from typing import Union
 
+import click
 import yaml
-from typeguard import check_argument_types
 
 from asphalt.core.component import ContainerComponent, component_types
 from asphalt.core.context import Context
 from asphalt.core.util import PluginContainer
 
-__all__ = ('runners', 'quickstart_application', 'run_from_config_file')
-
 runners = PluginContainer('asphalt.core.runners')
 
 
-def quickstart_application():
-    """Interactively build a skeleton application directory structure."""
-    project_name = input('Project name: ')
-    package = input('Top level package name: ')
-    component_subclass = '{}Application'.format(
-        ''.join(part.capitalize() for part in project_name.split()))
+@click.group()
+def main():
+    pass  # pragma: no cover
 
-    project = Path(project_name)
-    if project.exists():
-        print('Error: the directory "{}" already exists.'.format(project), file=sys.stderr)
+
+@main.command()
+@click.option('--project', help='Project name', prompt=True)
+@click.option('--package', help='Top level package name', prompt=True)
+def quickstart(project: str, package: str):
+    component_subclass = '{}Application'.format(project.title().replace(' ', ''))
+    project_path = Path(project)
+    if project_path.exists():
+        print('Error: the directory "{}" already exists.'.format(project_path), file=sys.stderr)
         sys.exit(1)
 
-    top_package = project / package
+    top_package = project_path / package
     top_package.mkdir(parents=True)
     with (top_package / '__init__.py').open('w') as f:
         pass
@@ -46,7 +45,7 @@ class {component_subclass}({component_cls.__name__}):
 """.format(component_cls=ContainerComponent, context_cls=Context,
            component_subclass=component_subclass))
 
-    with (project / 'config.yml').open('w') as f:
+    with (project_path / 'config.yml').open('w') as f:
         f.write("""\
 ---
 component:
@@ -67,7 +66,7 @@ logging:
     level: INFO
 """.format(package=package, component_subclass=component_subclass))
 
-    with (project / 'setup.py').open('w') as f:
+    with (project_path / 'setup.py').open('w') as f:
         f.write("""\
 from setuptools import setup
 
@@ -90,66 +89,32 @@ setup(
         'asphalt'
     ]
 )
-""".format(package=package, project_name=project_name))
+""".format(package=package, project_name=project))
 
 
-def run_from_config_file(config_file: Union[str, Path], runner: str='asyncio', unsafe: bool=False):
-    """
-    Run an application using configuration from the given configuration file.
-
-    :param config_file: path to a YAML configuration file
-    :param unsafe: ``True`` to load the YAML file in unsafe mode
-
-    """
-    assert check_argument_types()
-
+@main.command(help='Read a configuration file and start the application.')
+@click.argument('config', type=click.File())
+@click.option('--unsafe', is_flag=True,
+              help='use unsafe mode when loading YAML (enables markup extensions)')
+def run(config, unsafe: bool=False):
     # Read the configuration from the supplied YAML file
-    with Path(config_file).open() as stream:
-        config = yaml.load(stream) if unsafe else yaml.safe_load(stream)
-    assert isinstance(config, dict), 'the YAML document root must be a dictionary'
+    config_data = yaml.load(config) if unsafe else yaml.safe_load(config)
+    assert isinstance(config_data, dict), 'the document root element must be a dictionary'
 
-    # Instantiate the top level component
+    # Get a reference to the runner
+    runner = runners.resolve(config_data.pop('runner', 'asyncio'))
+
+    # Instantiate the root component
     try:
-        component_config = config.pop('component')
+        component_config = config_data.pop('component')
     except KeyError:
         raise LookupError('missing configuration key: component') from None
     else:
         component = component_types.create_object(**component_config)
 
-    # Get a reference to the runner
-    runner = runners.resolve(config.pop('runner', runner))
-
     # Start the application
-    runner(component, **config)
+    runner(component, **config_data)
 
-
-def main():
-    parser = argparse.ArgumentParser(description='The Asphalt application framework')
-    subparsers = parser.add_subparsers()
-
-    run_parser = subparsers.add_parser(
-        'run', help='Run an Asphalt application from a YAML configuration file')
-    run_parser.add_argument('config_file', help='Path to the configuration file')
-    run_parser.add_argument(
-        '--unsafe', action='store_true', default=False,
-        help='Load the YAML file in unsafe mode (enables YAML markup extensions)')
-    run_parser.add_argument(
-        '--runner', default='asyncio',
-        help='Select the runner with which to start the application')
-    run_parser.set_defaults(func=run_from_config_file)
-
-    quickstart_parser = subparsers.add_parser(
-        'quickstart', help='Quickstart an Asphalt application'
-    )
-    quickstart_parser.set_defaults(func=quickstart_application)
-
-    args = parser.parse_args(sys.argv[1:])
-    if 'func' in args:
-        kwargs = dict(args._get_kwargs())
-        del kwargs['func']
-        args.func(**kwargs)
-    else:
-        parser.print_help()
 
 if __name__ == '__main__':  # pragma: no cover
     main()

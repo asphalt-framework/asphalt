@@ -18,6 +18,7 @@ Version history
   that contains all the exceptions and the listeners who raised them.
 - Added the ability to listen to multiple topics in an EventSource with a single listener
 - Added the ability to stream events from an EventSource
+- Switched from argparse to click for the command line interface
 
 **1.3.0**
 
