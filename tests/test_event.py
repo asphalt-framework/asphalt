@@ -2,7 +2,8 @@ import asyncio
 
 import pytest
 
-from asphalt.core.event import EventSource, Event, EventListener, EventDispatchError, stream_events
+from asphalt.core.event import (
+    EventSource, Event, EventListener, EventDispatchError, stream_events, register_topic)
 
 
 class DummyEvent(Event):
@@ -12,11 +13,15 @@ class DummyEvent(Event):
         self.kwargs = kwargs
 
 
+@register_topic('event_a', DummyEvent)
+@register_topic('event_b', DummyEvent)
+class DummySource(EventSource):
+    pass
+
+
 @pytest.fixture
 def source():
-    event_source = EventSource()
-    event_source._register_topics({'event_a': DummyEvent, 'event_b': DummyEvent})
-    return event_source
+    return DummySource()
 
 
 class TestEventListener:
@@ -28,6 +33,48 @@ class TestEventListener:
         assert repr(handle) == (
             "EventListener(topics=('foo', 'bar'), "
             "callback=test_event.TestEventListener.handle.<locals>.<lambda>, args=(), kwargs={})")
+
+
+class TestRegisterTopic:
+    def test_incompatible_class(self):
+        """
+        Test that attempting to use the @register_topic decorator on an incompatible class raises a
+        TypeError.
+
+        """
+        target_class = type('TestType', (object,), {})
+        exc = pytest.raises(TypeError, register_topic('some_event', DummyEvent), target_class)
+        assert str(exc.value) == 'cls must be a subclass of EventSource'
+
+    def test_incompatible_override(self):
+        """
+        Test that attempting to override an event topic with an incompatible Event subclass raises
+        a TypeError.
+
+        """
+        target_class = type('TestType', (EventSource,), {})
+        register_topic('some_event', DummyEvent)(target_class)
+        exc = pytest.raises(TypeError, register_topic('some_event', Event), target_class)
+        assert str(exc.value) == ('cannot override event class for topic "some_event" -- event '
+                                  'class asphalt.core.event.Event is not a subclass of '
+                                  'test_event.DummyEvent')
+
+    @pytest.mark.asyncio
+    async def test_topic_override(self):
+        """
+        Test that re-registering an event topic with a subclass of the original event class is
+        allowed.
+
+        """
+        target_class = type('TestType', (EventSource,), {})
+        event_subclass = type('EventSubclass', (DummyEvent,), {})
+        register_topic('some_event', DummyEvent)(target_class)
+        register_topic('some_event', event_subclass)(target_class)
+        events = []
+        source = target_class()
+        source.add_listener('some_event', events.append)
+        await source.dispatch('some_event')
+        assert isinstance(events[0], event_subclass)
 
 
 class TestEventSource:

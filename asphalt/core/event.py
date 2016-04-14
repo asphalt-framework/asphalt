@@ -1,5 +1,7 @@
+import re
 from asyncio import ensure_future
 from asyncio.queues import Queue
+from collections import defaultdict
 from inspect import isawaitable
 from typing import Dict, Callable, Any, Sequence, Union, Iterable, Tuple
 
@@ -9,7 +11,7 @@ from typeguard import check_argument_types
 
 from asphalt.core.util import qualified_name
 
-__all__ = ('Event', 'EventListener', 'EventSource')
+__all__ = ('Event', 'EventListener', 'register_topic', 'EventSource')
 
 
 class Event:
@@ -65,24 +67,56 @@ class EventDispatchError(Exception):
         self.exceptions = exceptions
 
 
+def register_topic(name: str, event_class: type = Event):
+    """
+    Return a class decorator that registers an event topic on the given class.
+
+    A subclass may override an event topic by re-registering it with an event class that is a
+    subclass of the previously registered event class. Attempting to override the topic with an
+    incompatible class will raise a :exception:`TypeError`.
+
+    :param name: name of the topic (must consist of alphanumeric characters and ``_``)
+    :param event_class: the event class associated with this topic
+
+    """
+    def wrapper(cls: type):
+        if not isinstance(cls, type) or not issubclass(cls, EventSource):
+            raise TypeError('cls must be a subclass of EventSource')
+
+        topics = cls.__dict__.get('_eventsource_topics')
+        if topics is None:
+            # Collect all the topics from superclasses
+            topics = cls._eventsource_topics = {}
+            for supercls in cls.__mro__[1:]:
+                supercls_topics = getattr(supercls, '_eventsource_topics', {})
+                topics.update(supercls_topics)
+
+        if name in topics and not issubclass(event_class, topics[name]):
+            existing_classname = qualified_name(topics[name])
+            new_classname = qualified_name(event_class)
+            raise TypeError('cannot override event class for topic "{}" -- event class {} is not '
+                            'a subclass of {}'.format(name, new_classname, existing_classname))
+
+        topics[name] = event_class
+        return cls
+
+    assert check_argument_types()
+    assert re.match('[a-z0-9_]+', name), 'invalid characters in topic name'
+    assert issubclass(event_class, Event), 'event_class must be a subclass of Event'
+    return wrapper
+
+
 class EventSource:
     """A mixin class that provides support for dispatching and listening to events."""
 
-    __slots__ = '_topics'
+    __slots__ = '_listeners'
+
+    # Provided in subclasses using @register_topic(...)
+    _eventsource_topics = {}  # type: Dict[str, Any]
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self._topics = {}
-
-    def _register_topics(self, topics: Dict[str, Any]) -> None:
-        """
-        Register a number of supported topics and their respective event classes.
-
-        :param topics: a dictionary of topic -> event class
-
-        """
-        for topic, event_class in topics.items():
-            self._topics[topic] = {'event_class': event_class, 'listeners': []}
+        self._listeners = defaultdict(list)
 
     def add_listener(self, topics: Union[str, Iterable[str]], callback: Callable,
                      args: Sequence=(), kwargs: Dict[str, Any]=None) -> EventListener:
@@ -104,12 +138,12 @@ class EventSource:
         assert check_argument_types()
         topics = (topics,) if isinstance(topics, str) else tuple(topics)
         for topic in topics:
-            if topic not in self._topics:
+            if topic not in self._eventsource_topics:
                 raise LookupError('no such topic registered: {}'.format(topic))
 
         handle = EventListener(self, topics, callback, args, kwargs or {})
         for topic in topics:
-            self._topics[topic]['listeners'].append(handle)
+            self._listeners[topic].append(handle)
 
         return handle
 
@@ -124,7 +158,7 @@ class EventSource:
         assert check_argument_types()
         try:
             for topic in handle.topics:
-                self._topics[topic]['listeners'].remove(handle)
+                self._listeners[topic].remove(handle)
         except (KeyError, ValueError):
             raise LookupError('listener not found') from None
 
@@ -149,19 +183,18 @@ class EventSource:
         assert check_argument_types()
         topic = event.topic if isinstance(event, Event) else event
         try:
-            registration = self._topics[topic]
+            event_class = self._eventsource_topics[topic]
         except KeyError:
             raise LookupError('no such topic registered: {}'.format(topic)) from None
 
         if isinstance(event, Event):
             assert not args and not kwargs, 'passing extra arguments makes no sense here'
-            assert isinstance(event, registration['event_class']), 'event class mismatch'
+            assert isinstance(event, event_class), 'event class mismatch'
         else:
-            event_class = registration['event_class']
             event = event_class(self, topic, *args, **kwargs)
 
         futures, exceptions = [], []
-        for listener in list(registration['listeners']):
+        for listener in list(self._listeners[topic]):
             try:
                 retval = listener.callback(event, *listener.args, **listener.kwargs)
             except Exception as e:

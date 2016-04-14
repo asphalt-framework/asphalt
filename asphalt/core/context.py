@@ -6,7 +6,7 @@ from typing import Optional, Callable, Any, Union, Iterable, Sequence, Dict  # n
 
 from typeguard import check_argument_types
 
-from asphalt.core.event import EventSource, Event
+from asphalt.core.event import EventSource, Event, register_topic
 from asphalt.core.util import qualified_name
 
 __all__ = ('Resource', 'ResourceEvent', 'ResourceConflict', 'ResourceNotFound',
@@ -104,6 +104,9 @@ class ContextFinishEvent(Event):
         self.exception = exception
 
 
+@register_topic('finished', ContextFinishEvent)
+@register_topic('resource_published', ResourceEvent)
+@register_topic('resource_removed', ResourceEvent)
 class Context(EventSource):
     """
     Contexts give request handlers and callbacks access to resources.
@@ -126,12 +129,6 @@ class Context(EventSource):
     def __init__(self, parent: 'Context'=None, default_timeout: int=5):
         assert check_argument_types()
         super().__init__()
-        self._register_topics({
-            'finished': ContextFinishEvent,
-            'resource_published': ResourceEvent,
-            'resource_removed': ResourceEvent
-        })
-
         self._parent = parent
         self._resources = defaultdict(dict)  # type: Dict[str, Dict[str, Resource]]
         self._resource_creators = {}  # type: Dict[str, Callable[[Context], Any]
