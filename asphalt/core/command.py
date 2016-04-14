@@ -4,8 +4,7 @@ from pathlib import Path
 import click
 import yaml
 
-from asphalt.core.component import ContainerComponent, component_types
-from asphalt.core.context import Context
+from asphalt.core.component import component_types
 from asphalt.core.util import PluginContainer
 
 runners = PluginContainer('asphalt.core.runners')
@@ -33,17 +32,15 @@ def quickstart(project: str, package: str):
 
     with (top_package / 'application.py').open('w') as f:
         f.write("""\
-from {component_cls.__module__} import {component_cls.__name__}
-from {context_cls.__module__} import {context_cls.__name__}
+from asphalt.core import ContainerComponent, Context
 
 
-class {component_subclass}({component_cls.__name__}):
+class {component_subclass}(ContainerComponent):
     async def start(ctx: Context):
         # Add components and resources here as needed
         await super().start(ctx)
         # The components have started now
-""".format(component_cls=ContainerComponent, context_cls=Context,
-           component_subclass=component_subclass))
+""".format(component_subclass=component_subclass))
 
     with (project_path / 'config.yml').open('w') as f:
         f.write("""\

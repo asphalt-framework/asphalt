@@ -8,7 +8,7 @@ from typeguard import check_argument_types
 from asphalt.core.context import Context
 from asphalt.core.util import PluginContainer, merge_config
 
-__all__ = ('Component', 'ContainerComponent', 'component_types')
+__all__ = ('Component', 'ContainerComponent')
 
 
 class Component(metaclass=ABCMeta):

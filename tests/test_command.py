@@ -33,8 +33,7 @@ def test_quickstart_application(runner):
 
         # Check that example/application.py was properly generated
         assert pkgpath.joinpath('application.py').read_text() == """\
-from asphalt.core.component import ContainerComponent
-from asphalt.core.context import Context
+from asphalt.core import ContainerComponent, Context
 
 
 class ExampleProjectApplication(ContainerComponent):
