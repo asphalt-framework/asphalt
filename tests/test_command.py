@@ -32,8 +32,7 @@ def test_quickstart_application(runner):
         assert pkgpath.joinpath('__init__.py').is_file()
 
         # Check that example/application.py was properly generated
-        with pkgpath.joinpath('application.py').open() as f:
-            assert f.read() == """\
+        assert pkgpath.joinpath('application.py').read_text() == """\
 from asphalt.core.component import ContainerComponent
 from asphalt.core.context import Context
 
@@ -45,10 +44,9 @@ class ExampleProjectApplication(ContainerComponent):
         # The components have started now
 """
 
-        with projectdir.joinpath('config.yml').open() as f:
-            config_data = f.read()
-            assert isinstance(yaml.load(config_data), dict)
-            assert config_data == """\
+        config_data = projectdir.joinpath('config.yml').read_text()
+        assert isinstance(yaml.load(config_data), dict)
+        assert config_data == """\
 ---
 component:
   type: example:ExampleProjectApplication
@@ -69,8 +67,7 @@ logging:
 """
 
         # Check that setup.py was properly generated
-        with projectdir.joinpath('setup.py').open() as f:
-            assert f.read() == """\
+        assert projectdir.joinpath('setup.py').read_text() == """\
 from setuptools import setup
 
 setup(
