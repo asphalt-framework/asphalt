@@ -10,7 +10,6 @@ from typing import Union, Dict, Any
 from typeguard import check_argument_types
 
 from asphalt.core.component import Component
-from asphalt.core.concurrency import set_event_loop
 from asphalt.core.context import Context
 
 __all__ = ('run_application',)
@@ -54,7 +53,6 @@ def run_application(component: Component, *, max_threads: int=None,
     max_threads = max_threads if max_threads is not None else os.cpu_count()
     event_loop = asyncio.get_event_loop()
     event_loop.set_default_executor(ThreadPoolExecutor(max_threads))
-    set_event_loop(event_loop)
 
     logger = getLogger(__name__)
     logger.info('Starting application')

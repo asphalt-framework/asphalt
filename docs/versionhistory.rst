@@ -5,13 +5,12 @@ Version history
 
 - *BACKWARD INCOMPATIBLE* Dropped Python 3.4 support in order to make the code fully rely on the
   new ``async``/``await``, ``async for`` and ``async with`` language additions
+- *BACKWARD INCOMPATIBLE* Dropped the ``asphalt.core.concurrency`` module in favor of the
+  ``asyncio_extras`` library
 - *BACKWARD INCOMPATIBLE* De-emphasized the ability to run code in worker threads.
-  It is now recommended to minimize the use of worker threads.
-  As a result, the ``@asynchronous`` decorator has been removed.
-- *BACKWARD INCOMPATIBLE* Dropped the ``@blocking`` decorator in favor of the ``@threadpool``
-  decorator from ``asyncio_extras``
-- *BACKWARD INCOMPATIBLE* Removed the deprecated ``blocking`` and ``asynchronous`` aliases from the
-  ``asphalt.core.util`` module
+  As such, Asphalt components are no longer required to transparently work outside of the event
+  loop thread. Instead, use``asyncio_extras.threads.call_async()`` to call asynchronous code if
+  absolutely necessary.
 - *BACKWARD INCOMPATIBLE* Removed regular context manager support from the ``Context`` class
   (asynchronous context manager support still remains)
 - *BACKWARD INCOMPATIBLE* Modified event dispatch logic in ``EventSource`` to always run all
