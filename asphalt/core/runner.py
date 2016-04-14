@@ -18,8 +18,10 @@ __all__ = ('run_application',)
 def run_application(component: Component, *, max_threads: int=None,
                     logging: Union[Dict[str, Any], int, None]=INFO):
     """
-    Start the given top level component in the default asyncio event loop and keeps the event loop
-    running until the process is terminated.
+    Configure logging and start the given root component in the default asyncio event loop.
+
+    Assuming the application start is successful, the event loop will continue running until the
+    process is terminated.
 
     Initializes the logging system first based on the value of ``logging``:
       * If the value is a dictionary, it is passed to :func:`logging.config.dictConfig` as
@@ -35,7 +37,7 @@ def run_application(component: Component, *, max_threads: int=None,
     :class:`~concurrent.futures.ThreadPoolExecutor` where the maximum number of threads is set to
     the value of ``max_threads`` or, if omitted, the return value of :func:`os.cpu_count()`.
 
-    :param component: the top level component
+    :param component: the root component
     :param max_threads: the maximum number of threads in the thread pool
     :param logging: a logging configuration dictionary, :ref:`logging level <python:levels>` or
         ``None``
