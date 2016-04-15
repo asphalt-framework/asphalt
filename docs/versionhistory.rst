@@ -23,6 +23,7 @@ This library adheres to `Semantic Versioning <http://semver.org/>`_.
   using the ``@register_topic`` class decorator instead of the ``_register_topic()`` method
 - Added the ability to listen to multiple topics in an EventSource with a single listener
 - Added the ability to stream events from an EventSource
+- Added a utility function to listen to a single event coming from an EventSource
 - Switched from argparse to click for the command line interface
 - All classes and functions are now importable directly from ``asphalt.core``
 

@@ -1,5 +1,5 @@
 import re
-from asyncio import ensure_future
+from asyncio import ensure_future, Future
 from asyncio.queues import Queue
 from collections import defaultdict
 from inspect import isawaitable
@@ -11,7 +11,8 @@ from typeguard import check_argument_types
 
 from asphalt.core.util import qualified_name
 
-__all__ = ('Event', 'EventListener', 'register_topic', 'EventSource')
+__all__ = ('Event', 'EventListener', 'register_topic', 'EventSource', 'wait_event',
+           'stream_events')
 
 
 class Event:
@@ -112,7 +113,7 @@ class EventSource:
     __slots__ = '_listeners'
 
     # Provided in subclasses using @register_topic(...)
-    _eventsource_topics = {}  # type: Dict[str, Any]
+    _eventsource_topics = {}  # type: Dict[str, Callable[[Event], Any]]
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -214,6 +215,23 @@ class EventSource:
 
         if exceptions:
             raise EventDispatchError(event, exceptions)
+
+
+async def wait_event(source: EventSource, topics: Union[str, Iterable[str]]) -> Event:
+    """
+    Listen to the given topic(s) on the event source and return the next received event.
+
+    :param source: an event source
+    :param topics: topic or topics to listen to
+    :return: the received event object
+
+    """
+    future = Future()
+    listener = source.add_listener(topics, future.set_result)
+    try:
+        return await future
+    finally:
+        listener.remove()
 
 
 @async_generator

@@ -3,7 +3,8 @@ import asyncio
 import pytest
 
 from asphalt.core.event import (
-    EventSource, Event, EventListener, EventDispatchError, stream_events, register_topic)
+    EventSource, Event, EventListener, EventDispatchError, stream_events, register_topic,
+    wait_event)
 
 
 class DummyEvent(Event):
@@ -218,6 +219,14 @@ class TestEventSource:
         with pytest.raises(AssertionError) as exc:
             await source.dispatch(Event(source, 'event_a'))
         assert str(exc.value) == 'event class mismatch'
+
+
+@pytest.mark.asyncio
+async def test_wait_event(source, event_loop):
+    event = DummyEvent(source, 'event_a')
+    event_loop.create_task(source.dispatch(event))
+    received_event = await wait_event(source, 'event_a')
+    assert received_event is event
 
 
 @pytest.mark.asyncio
