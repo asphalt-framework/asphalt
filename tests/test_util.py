@@ -80,10 +80,10 @@ class TestPluginContainer:
                              ids=['explicit_class', 'entrypoint', 'class_reference'])
     def test_create_object(self, container, argument):
         """
-        Tests that create_object works with all three supported ways of passing a plugin class
+        Test that create_object works with all three supported ways of passing a plugin class
         reference.
-        """
 
+        """
         component = container.create_object(argument, a=5, b=2)
 
         assert isinstance(component, DummyPlugin)

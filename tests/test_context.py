@@ -40,7 +40,7 @@ class TestContext:
     @pytest.mark.asyncio
     async def test_contextmanager(self, context):
         """
-        Tests that "async with context:" dispatches both started and finished events and sets the
+        Test that "async with context:" dispatches both started and finished events and sets the
         exception variable when an exception is raised during the context lifetime.
 
         """
@@ -55,7 +55,7 @@ class TestContext:
     @pytest.mark.asyncio
     async def test_contextmanager_exception(self, context):
         """
-        Tests that "async with context:" dispatches both started and finished events and sets the
+        Test that "async with context:" dispatches both started and finished events and sets the
         exception variable when an exception is raised during the context lifetime.
 
         """
@@ -72,11 +72,7 @@ class TestContext:
     @pytest.mark.asyncio
     @pytest.mark.parametrize('delay', [False, True], ids=['immediate', 'delayed'])
     async def test_publish_resource(self, context, event_loop, delay):
-        """
-        Tests that a resource is properly published in the context and listeners are
-        notified.
-        """
-
+        """Test that a resource is properly published in the context and listeners are notified."""
         events = []
         context.add_listener('resource_published', events.append)
         if delay:
@@ -95,8 +91,7 @@ class TestContext:
 
     @pytest.mark.asyncio
     async def test_add_name_conflict(self, context):
-        """Tests that publishing a resource won't replace any existing resources."""
-
+        """Test that publishing a resource won't replace any existing resources."""
         await context.publish_resource(5, 'foo')
         with pytest.raises(ResourceConflict) as exc:
             await context.publish_resource(4, 'foo')
@@ -106,8 +101,7 @@ class TestContext:
 
     @pytest.mark.asyncio
     async def test_remove_resource(self, context):
-        """Tests that resources can be removed and that the listeners are notified."""
-
+        """Test that resources can be removed and that the listeners are notified."""
         events = []
         context.add_listener('resource_removed', events.append)
         resource = await context.publish_resource(4)
@@ -149,8 +143,7 @@ class TestContext:
 
     @pytest.mark.asyncio
     async def test_publish_lazy_resource(self, context):
-        """Tests that lazy resources are only created once per context instance."""
-
+        """Test that lazy resources are only created once per context instance."""
         def creator(ctx):
             assert ctx is context
             return next(counter)
@@ -164,10 +157,10 @@ class TestContext:
     @pytest.mark.asyncio
     async def test_resource_added_removed(self, context):
         """
-        Tests that when resources are published, they are also set as properties of the context.
+        Test that when resources are published, they are also set as properties of the context.
+
         Likewise, when they are removed, they are deleted from the context.
         """
-
         resource = await context.publish_resource(1, context_attr='foo')
         assert context.foo == 1
         await context.remove_resource(resource)
@@ -175,8 +168,7 @@ class TestContext:
 
     @pytest.mark.asyncio
     async def test_publish_lazy_resource_coroutine(self, context):
-        """Tests that coroutine functions are not accepted as lazy resource creators."""
-
+        """Test that coroutine functions are not accepted as lazy resource creators."""
         async def faulty_creator(context):
             pass
 
@@ -219,9 +211,9 @@ class TestContext:
 
     def test_get_parent_attribute(self, context):
         """
-        Tests that accessing a nonexistent attribute on a context retrieves the value from parent.
-        """
+        Test that accessing a nonexistent attribute on a context retrieves the value from parent.
 
+        """
         child_context = Context(context)
         context.a = 2
         assert child_context.a == 2
@@ -229,20 +221,20 @@ class TestContext:
     @pytest.mark.asyncio
     async def test_request_optional(self, context):
         """
-        Tests that requesting a nonexistent resource with optional=True returns None instead of
+        Test that requesting a nonexistent resource with optional=True returns None instead of
         raising an exception.
-        """
 
+        """
         resource = await context.request_resource(str, timeout=0, optional=True)
         assert resource is None
 
     @pytest.mark.asyncio
     async def test_request_resource_parent_add(self, context, event_loop):
         """
-        Tests that publishing a resource to the parent context will satisfy a resource request in a
+        Test that publishing a resource to the parent context will satisfy a resource request in a
         child context.
-        """
 
+        """
         child_context = Context(context)
         task = event_loop.create_task(child_context.request_resource(int))
         await context.publish_resource(6)
@@ -251,8 +243,7 @@ class TestContext:
 
     @pytest.mark.asyncio
     async def test_request_lazy_resource_context_attr(self, context):
-        """Tests that requesting a lazy resource also sets the context variable."""
-
+        """Test that requesting a lazy resource also sets the context variable."""
         await context.publish_lazy_resource(lambda ctx: 6, int, context_attr='foo')
         await context.request_resource(int)
         assert context.__dict__['foo'] == 6
@@ -260,10 +251,10 @@ class TestContext:
     @pytest.mark.asyncio
     async def test_remove_lazy_resource(self, context):
         """
-        Tests that the lazy resource is no longer created when it has been removed and its
+        Test that the lazy resource is no longer created when it has been removed and its
         context variable is accessed.
-        """
 
+        """
         resource = await context.publish_lazy_resource(lambda ctx: 6, int, context_attr='foo')
         await context.remove_resource(resource)
         exc = pytest.raises(AttributeError, getattr, context, 'foo')

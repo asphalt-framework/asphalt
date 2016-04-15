@@ -28,10 +28,10 @@ class TestContainerComponent:
 
     def test_add_component(self, container):
         """
-        Tests that add_component works with an without an entry point and that external
+        Test that add_component works with an without an entry point and that external
         configuration overriddes directly supplied configuration values.
-        """
 
+        """
         container.add_component('dummy', DummyComponent, a=5, b=2)
 
         assert len(container.child_components) == 1

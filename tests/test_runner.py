@@ -60,10 +60,10 @@ def test_run_logging_config(logging_config):
 @pytest.mark.parametrize('coroutine_start', [False, True], ids=['coroutine', 'normal'])
 def test_run_callbacks(coroutine_start, caplog):
     """
-    Tests that the "finished" callbacks are run when the application is started and shut down
+    Test that the "finished" callbacks are run when the application is started and shut down
     properly and that the proper logging messages are emitted.
-    """
 
+    """
     component = ShutdownComponent()
     component.start = asyncio.coroutine(component.start) if coroutine_start else component.start
     run_application(component)
@@ -90,10 +90,10 @@ def test_run_sysexit(caplog):
 
 def test_run_start_exception(caplog):
     """
-    Tests that an exception caught during the application initialization is put into the
+    Test that an exception caught during the application initialization is put into the
     application context and made available to finish callbacks.
-    """
 
+    """
     component = ShutdownComponent(method='exception')
     pytest.raises(SystemExit, run_application, component)
 
