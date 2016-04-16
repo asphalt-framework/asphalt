@@ -35,10 +35,10 @@ Examples
 --------
 
 Consider a coroutine function that reads the contents of a certain file and then sends them over a
-network connection. The ``connection.send()`` operation is also a coroutine here. While you might
-get away with reading the file in the event loop thread, consider what happens if the disk has to
-spin up from idle state or the file is located on a slow (or temporarily inaccessible) network
-drive. The whole event loop will then be blocked for who knows how long.
+network connection. While you might get away with reading the file in the event loop thread,
+consider what happens if the disk has to spin up from idle state or the file is located on a slow
+(or temporarily inaccessible) network drive. The whole event loop will then be blocked for who
+knows how long.
 
 The easiest way is probably to use :func:`~asyncio_extras.file.open_async`::
 
