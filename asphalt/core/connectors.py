@@ -44,11 +44,9 @@ class Connector(metaclass=ABCMeta):
     __slots__ = ()
 
     @abstractmethod
-    def connect(self) -> Tuple[StreamReader, StreamWriter]:
+    async def connect(self) -> Tuple[StreamReader, StreamWriter]:
         """
         Make a connection to the connector's endpoint.
-
-        This is a coroutine.
 
         :raises ConnectionError: if connection could not be established
         """

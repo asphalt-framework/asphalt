@@ -17,11 +17,9 @@ class Component(metaclass=ABCMeta):
     __slots__ = ()
 
     @abstractmethod
-    def start(self, ctx: Context):
+    async def start(self, ctx: Context):
         """
         Perform any necessary tasks to start the services provided by this component.
-
-        This method can be a coroutine.
 
         The context can be used to:
           * add context event listeners (:meth:`~Context.add_listener`)
