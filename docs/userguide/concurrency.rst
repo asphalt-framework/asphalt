@@ -6,7 +6,7 @@ it can efficiently work with hundreds or even thousands of connections at once. 
 utilizing `co-operative multitasking`_, using an *event loop* provided by the :mod:`asyncio`
 module.
 
-The event loop can only work on one task once, so whenever the currently running task needs to
+The event loop can only work on one task at a time, so whenever the currently running task needs to
 wait for something to happen, it will need to explicitly yield control back to the event loop
 (using ``await`` and similar statements) to let the event loop run other tasks while this task
 waits for the result. Once the result is available, the event loop will resume the task.
