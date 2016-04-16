@@ -1,21 +1,15 @@
 Asphalt core documentation
 ==========================
 
-Contents:
+This is the core Asphalt library.
 
 .. toctree::
    :maxdepth: 2
 
-   overview
-   events
-   building
-   testing
+   tutorials/index
+   userguide/index
    versionhistory
    acknowledgements
-
-.. warning::
-   Apart from the :ref:`API reference <modindex>`, the documentation is still in the very early
-   stages of development.
 
 Indices and tables
 ==================
