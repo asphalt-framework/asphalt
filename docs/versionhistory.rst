@@ -28,11 +28,6 @@ This library adheres to `Semantic Versioning <http://semver.org/>`_.
 - Switched from argparse to click for the command line interface
 - All classes and functions are now importable directly from ``asphalt.core``
 
-**1.3.0**
-
-- Allow the context manager of the ``Context`` class to be used from a non-eventloop thread when
-  the event loop is running
-
 **1.2.0**
 
 - Moved the ``@asynchronous`` and ``@blocking`` decorators to the ``asphalt.core.concurrency``
