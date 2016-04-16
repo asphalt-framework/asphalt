@@ -2,7 +2,6 @@ from pathlib import Path
 from unittest.mock import patch
 
 import pytest
-import yaml
 from click.testing import CliRunner
 
 from asphalt.core import command
@@ -14,86 +13,6 @@ mock_runner = None
 @pytest.fixture
 def runner():
     return CliRunner()
-
-
-def test_quickstart_application(runner):
-    project = 'Example project'
-    package = 'example'
-    args = ['--project', project, '--package', package]
-
-    with runner.isolated_filesystem():
-        result = runner.invoke(command.quickstart, args)
-        assert result.exit_code == 0
-
-        # Check that the project directory and the top level package were created
-        projectdir = Path(project)
-        pkgpath = projectdir / package
-        assert projectdir.is_dir()
-        assert pkgpath.joinpath('__init__.py').is_file()
-
-        # Check that example/application.py was properly generated
-        assert pkgpath.joinpath('application.py').read_text() == """\
-from asphalt.core import ContainerComponent, Context
-
-
-class ExampleProjectApplication(ContainerComponent):
-    async def start(ctx: Context):
-        # Add components and resources here as needed
-        await super().start(ctx)
-        # The components have started now
-"""
-
-        config_data = projectdir.joinpath('config.yml').read_text()
-        assert isinstance(yaml.load(config_data), dict)
-        assert config_data == """\
----
-component:
-  type: example:ExampleProjectApplication
-  components: {}  # override component configurations here (or just remove this)
-logging:
-  version: 1
-  disable_existing_loggers: false
-  handlers:
-    console:
-      class: logging.StreamHandler
-      formatter: generic
-  formatters:
-    generic:
-        format: "%(asctime)s:%(levelname)s:%(name)s:%(message)s"
-  root:
-    handlers: [console]
-    level: INFO
-"""
-
-        # Check that setup.py was properly generated
-        assert projectdir.joinpath('setup.py').read_text() == """\
-from setuptools import setup
-
-setup(
-    name='example',
-    version='1.0.0',
-    description='Example project',
-    long_description='FILL IN HERE',
-    author='FILL IN HERE',
-    author_email='FILL IN HERE',
-    classifiers=[
-        'Programming Language :: Python',
-        'Programming Language :: Python :: 3'
-    ],
-    zip_safe=False,
-    packages=[
-        'example'
-    ],
-    install_requires=[
-        'asphalt'
-    ]
-)
-"""
-
-        # Check that another run will raise an error because the directory exists already
-        result = runner.invoke(command.quickstart, args)
-        assert result.exit_code == 1
-        assert result.output == 'Error: the directory "Example project" already exists.\n'
 
 
 @pytest.mark.parametrize('unsafe', [False, True], ids=['safe', 'unsafe'])

@@ -15,6 +15,7 @@ This library adheres to `Semantic Versioning <http://semver.org/>`_.
   absolutely necessary.
 - *BACKWARD INCOMPATIBLE* The ``Component.start()`` method is now required to be a coroutine
 - *BACKWARD INCOMPATIBLE* Removed the ``asphalt.command`` module from the public API
+- *BACKWARD INCOMPATIBLE* Removed the ``asphalt quickstart`` command
 - *BACKWARD INCOMPATIBLE* Removed regular context manager support from the ``Context`` class
   (asynchronous context manager support still remains)
 - *BACKWARD INCOMPATIBLE* Modified event dispatch logic in ``EventSource`` to always run all
