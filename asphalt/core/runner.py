@@ -2,7 +2,6 @@ import asyncio
 import os
 import sys
 from concurrent.futures import ThreadPoolExecutor
-from inspect import isawaitable
 from logging import basicConfig, getLogger, INFO
 from logging.config import dictConfig
 from typing import Union, Dict, Any
@@ -62,25 +61,20 @@ def run_application(component: Component, *, max_threads: int=None,
     exception = None
     try:
         try:
-            retval = component.start(context)
-            if isawaitable(retval):
-                event_loop.run_until_complete(retval)
-        except Exception:
+            event_loop.run_until_complete(component.start(context))
+        except Exception as e:
+            exception = e
             logger.exception('Error during application startup')
-            raise
-
-        # Finally, run the event loop until the process is terminated
-        # or Ctrl+C is pressed
-        logger.info('Application started')
-        event_loop.run_forever()
+        else:
+            # Finally, run the event loop until the process is terminated or Ctrl+C is pressed
+            event_loop.run_forever()
     except (KeyboardInterrupt, SystemExit):
         pass
-    except BaseException as e:
-        exception = e
+    finally:
+        event_loop.run_until_complete(context.dispatch('finished', exception))
 
-    event_loop.run_until_complete(context.dispatch('finished', exception))
-    logger.info('Application stopped')
     event_loop.close()
+    logger.info('Application stopped')
 
     if exception is not None:
         sys.exit(1)

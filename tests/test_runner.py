@@ -21,7 +21,7 @@ class ShutdownComponent(Component):
         self.finish_callback_called = True
         self.exception = event.exception
 
-    def start(self, ctx: Context):
+    async def start(self, ctx: Context):
         ctx.add_listener('finished', self.finish_callback)
 
         if self.method == 'stop':
@@ -70,10 +70,9 @@ def test_run_callbacks(coroutine_start, caplog):
 
     assert component.finish_callback_called
     records = [record for record in caplog.records if record.name == 'asphalt.core.runner']
-    assert len(records) == 3
+    assert len(records) == 2
     assert records[0].message == 'Starting application'
-    assert records[1].message == 'Application started'
-    assert records[2].message == 'Application stopped'
+    assert records[1].message == 'Application stopped'
 
 
 def test_run_sysexit(caplog):
@@ -82,10 +81,9 @@ def test_run_sysexit(caplog):
 
     assert component.finish_callback_called
     records = [record for record in caplog.records if record.name == 'asphalt.core.runner']
-    assert len(records) == 3
+    assert len(records) == 2
     assert records[0].message == 'Starting application'
-    assert records[1].message == 'Application started'
-    assert records[2].message == 'Application stopped'
+    assert records[1].message == 'Application stopped'
 
 
 def test_run_start_exception(caplog):

@@ -13,6 +13,7 @@ This library adheres to `Semantic Versioning <http://semver.org/>`_.
   As such, Asphalt components are no longer required to transparently work outside of the event
   loop thread. Instead, use``asyncio_extras.threads.call_async()`` to call asynchronous code if
   absolutely necessary.
+- *BACKWARD INCOMPATIBLE* The ``Component.start()`` method is now required to be a coroutine
 - *BACKWARD INCOMPATIBLE* Removed the ``asphalt.command`` module from the public API
 - *BACKWARD INCOMPATIBLE* Removed regular context manager support from the ``Context`` class
   (asynchronous context manager support still remains)
