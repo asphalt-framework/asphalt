@@ -29,7 +29,7 @@ The event listener can be either a regular function or a coroutine function::
         context.add_listener('finished', asynclistener)
 
         # As we dispatch the "finished" event, the event object is printed twice
-        await context.dispatch('finished', None)
+        await context.dispatch_event('finished', None)
 
 Waiting for a single event
 --------------------------
@@ -100,5 +100,5 @@ the topic(s)::
 
 And to dispatch a single ``MyCustomEvent`` from your new event source::
 
-    await MyEventSource().dispatch('sometopic', 'foo_value', bar='bar_value')
+    await MyEventSource().dispatch_event('sometopic', 'foo_value', bar='bar_value')
 

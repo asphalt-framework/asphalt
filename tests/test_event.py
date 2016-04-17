@@ -74,7 +74,7 @@ class TestRegisterTopic:
         events = []
         source = target_class()
         source.add_listener('some_event', events.append)
-        await source.dispatch('some_event')
+        await source.dispatch_event('some_event')
         assert isinstance(events[0], event_subclass)
 
 
@@ -96,7 +96,7 @@ class TestEventSource:
 
         events = []
         source.add_listener('event_a', callback)
-        await source.dispatch('event_a', 'x', 'y', a=1, b=2)
+        await source.dispatch_event('event_a', 'x', 'y', a=1, b=2)
 
         assert len(events) == 1
         assert events[0].args == ('x', 'y')
@@ -114,9 +114,9 @@ class TestEventSource:
         source.add_listener('event_a', events.append)
         if construct_first:
             event = DummyEvent(source, 'event_a', 'x', 'y', a=1, b=2)
-            await source.dispatch(event)
+            await source.dispatch_event(event)
         else:
-            await source.dispatch('event_a', 'x', 'y', a=1, b=2)
+            await source.dispatch_event('event_a', 'x', 'y', a=1, b=2)
 
         assert len(events) == 1
         assert events[0].args == ('x', 'y')
@@ -128,7 +128,7 @@ class TestEventSource:
         arguments = []
         source.add_listener(['event_a'], lambda *args, **kwargs: arguments.append((args, kwargs)),
                             [1, 2], {'x': 6, 'y': 8})
-        await source.dispatch('event_a')
+        await source.dispatch_event('event_a')
 
         assert len(arguments) == 1
         assert arguments[0][0] == (1, 2)
@@ -139,8 +139,8 @@ class TestEventSource:
         """Test that a one add_listen() call can be made to subscribe to multiple topics."""
         events = []
         source.add_listener(['event_a', 'event_b'], events.append)
-        await source.dispatch('event_a', 'x', 'y', a=1, b=2)
-        await source.dispatch('event_b', 'c', 'd', g=7, h=8)
+        await source.dispatch_event('event_a', 'x', 'y', a=1, b=2)
+        await source.dispatch_event('event_b', 'c', 'd', g=7, h=8)
 
         assert len(events) == 2
         assert events[0].args == ('x', 'y')
@@ -166,7 +166,7 @@ class TestEventSource:
         async_listener = source.add_listener('event_a', async_error)
         event = DummyEvent(source, 'event_a')
         with pytest.raises(EventDispatchError) as exc:
-            await source.dispatch(event)
+            await source.dispatch_event(event)
 
         assert exc.value.event is event
         assert exc.value.exceptions == [
@@ -181,13 +181,13 @@ class TestEventSource:
         """Test that an event listener no longer receives events after it's been removed."""
         events = []
         handle = source.add_listener('event_a', events.append)
-        await source.dispatch('event_a', 1)
+        await source.dispatch_event('event_a', 1)
         if from_handle:
             handle.remove()
         else:
             source.remove_listener(handle)
 
-        await source.dispatch('event_a', 2)
+        await source.dispatch_event('event_a', 2)
 
         assert len(events) == 1
         assert events[0].args == (1,)
@@ -203,28 +203,28 @@ class TestEventSource:
     @pytest.mark.asyncio
     async def test_dispatch_nonexistent_topic(self, source):
         with pytest.raises(LookupError) as exc:
-            await source.dispatch('blah')
+            await source.dispatch_event('blah')
         assert str(exc.value) == 'no such topic registered: blah'
 
     @pytest.mark.asyncio
     async def test_dispatch_pointless_args(self, source):
         """Test that passing variable arguments with an Event instance raises an AssertionError."""
         with pytest.raises(AssertionError) as exc:
-            await source.dispatch(DummyEvent(source, 'event_a'), 6)
+            await source.dispatch_event(DummyEvent(source, 'event_a'), 6)
         assert str(exc.value) == 'passing extra arguments makes no sense here'
 
     @pytest.mark.asyncio
     async def test_dispatch_event_class_mismatch(self, source):
         """Test that passing an event of the wrong type raises an AssertionError."""
         with pytest.raises(AssertionError) as exc:
-            await source.dispatch(Event(source, 'event_a'))
+            await source.dispatch_event(Event(source, 'event_a'))
         assert str(exc.value) == 'event class mismatch'
 
 
 @pytest.mark.asyncio
 async def test_wait_event(source, event_loop):
     event = DummyEvent(source, 'event_a')
-    event_loop.create_task(source.dispatch(event))
+    event_loop.create_task(source.dispatch_event(event))
     received_event = await wait_event(source, 'event_a')
     assert received_event is event
 
@@ -233,11 +233,11 @@ async def test_wait_event(source, event_loop):
 async def test_stream_events(source, event_loop):
     async def generate_events():
         await asyncio.sleep(0.2)
-        await source.dispatch('event_a', 1)
+        await source.dispatch_event('event_a', 1)
         await asyncio.sleep(0.2)
-        await source.dispatch('event_a', 2)
+        await source.dispatch_event('event_a', 2)
         await asyncio.sleep(0.2)
-        await source.dispatch('event_a', 3)
+        await source.dispatch_event('event_a', 3)
 
     event_loop.create_task(generate_events())
     last_number = 0

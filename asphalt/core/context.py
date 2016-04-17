@@ -150,7 +150,7 @@ class Context(EventSource):
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
-        await self.dispatch('finished', exc_val)
+        await self.dispatch_event('finished', exc_val)
 
     async def _publish_resource(self, value, alias: str, context_attr: str,
                                 types: Iterable[Union[str, type]],
@@ -197,7 +197,7 @@ class Context(EventSource):
         if creator is None and resource.context_attr:
             setattr(self, context_attr, value)
 
-        await self.dispatch('resource_published', resource)
+        await self.dispatch_event('resource_published', resource)
         return resource
 
     async def publish_resource(
@@ -273,7 +273,7 @@ class Context(EventSource):
         if resource.context_attr and resource.context_attr in self.__dict__:
             delattr(self, resource.context_attr)
 
-        await self.dispatch('resource_removed', resource)
+        await self.dispatch_event('resource_removed', resource)
 
     async def request_resource(self, type: Union[str, type], alias: str='default', *,
                                timeout: Union[int, float, None]=None, optional: bool=False):

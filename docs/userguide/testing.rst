@@ -67,7 +67,7 @@ You could test it using `py.test`_ like this::
         yield ctx
 
         # This is run at test teardown
-        event_loop.run_until_complete(ctx.dispatch('finished', None))
+        event_loop.run_until_complete(ctx.dispatch_event('finished', None))
 
 
     @pytest.fixture

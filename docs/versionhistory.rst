@@ -21,6 +21,8 @@ This library adheres to `Semantic Versioning <http://semver.org/>`_.
 - *BACKWARD INCOMPATIBLE* Modified event dispatch logic in ``EventSource`` to always run all
   event listeners even if some listeners raise exceptions. A uniform exception is then raised
   that contains all the exceptions and the listeners who raised them.
+- *BACKWARD INCOMPATIBLE* Renamed the ``EventSource.dispatch()`` method to ``dispatch_event``
+  to disambiguate the operation and to prevent name clashes with subclasses
 - *BACKWARD INCOMPATIBLE* Event topic registrations for ``EventSource`` subclasses are now done
   using the ``@register_topic`` class decorator instead of the ``_register_topic()`` method
 - Added the ability to listen to multiple topics in an EventSource with a single listener

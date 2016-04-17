@@ -71,7 +71,7 @@ def run_application(component: Component, *, max_threads: int=None,
     except (KeyboardInterrupt, SystemExit):
         pass
     finally:
-        event_loop.run_until_complete(context.dispatch('finished', exception))
+        event_loop.run_until_complete(context.dispatch_event('finished', exception))
 
     event_loop.close()
     logger.info('Application stopped')

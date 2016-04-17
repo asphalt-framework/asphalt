@@ -163,7 +163,7 @@ class EventSource:
         except (KeyError, ValueError):
             raise LookupError('listener not found') from None
 
-    async def dispatch(self, event: Union[str, Event], *args, **kwargs) -> None:
+    async def dispatch_event(self, event: Union[str, Event], *args, **kwargs) -> None:
         """
         Dispatch an event, optionally constructing one first.
 
