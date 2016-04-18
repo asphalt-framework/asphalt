@@ -74,7 +74,7 @@ def register_topic(name: str, event_class: type = Event):
 
     A subclass may override an event topic by re-registering it with an event class that is a
     subclass of the previously registered event class. Attempting to override the topic with an
-    incompatible class will raise a :exception:`TypeError`.
+    incompatible class will raise a :exc:`TypeError`.
 
     :param name: name of the topic (must consist of alphanumeric characters and ``_``)
     :param event_class: the event class associated with this topic

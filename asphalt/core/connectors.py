@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 class ConnectorError(LookupError):
     """
     Raised by :func:`create_connector` when the requested connector
-    could not be created orlooked up.
+    could not be created or looked up.
 
     :ivar endpoint: the endpoint value
     """

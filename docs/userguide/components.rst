@@ -1,4 +1,4 @@
-Building Asphalt components
-===========================
+Working with components and contexts
+====================================
 
 TODO

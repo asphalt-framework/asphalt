@@ -19,8 +19,8 @@ def run_application(component: Component, *, max_threads: int=None,
     """
     Configure logging and start the given root component in the default asyncio event loop.
 
-    Assuming the application start is successful, the event loop will continue running until the
-    process is terminated.
+    Assuming the root component was started successfully, the event loop will continue running
+    until the process is terminated.
 
     Initializes the logging system first based on the value of ``logging``:
       * If the value is a dictionary, it is passed to :func:`logging.config.dictConfig` as

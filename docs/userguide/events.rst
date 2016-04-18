@@ -3,14 +3,14 @@ Events
 
 Events are a handy way to make your code react to changes in another part of the application.
 Asphalt events originate from classes that inherit from the
-:class:`~asphalt.core.context.EventSource` mixin class.
+:class:`~asphalt.core.event.EventSource` mixin class.
 An example of such class is the :class:`~asphalt.core.context.Context` class.
 
 Listening to events
 -------------------
 
-To listen to events dispatched from an :class:`~asphalt.core.context.EventSource`, call
-:meth:`~asphalt.core.context.EventSource.add_listener` to add an event listener callback.
+To listen to events dispatched from an :class:`~asphalt.core.event.EventSource`, call
+:meth:`~asphalt.core.event.EventSource.add_listener` to add an event listener callback.
 
 The event listener can be either a regular function or a coroutine function::
 
@@ -20,8 +20,10 @@ The event listener can be either a regular function or a coroutine function::
     def listener(event: Event):
         print(event)
 
+
     async def asynclistener(event: Event):
         print(event)
+
 
     async def event_test():
         context = Context()
@@ -63,7 +65,7 @@ Creating new event sources and event types
 ------------------------------------------
 
 Any class can be made into an event source simply by inheriting from the
-:class:`~asphalt.core.context.EventSource` mixin class. Then you'll just need to register one or
+:class:`~asphalt.core.event.EventSource` mixin class. Then you'll just need to register one or
 more event topics by using the ``@register_topic`` decorator::
 
     from asphalt.core import EventSource, Event, register_topic
@@ -101,4 +103,3 @@ the topic(s)::
 And to dispatch a single ``MyCustomEvent`` from your new event source::
 
     await MyEventSource().dispatch_event('sometopic', 'foo_value', bar='bar_value')
-

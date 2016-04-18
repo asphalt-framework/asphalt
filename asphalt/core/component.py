@@ -21,11 +21,10 @@ class Component(metaclass=ABCMeta):
         """
         Perform any necessary tasks to start the services provided by this component.
 
-        The context can be used to:
-          * add context event listeners (:meth:`~Context.add_listener`)
-          * publish resources (:meth:`~Context.publish_resource` and
-            :meth:`~Context.publish_lazy_resource`)
-          * request resources (:meth:`~Context.request_resource`)
+        Components typically use the context to:
+          * publish resources (:meth:`~asphalt.core.context.Context.publish_resource` and
+            :meth:`~asphalt.core.context.Context.publish_lazy_resource`)
+          * request resources (:meth:`~asphalt.core.context.Context.request_resource`)
 
         It is advisable for Components to first publish all the resources they can before
         requesting any. This will speed up the dependency resolution and prevent deadlocks.
@@ -35,6 +34,12 @@ class Component(metaclass=ABCMeta):
 
 
 class ContainerComponent(Component):
+    """
+    A component that can contain other components.
+
+    This class is essential to building nontrivial applications.
+    """
+
     __slots__ = 'child_components', 'component_config'
 
     def __init__(self, components: Dict[str, Any]=None):
@@ -43,16 +48,23 @@ class ContainerComponent(Component):
 
     def add_component(self, alias: str, type: Union[str, type]=None, **kwargs):
         """
-        Instantiate a component using :func:`create_component` and adds it as a child component of
-        this container.
+        Add a child component.
+
+        This will instantiate a component class, as specified by the ``type`` argument.
 
         If the second argument is omitted, the value of ``alias`` is used as its value.
 
         The locally given configuration can be overridden by component configuration parameters
         supplied to the constructor (the ``components`` argument).
 
+        When configuration values are provided both as keyword arguments to this method and
+        component configuration through the ``components`` constructor argument, the configurations
+        are merged together using :func:`~asphalt.core.util.merge_config` in a way that the
+        configuration values from the ``components`` argument override the keyword arguments to
+        this method.
+
         :param alias: a name for the component instance, unique within this container
-        :param type: entry point name or :cls:`Component` subclass or a textual reference to one
+        :param type: entry point name or :class:`Component` subclass or a textual reference to one
 
         """
         assert check_argument_types()
@@ -70,7 +82,7 @@ class ContainerComponent(Component):
     async def start(self, ctx: Context):
         """
         Create child components that have been configured but not yet created and then calls their
-        :meth:`Component.start` methods in separate tasks and waits until they have completed.
+        :meth:`~Component.start` methods in separate tasks and waits until they have completed.
 
         """
         for alias in self.component_config:

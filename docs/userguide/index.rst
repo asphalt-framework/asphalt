@@ -12,3 +12,4 @@ take a look at the :ref:`tutorials/index` first.
    events
    components
    testing
+   deployment
