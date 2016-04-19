@@ -89,6 +89,31 @@ class TestEventSource:
         assert str(exc.value) == 'no such topic registered: foo'
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize('from_handle', [True, False], ids=['eventhandle', 'direct'])
+    async def test_remove_listener(self, source, from_handle):
+        """Test that an event listener no longer receives events after it's been removed."""
+        events = []
+        handle = source.add_listener('event_a', events.append)
+        await source.dispatch_event('event_a', 1)
+        if from_handle:
+            handle.remove()
+        else:
+            source.remove_listener(handle)
+
+        await source.dispatch_event('event_a', 2)
+
+        assert len(events) == 1
+        assert events[0].args == (1,)
+
+    @pytest.mark.parametrize('topic', ['event_a', 'foo'],
+                             ids=['existing_event', 'nonexistent_event'])
+    def test_remove_nonexistent_listener(self, source, topic):
+        """Test that attempting to remove a nonexistent event listener raises a LookupError."""
+        handle = EventListener(source, topic, lambda: None, (), {})
+        exc = pytest.raises(LookupError, source.remove_listener, handle)
+        assert str(exc.value) == 'listener not found'
+
+    @pytest.mark.asyncio
     async def test_dispatch_event_coroutine(self, source: EventSource):
         """Test that a coroutine function can be an event listener."""
         async def callback(event: Event):
@@ -104,7 +129,7 @@ class TestEventSource:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize('construct_first', [True, False], ids=['forward', 'construct'])
-    async def dispatch_event_construct(self, source: EventSource, construct_first):
+    async def test_dispatch_event_construct(self, source: EventSource, construct_first):
         """
         Test that it doesn't matter if the event was constructed beforehand or if the constructor
         arguments were given directly to dispatch_event().
@@ -123,22 +148,27 @@ class TestEventSource:
         assert events[0].kwargs == {'a': 1, 'b': 2}
 
     @pytest.mark.asyncio
-    async def dispatch_event_listener_arguments(self, source: EventSource):
+    async def test_dispatch_event_listener_arguments(self, source: EventSource):
         """Test that extra positional and keyword arguments are passed to the listener."""
         arguments = []
-        source.add_listener(['event_a'], lambda *args, **kwargs: arguments.append((args, kwargs)),
+        source.add_listener(['event_a'],
+                            lambda event, *args, **kwargs: arguments.append((args, kwargs)),
                             [1, 2], {'x': 6, 'y': 8})
         await source.dispatch_event('event_a')
 
         assert len(arguments) == 1
         assert arguments[0][0] == (1, 2)
-        assert arguments[0].kwargs == {'x': 1, 'y': 2}
+        assert arguments[0][1] == {'x': 6, 'y': 8}
 
     @pytest.mark.asyncio
-    async def dispatch_event_multiple_topic(self, source: EventSource):
+    @pytest.mark.parametrize('topics', [
+        ['event_a', 'event_b'],
+        'event_a, event_b'
+    ], ids=['list', 'comma-separated'])
+    async def test_dispatch_event_multiple_topic(self, source: EventSource, topics):
         """Test that a one add_listen() call can be made to subscribe to multiple topics."""
         events = []
-        source.add_listener(['event_a', 'event_b'], events.append)
+        source.add_listener(topics, events.append)
         await source.dispatch_event('event_a', 'x', 'y', a=1, b=2)
         await source.dispatch_event('event_b', 'c', 'd', g=7, h=8)
 
@@ -149,7 +179,7 @@ class TestEventSource:
         assert events[1].kwargs == {'g': 7, 'h': 8}
 
     @pytest.mark.asyncio
-    async def test_dispatch_listener_exceptions(self, source):
+    async def test_dispatch_event_listener_exceptions(self, source):
         """
         Test that multiple exceptions raised by listeners are combined into one EventDispatchError.
 
@@ -175,39 +205,13 @@ class TestEventSource:
         ]
 
     @pytest.mark.asyncio
-    @pytest.mark.parametrize('from_handle', [True, False],
-                             ids=['eventhandle', 'direct'])
-    async def test_remove_listener(self, source, from_handle):
-        """Test that an event listener no longer receives events after it's been removed."""
-        events = []
-        handle = source.add_listener('event_a', events.append)
-        await source.dispatch_event('event_a', 1)
-        if from_handle:
-            handle.remove()
-        else:
-            source.remove_listener(handle)
-
-        await source.dispatch_event('event_a', 2)
-
-        assert len(events) == 1
-        assert events[0].args == (1,)
-
-    @pytest.mark.parametrize('topic', ['event_a', 'foo'],
-                             ids=['existing_event', 'nonexistent_event'])
-    def test_remove_nonexistent_listener(self, source, topic):
-        """Test that attempting to remove a nonexistent event listener raises a LookupError."""
-        handle = EventListener(source, topic, lambda: None, (), {})
-        exc = pytest.raises(LookupError, source.remove_listener, handle)
-        assert str(exc.value) == 'listener not found'
-
-    @pytest.mark.asyncio
-    async def test_dispatch_nonexistent_topic(self, source):
+    async def test_dispatch_event_nonexistent_topic(self, source):
         with pytest.raises(LookupError) as exc:
             await source.dispatch_event('blah')
         assert str(exc.value) == 'no such topic registered: blah'
 
     @pytest.mark.asyncio
-    async def test_dispatch_pointless_args(self, source):
+    async def test_dispatch_event_pointless_args(self, source):
         """Test that passing variable arguments with an Event instance raises an AssertionError."""
         with pytest.raises(AssertionError) as exc:
             await source.dispatch_event(DummyEvent(source, 'event_a'), 6)

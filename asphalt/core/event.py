@@ -128,7 +128,7 @@ class EventSource:
         :class:`Event` instance). The exact event class used depends on the event class mappings
         given to the constructor.
 
-        :param topics: the topic(s) to listen to
+        :param topics: either a comma separated list or an iterable of topic(s) to listen to
         :param callback: a callable to call with the event object when the event is dispatched
         :param args: positional arguments to call the callback with (in addition to the event)
         :param kwargs: keyword arguments to call the callback with
@@ -137,7 +137,12 @@ class EventSource:
 
         """
         assert check_argument_types()
-        topics = (topics,) if isinstance(topics, str) else tuple(topics)
+
+        if isinstance(topics, str):
+            topics = tuple(topic.strip() for topic in topics.split(','))
+        else:
+            topics = tuple(topics)
+
         for topic in topics:
             if topic not in self._eventsource_topics:
                 raise LookupError('no such topic registered: {}'.format(topic))
