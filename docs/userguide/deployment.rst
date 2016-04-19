@@ -8,6 +8,8 @@ deployments that all need their own custom configuration.
 For this purpose, Asphalt provides a command line interface that will read a YAML_ formatted
 configuration file and run the application it describes.
 
+.. _YAML: http://yaml.org/
+
 Running the Asphalt launcher
 ----------------------------
 
@@ -24,9 +26,9 @@ What this will do is:
 #. resolve and instantiate the root component
 #. call the runner function
 
-Except for the ``runner`` and ``component`` options, all keys in the configuration dictionary
-are passed as-is to the runner function as keyword arguments. If no runner function has been
-defined, :func:`asphalt.core.runner.run_application` is used.
+Except for the ``runner`` option, all keys in the configuration dictionary are passed to the runner
+function as keyword arguments. If no runner function has been defined,
+:func:`asphalt.core.runner.run_application` is used.
 
 Writing a configuration file
 ----------------------------
@@ -81,16 +83,17 @@ In the above configuration you have three top level configuration keys: ``compon
 The ``component`` section defines the type of the root component using the specially processed
 ``type`` option. You can either specify a setuptools entry point name (from the
 ``asphalt.components`` namespace) or a text reference like ``module:class`` (see
-:func:`~asphalt.core.util.resolve_reference` for details).
+:func:`~asphalt.core.util.resolve_reference` for details). The rest of the keys in this section are
+passed directly to the constructor of the ``MyRootComponent`` class.
 
-The keys inside ``component``, save for ``type``, are passed directly to the constructor of the
-``MyRootComponent`` class. The ``components`` section has similar processing; refer to
-:meth:`~asphalt.core.component.ContainerComponent.add_component` for details.
-Suffice to say that the per-component configuration values are merged with those provided in the
-``start()`` method of ``MyRootComponent``. See the next section for a more elaborate explanation.
+The ``components`` section within ``component`` is processed in a similar fashion.
+Each subsection here is a component type alias and its keys and values are the constructor
+arguments to the relevant component class. The per-component configuration values are merged with
+those provided in the ``start()`` method of ``MyRootComponent``. See the next section for a more
+elaborate explanation.
 
-With ``max_threads: 20``, the maximum number of threads in the default thread pool executor is set
-to 20.
+With ``max_threads: 20``, the maximum number of threads in the event loop's default thread pool
+executor is set to 20.
 
 The ``logging`` configuration tree here sets up a root logger that prints all log entries of at
 least ``INFO`` level to the console. You may want to set up more granular logging in your own
@@ -116,22 +119,18 @@ file. You could also override the mailer's type in the configuration file if you
 effect can be achieved programmatically by supplying the override configuration to the container
 component via its ``components`` constructor argument. This is very useful when writing tests
 against your application. For example, you might want to use the ``mock`` mailer in your test suite
-configuration to test that the application correctly sends out emails. See the documentation of the
+configuration to test that the application correctly sends out emails (and to prevent them from
+actually being sent to recipients!). See the documentation of the
 :func:`~asphalt.core.util.merge_config` function for details on how configuration merging works.
 
 Enabling optimizations
 ----------------------
 
-Asphalt employs a number of potentially expensive validation steps in this code. The performance
-hit of these checks is not a concern in development and testing, but in a production environment
-you will probably want to maximize the performance.
+Asphalt's core code and many third part components employ a number of potentially expensive
+validation steps in its code. The performance hit of these checks is not a concern in development
+and testing, but in a production environment you will probably want to maximize the performance.
 
 To do this, you will want to disable Python's debugging mode by either setting the environment
 variable ``PYTHONOPTIMIZE`` to ``1`` or (if applicable) running Python with the ``-O`` switch.
 This has the effect of completely eliminating all ``assert`` statements and blocks starting with
 ``if __debug__:`` from the compiled bytecode.
-
-
-.. _YAML: http://yaml.org/
-.. _asphalt-mailer: https://github.com/asphalt-framework/asphalt-mailer
-.. _asphalt-sqlalchemy: https://github.com/asphalt-framework/asphalt-sqlalchemy
