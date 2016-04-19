@@ -25,6 +25,11 @@ def source():
     return DummySource()
 
 
+def test_event_repr(source):
+    event = Event(source, 'sometopic')
+    assert repr(event) == "Event(source=%r, topic='sometopic')" % source
+
+
 class TestEventListener:
     @pytest.fixture
     def handle(self):

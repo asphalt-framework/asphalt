@@ -29,6 +29,9 @@ class Event:
         self.source = source
         self.topic = topic
 
+    def __repr__(self):
+        return '{0.__class__.__name__}(source={0.source!r}, topic={0.topic!r})'.format(self)
+
 
 class EventListener:
     """A handle that can be used to remove an event listener from its :class:`EventSource`."""
