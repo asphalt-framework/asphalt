@@ -37,6 +37,13 @@ class TestContext:
     def context(self):
         return Context(default_timeout=2)
 
+    def test_parent(self):
+        """Test that the parent property points to the parent context instance, if any."""
+        parent = Context()
+        child = Context(parent)
+        assert parent.parent is None
+        assert child.parent is parent
+
     @pytest.mark.asyncio
     async def test_contextmanager(self, context):
         """
@@ -259,3 +266,16 @@ class TestContext:
         await context.remove_resource(resource)
         exc = pytest.raises(AttributeError, getattr, context, 'foo')
         assert str(exc.value) == 'no such context variable: foo'
+
+    @pytest.mark.asyncio
+    async def test_get_resources(self, context):
+        resource1 = await context.publish_resource(6, 'int1')
+        resource2 = await context.publish_resource(8, 'int2')
+        resource3 = await context.publish_resource('foo', types=(str, 'collections.abc.Iterable'))
+        resource4 = await context.publish_resource(
+            (5, 4), 'sometuple', types=(tuple, 'collections.abc.Iterable'))
+
+        assert context.get_resources() == [resource1, resource2, resource3, resource4]
+        assert context.get_resources(int) == [resource1, resource2]
+        assert context.get_resources(str) == [resource3]
+        assert context.get_resources('collections.abc.Iterable') == [resource3, resource4]

@@ -1,9 +1,10 @@
 from asyncio import iscoroutinefunction
 from asyncio.futures import Future, TimeoutError
 from asyncio.tasks import wait_for
-from collections import defaultdict
+from itertools import chain
 from typing import Optional, Callable, Any, Union, Iterable, Sequence, Dict  # noqa
 
+from collections import defaultdict
 from typeguard import check_argument_types
 
 from asphalt.core.event import EventSource, Event, register_topic
@@ -126,7 +127,7 @@ class Context(EventSource):
         arguments
     """
 
-    def __init__(self, parent: 'Context'=None, default_timeout: int=5):
+    def __init__(self, parent: 'Context'=None, *, default_timeout: int=5):
         assert check_argument_types()
         super().__init__()
         self._parent = parent
@@ -145,6 +146,11 @@ class Context(EventSource):
             return getattr(self._parent, name)
 
         raise AttributeError('no such context variable: {}'.format(name))
+
+    @property
+    def parent(self) -> Optional['Context']:
+        """Return the parent of this context or ``None`` if there is no parent context."""
+        return self._parent
 
     async def __aenter__(self):
         return self
@@ -336,3 +342,17 @@ class Context(EventSource):
         finally:
             for listener in listeners:
                 listener.remove()
+
+    def get_resources(self, type: Union[str, type] = None) -> Sequence[Resource]:
+        """
+        Return the currently published resources specific to one type or all types.
+
+        :param type: type of the resources to return, or ``None`` to return all resources
+
+        """
+        resources = frozenset(chain(*(value.values() for value in self._resources.values())))
+        if type is not None:
+            resource_type = qualified_name(type) if not isinstance(type, str) else type
+            resources = (resource for resource in resources if resource_type in resource.types)
+
+        return sorted(resources, key=lambda resource: (resource.types, resource.alias))
