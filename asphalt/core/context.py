@@ -94,7 +94,8 @@ class ContextFinishEvent(Event):
     """
     Dispatched when a context has served its purpose and is being torn down.
 
-    :ivar BaseException exception: the exception that caused the context to finish (or ``None``)
+    :ivar Optional[BaseException] exception: the exception that caused the context to finish
+        (or ``None``)
     """
 
     __slots__ = 'exception'
@@ -117,10 +118,11 @@ class Context(EventSource):
     attribute is found (or :class:`AttributeError` is raised).
 
     Supported events:
-      * finished (:class:`~asphalt.core.event.Event`): the context has served its purpose and is
-        being discarded
-      * resource_published (:class:`ResourceEvent`): a resource has been published in this context
-      * resource_removed (:class:`ResourceEvent`): a resource has been removed from this context
+
+    * finished (:class:`~asphalt.core.event.Event`): the context has served its purpose and is
+      being discarded
+    * resource_published (:class:`ResourceEvent`): a resource has been published in this context
+    * resource_removed (:class:`ResourceEvent`): a resource has been removed from this context
 
     :param parent: the parent context, if any
     :param default_timeout: default timeout for :meth:`request_resource` if omitted from the call

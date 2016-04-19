@@ -1,6 +1,6 @@
-from typing import Any, Union, List
-
 from importlib import import_module
+from typing import Any, Union, List, Dict
+
 from pkg_resources import EntryPoint, iter_entry_points
 from typeguard import check_argument_types
 
@@ -54,7 +54,7 @@ def qualified_name(obj) -> str:
     return qualname if module in ('typing', 'builtins') else '{}.{}'.format(module, qualname)
 
 
-def merge_config(original: dict, overrides: dict) -> dict:
+def merge_config(original: Dict[str, Any], overrides: Dict[str, Any]) -> Dict[str, Any]:
     """
     Return a copy of the ``original`` configuration dictionary, with overrides from ``overrides``
     applied.
@@ -104,11 +104,11 @@ class PluginContainer:
 
     def resolve(self, obj):
         """
-        If ``obj`` is a textual reference to an object (contains ":"),
-        returns the resolved reference using :func:`resolve_reference`.
-        If it is a string of any other kind, loads the named entry
-        point in this container's namespace. Otherwise, ``obj`` is
-        returned as is.
+        Resolve a reference to an entry point or a variable in a module.
+
+        If ``obj`` is a textual reference to an object (contains ":"), :func:`resolve_reference` is
+        used to resolve. If it is a string of any other kind, the named entry point is loaded from
+        this container's namespace. Otherwise, ``obj`` is returned as is.
 
         :param obj: an entry point identifier, an object reference or an arbitrary object
         :return: the loaded entry point, resolved object or the unchanged input value
@@ -131,14 +131,16 @@ class PluginContainer:
 
     def create_object(self, type: Union[type, str], **constructor_kwargs):
         """
-        Instantiates a plugin. The entry points in this namespace must point to subclasses of the
-        ``base_class`` parameter passed to this container.
+        Instantiate a plugin.
+
+        The entry points in this namespace must point to subclasses of the ``base_class`` parameter
+        passed to this container.
 
         :param type: an entry point identifier, a textual reference to a class or an actual class
         :param constructor_kwargs: keyword arguments passed to the constructor of the plugin class
         :return: the plugin instance
-        """
 
+        """
         assert check_argument_types()
         assert self.base_class, 'base class has not been defined'
         plugin_class = self.resolve(type)
@@ -152,8 +154,8 @@ class PluginContainer:
         """
         Load all entry points (if not already loaded) in this namespace and return the resulting
         objects as a list.
-        """
 
+        """
         values = []
         for name, value in self._entrypoints.items():
             if isinstance(value, EntryPoint):
