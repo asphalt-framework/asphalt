@@ -11,27 +11,26 @@ def resolve_reference(ref):
     """
     Return the object pointed to by ``ref``.
 
-    If ``ref`` is not a string, it is returned as is.
+    If ``ref`` is not a string or does not contain ``:``, it is returned as is.
+
     References must be in the form  <modulename>:<varname> where <modulename> is the fully
     qualified module name and varname is the path to the variable inside that module.
 
     For example, "concurrent.futures:Future" would give you the
     :class:`~concurrent.futures.Future` class.
 
-    :raises ValueError: if there was no : in the reference string
     :raises LookupError: if the reference could not be resolved
 
     """
-    if not isinstance(ref, str):
+    if not isinstance(ref, str) or ':' not in ref:
         return ref
-    if ':' not in ref:
-        raise ValueError('invalid reference (no ":" contained in the string)')
 
     modulename, rest = ref.split(':', 1)
     try:
         obj = import_module(modulename)
-    except ImportError:
-        raise LookupError('error resolving reference {}: could not import module'.format(ref))
+    except ImportError as e:
+        raise LookupError(
+            'error resolving reference {}: could not import module'.format(ref)) from e
 
     try:
         for name in rest.split('.'):

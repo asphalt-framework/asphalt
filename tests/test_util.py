@@ -1,8 +1,8 @@
-from unittest.mock import Mock
 import asyncio
+from unittest.mock import Mock
 
-from pkg_resources import EntryPoint
 import pytest
+from pkg_resources import EntryPoint
 
 from asphalt.core.util import resolve_reference, qualified_name, PluginContainer, merge_config
 
@@ -25,11 +25,10 @@ def test_resolve_reference(inputval):
 
 
 @pytest.mark.parametrize('inputval, error_type, error_text', [
-    ('x.y', ValueError, 'invalid reference (no ":" contained in the string)'),
     ('x.y:foo', LookupError, 'error resolving reference x.y:foo: could not import module'),
     ('asphalt.core:foo', LookupError,
      'error resolving reference asphalt.core:foo: error looking up object')
-], ids=['invalid_ref', 'module_not_found', 'object_not_found'])
+], ids=['module_not_found', 'object_not_found'])
 def test_resolve_reference_error(inputval, error_type, error_text):
     exc = pytest.raises(error_type, resolve_reference, inputval)
     assert str(exc.value) == error_text

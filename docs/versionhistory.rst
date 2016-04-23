@@ -30,6 +30,8 @@ This library adheres to `Semantic Versioning <http://semver.org/>`_.
 - Added the ability to listen to multiple topics in an EventSource with a single listener
 - Added the ability to stream events from an EventSource
 - Added a utility function to listen to a single event coming from an EventSource
+- Changed the ``asphalt.core.util.resolve_reference()`` function to return invalid reference
+  strings as-is
 - Switched from argparse to click for the command line interface
 - All classes and functions are now importable directly from ``asphalt.core``
 
