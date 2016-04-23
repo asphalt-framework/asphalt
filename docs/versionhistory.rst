@@ -25,6 +25,7 @@ This library adheres to `Semantic Versioning <http://semver.org/>`_.
   to disambiguate the operation and to prevent name clashes with subclasses
 - *BACKWARD INCOMPATIBLE* Event topic registrations for ``EventSource`` subclasses are now done
   using the ``@register_topic`` class decorator instead of the ``_register_topic()`` method
+- *BACKWARD INCOMPATIBLE* Removed the ``asphalt.core.connectors`` module
 - Added the ability to get a list of all the resources in a Context (``
 - Added the ability to listen to multiple topics in an EventSource with a single listener
 - Added the ability to stream events from an EventSource
