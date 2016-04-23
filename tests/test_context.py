@@ -174,16 +174,6 @@ class TestContext:
         assert 'foo' not in context.__dict__
 
     @pytest.mark.asyncio
-    async def test_publish_lazy_resource_coroutine(self, context):
-        """Test that coroutine functions are not accepted as lazy resource creators."""
-        async def faulty_creator(context):
-            pass
-
-        with pytest.raises(AssertionError) as exc:
-            await context.publish_lazy_resource(faulty_creator, 'foo')
-        assert str(exc.value) == 'creator cannot be a coroutine function'
-
-    @pytest.mark.asyncio
     async def test_publish_resource_conflicting_attribute(self, context):
         context.a = 2
         with pytest.raises(ResourceConflict) as exc:
@@ -193,6 +183,24 @@ class TestContext:
 
         with pytest.raises(ResourceNotFound):
             await context.request_resource(int, timeout=0)
+
+    @pytest.mark.parametrize('alias', ['a.b', 'a:b', 'a b'], ids=['dot', 'colon', 'space'])
+    @pytest.mark.asyncio
+    async def test_publish_resource_bad_alias(self, context, alias):
+        with pytest.raises(AssertionError) as exc:
+            await context.publish_resource(1, alias)
+
+        assert str(exc.value) == 'alias can only contain alphanumeric characters and underscores'
+
+    @pytest.mark.asyncio
+    async def test_publish_lazy_resource_coroutine(self, context):
+        """Test that coroutine functions are not accepted as lazy resource creators."""
+        async def faulty_creator(context):
+            pass
+
+        with pytest.raises(AssertionError) as exc:
+            await context.publish_lazy_resource(faulty_creator, 'foo')
+        assert str(exc.value) == 'creator cannot be a coroutine function'
 
     @pytest.mark.asyncio
     async def test_publish_lazy_resource_conflicting_resource(self, context):

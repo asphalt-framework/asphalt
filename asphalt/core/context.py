@@ -1,3 +1,4 @@
+import re
 from asyncio import iscoroutinefunction
 from asyncio.futures import Future, TimeoutError
 from asyncio.tasks import wait_for
@@ -164,6 +165,8 @@ class Context(EventSource):
                                 types: Iterable[Union[str, type]],
                                 creator: Optional[Callable[['Context'], Any]]):
         assert isinstance(alias, str) and alias, 'alias must be a nonempty string'
+        assert re.match(r'^\w+$', alias),\
+            'alias can only contain alphanumeric characters and underscores'
         assert context_attr is None or isinstance(context_attr, str),\
             'context_attr must be a nonempty string or None'
 

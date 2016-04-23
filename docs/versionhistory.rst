@@ -18,6 +18,7 @@ This library adheres to `Semantic Versioning <http://semver.org/>`_.
 - *BACKWARD INCOMPATIBLE* Removed the ``asphalt quickstart`` command
 - *BACKWARD INCOMPATIBLE* Removed regular context manager support from the ``Context`` class
   (asynchronous context manager support still remains)
+- *BACKWARD INCOMPATIBLE* Restricted resource names to alphanumeric characters and underscores
 - *BACKWARD INCOMPATIBLE* Modified event dispatch logic in ``EventSource`` to always run all
   event listeners even if some listeners raise exceptions. A uniform exception is then raised
   that contains all the exceptions and the listeners who raised them.
@@ -50,4 +51,4 @@ This library adheres to `Semantic Versioning <http://semver.org/>`_.
 
 **1.0.0**
 
-Initial release.
+- Initial release
