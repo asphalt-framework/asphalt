@@ -287,3 +287,13 @@ class TestContext:
         assert context.get_resources(int) == [resource1, resource2]
         assert context.get_resources(str) == [resource3]
         assert context.get_resources('collections.abc.Iterable') == [resource3, resource4]
+
+    @pytest.mark.asyncio
+    async def test_get_resources_include_parents(self, context):
+        subcontext = Context(context)
+        resource1 = await context.publish_resource(6, 'int1')
+        resource2 = await subcontext.publish_resource(8, 'int2')
+        resource3 = await context.publish_resource('foo', 'str')
+
+        assert subcontext.get_resources() == [resource1, resource2, resource3]
+        assert subcontext.get_resources(include_parents=False) == [resource2]

@@ -348,14 +348,19 @@ class Context(EventSource):
             for listener in listeners:
                 listener.remove()
 
-    def get_resources(self, type: Union[str, type] = None) -> Sequence[Resource]:
+    def get_resources(self, type: Union[str, type] = None, *,
+                      include_parents: bool = True) -> Sequence[Resource]:
         """
         Return the currently published resources specific to one type or all types.
 
         :param type: type of the resources to return, or ``None`` to return all resources
+        :param include_parents: include the resources from parent contexts
 
         """
-        resources = frozenset(chain(*(value.values() for value in self._resources.values())))
+        resources = set(chain(*(value.values() for value in self._resources.values())))
+        if include_parents and self._parent:
+            resources = resources.union(self._parent.get_resources(type, include_parents=True))
+
         if type is not None:
             resource_type = qualified_name(type) if not isinstance(type, str) else type
             resources = (resource for resource in resources if resource_type in resource.types)
