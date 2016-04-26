@@ -40,13 +40,13 @@ class ContainerComponent(Component):
     This class is essential to building nontrivial applications.
     """
 
-    __slots__ = 'child_components', 'component_config'
+    __slots__ = 'child_components', 'component_configs'
 
     def __init__(self, components: Dict[str, Any]=None):
         self.child_components = OrderedDict()
-        self.component_config = components or {}
+        self.component_configs = components or {}
 
-    def add_component(self, alias: str, type: Union[str, type]=None, **kwargs):
+    def add_component(self, alias: str, type: Union[str, type]=None, **config):
         """
         Add a child component.
 
@@ -65,6 +65,7 @@ class ContainerComponent(Component):
 
         :param alias: a name for the component instance, unique within this container
         :param type: entry point name or :class:`Component` subclass or a textual reference to one
+        :param config: keyword arguments passed to the component's constructor
 
         """
         assert check_argument_types()
@@ -74,9 +75,10 @@ class ContainerComponent(Component):
             raise ValueError('there is already a child component named "{}"'.format(alias))
 
         # Allow the external configuration to override the constructor arguments
-        kwargs = merge_config(kwargs, self.component_config.get(alias, {}))
+        override_config = self.component_configs.get(alias) or {}
+        config = merge_config(config, override_config)
 
-        component = component_types.create_object(type or alias, **kwargs)
+        component = component_types.create_object(type or alias, **config)
         self.child_components[alias] = component
 
     async def start(self, ctx: Context):
@@ -85,19 +87,15 @@ class ContainerComponent(Component):
         :meth:`~Component.start` methods in separate tasks and waits until they have completed.
 
         """
-        for alias in self.component_config:
+        for alias in self.component_configs:
             if alias not in self.child_components:
                 self.add_component(alias)
 
-        if self.child_components:
-            tasks = []
-            for component in self.child_components.values():
-                retval = component.start(ctx)
-                if retval is not None:
-                    tasks.append(retval)
-
-            if tasks:
-                await asyncio.gather(*tasks)
+        loop = asyncio.get_event_loop()
+        tasks = [loop.create_task(component.start(ctx)) for component in
+                 self.child_components.values()]
+        if tasks:
+            await asyncio.gather(*tasks)
 
 
 component_types = PluginContainer('asphalt.components', Component)
