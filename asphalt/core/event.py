@@ -113,14 +113,18 @@ def register_topic(name: str, event_class: type = Event):
 class EventSource:
     """A mixin class that provides support for dispatching and listening to events."""
 
-    __slots__ = '_listeners'
+    __slots__ = '__listeners'
 
     # Provided in subclasses using @register_topic(...)
     _eventsource_topics = {}  # type: Dict[str, Callable[[Event], Any]]
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self._listeners = defaultdict(list)
+    @property
+    def _listeners(self):
+        try:
+            return self.__listeners
+        except AttributeError:
+            self.__listeners = defaultdict(list)
+            return self.__listeners
 
     def add_listener(self, topics: Union[str, Iterable[str]], callback: Callable,
                      args: Sequence=(), kwargs: Dict[str, Any]=None) -> EventListener:

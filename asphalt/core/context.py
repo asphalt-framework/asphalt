@@ -132,7 +132,6 @@ class Context(EventSource):
 
     def __init__(self, parent: 'Context'=None, *, default_timeout: int=5):
         assert check_argument_types()
-        super().__init__()
         self._parent = parent
         self._resources = defaultdict(dict)  # type: Dict[str, Dict[str, Resource]]
         self._resource_creators = {}  # type: Dict[str, Callable[[Context], Any]
