@@ -286,7 +286,7 @@ class Context(EventSource):
         await self.dispatch_event('resource_removed', resource)
 
     async def request_resource(self, type: Union[str, type], alias: str='default', *,
-                               timeout: Union[int, float, None]=None, optional: bool=False):
+                               timeout: Union[int, None]=None):
         """
         Request a resource matching the given type and alias.
 
@@ -296,8 +296,6 @@ class Context(EventSource):
         :param type: type of the requested resource
         :param alias: alias of the requested resource
         :param timeout: the timeout (in seconds; omit to use the  default timeout)
-        :param optional: if ``True``, return None instead of raising an exception if no matching
-            resource becomes available within the timeout period
         :return: the value contained by the requested resource (**NOT** a :class:`Resource`
             instance)
         :raises ResourceNotFound: if the requested resource does not become available in the
@@ -337,10 +335,7 @@ class Context(EventSource):
         try:
             resource = await wait_for(future, timeout)
         except TimeoutError:
-            if optional:
-                return None
-            else:
-                raise ResourceNotFound(resource_type, alias)
+            raise ResourceNotFound(resource_type, alias) from None
         else:
             return resource.get_value(self)
         finally:
