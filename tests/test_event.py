@@ -208,6 +208,9 @@ class TestEventSource:
             (plain_listener, plain_exception),
             (async_listener, async_exception)
         ]
+        assert 'plain_error' in str(exc.value)
+        assert 'async_error' in str(exc.value)
+        assert '-------------------------------\n' in str(exc.value)
 
     @pytest.mark.asyncio
     async def test_dispatch_event_nonexistent_topic(self, source):

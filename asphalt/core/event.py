@@ -3,6 +3,7 @@ from asyncio import ensure_future, Future
 from asyncio.queues import Queue
 from collections import defaultdict
 from inspect import isawaitable
+from traceback import format_exception
 from typing import Dict, Callable, Any, Sequence, Union, Iterable, Tuple
 
 from asyncio_extras.asyncyield import yield_async
@@ -60,13 +61,17 @@ class EventDispatchError(Exception):
     """
     Raised when one or more event listener callback raises an exception.
 
+    The tracebacks of all the exceptions are displayed in the exception message.
+
     :ivar Event event: the event
     :ivar Sequence[Tuple[EventListener, Exception]]: a sequence containing tuples of
         (listener, exception) for each exception that was raised by a listener callback
     """
 
     def __init__(self, event: Event, exceptions: Sequence[Tuple[EventListener, Exception]]):
-        super().__init__('error dispatching event')
+        message = '-------------------------------\n'.join(
+            ''.join(format_exception(type(exc), exc, exc.__traceback__)) for _, exc in exceptions)
+        super().__init__('error dispatching event:\n' + message)
         self.event = event
         self.exceptions = exceptions
 
