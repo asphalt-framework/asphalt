@@ -11,10 +11,10 @@ using the ``asphalt`` command to run an application with a configuration file.
 Prerequisites
 -------------
 
-Asphalt requires Python 3.5.0 or later. You will also need to have the ``pip`` and ``virtualenv``
-tools installed. The former should come with most Python installations, but if it does not, you can
-usually install it with your operating system's package manager (``python3-pip`` is a good guess).
-As for ``virtualenv``, you can install it with the ``pip install --user virtualenv`` command.
+Asphalt requires Python 3.5.0 or later. You will also need to have the ``venv``
+ module installed for your Python version of choice.
+It should come with most Python installations, but if it does not, you can
+usually install it with your operating system's package manager (``python3-venv`` is a good guess).
 
 Setting up the virtual environment
 ----------------------------------
@@ -27,7 +27,7 @@ Now, create a project directory and a virtualenv::
 
     mkdir tutorial
     cd tutorial
-    virtualenv tutorialenv
+    python3.5 -m venv tutorialenv
     source tutorialenv/bin/activate
 
 On Windows, the last line should be:
