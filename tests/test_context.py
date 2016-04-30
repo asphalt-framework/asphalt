@@ -1,3 +1,5 @@
+import asyncio
+from asyncio.futures import Future
 from itertools import count
 
 import pytest
@@ -149,19 +151,6 @@ class TestContext:
         assert str(exc.value) == errormsg
 
     @pytest.mark.asyncio
-    async def test_publish_lazy_resource(self, context):
-        """Test that lazy resources are only created once per context instance."""
-        def creator(ctx):
-            assert ctx is context
-            return next(counter)
-
-        counter = count(1)
-        await context.publish_lazy_resource(creator, int, context_attr='foo')
-        assert context.foo == 1
-        assert context.foo == 1
-        assert context.__dict__['foo'] == 1
-
-    @pytest.mark.asyncio
     async def test_resource_added_removed(self, context):
         """
         Test that when resources are published, they are also set as properties of the context.
@@ -175,6 +164,11 @@ class TestContext:
 
     @pytest.mark.asyncio
     async def test_publish_resource_conflicting_attribute(self, context):
+        """
+        Test that the context won't allow publishing a resource with an attribute name that
+        conflicts with an existing attribute.
+
+        """
         context.a = 2
         with pytest.raises(ResourceConflict) as exc:
             await context.publish_resource(2, context_attr='a')
@@ -193,14 +187,46 @@ class TestContext:
         assert str(exc.value) == 'alias can only contain alphanumeric characters and underscores'
 
     @pytest.mark.asyncio
-    async def test_publish_lazy_resource_coroutine(self, context):
-        """Test that coroutine functions are not accepted as lazy resource creators."""
-        async def faulty_creator(context):
-            pass
+    async def test_publish_lazy_resource(self, context):
+        """Test that lazy resources are only created once per context instance."""
+        def creator(ctx):
+            assert ctx is context
+            return next(counter)
 
-        with pytest.raises(AssertionError) as exc:
-            await context.publish_lazy_resource(faulty_creator, 'foo')
-        assert str(exc.value) == 'creator cannot be a coroutine function'
+        counter = count(1)
+        await context.publish_lazy_resource(creator, int, context_attr='foo')
+        assert context.foo == 1
+        assert context.foo == 1
+        assert context.__dict__['foo'] == 1
+
+    @pytest.mark.asyncio
+    async def test_publish_lazy_resource_coroutine(self, context):
+        """
+        Test that a coroutine function can be a resource creator, and that it returns a Future.
+
+        """
+        async def async_creator(context):
+            return 'hello'
+
+        await context.publish_lazy_resource(async_creator, str, 'foo', 'foo')
+        hello = context.foo
+        assert isinstance(hello, Future)
+        assert await context.request_resource(str, 'foo') == 'hello'
+
+    @pytest.mark.asyncio
+    async def test_publish_lazy_resource_coroutine_delayed(self, event_loop, context):
+        """
+        Test that a coroutine resource creator works even when the resource isn't immediately
+        available.
+
+        """
+        async def async_creator(context):
+            return 'hello'
+
+        future = event_loop.create_task(context.request_resource(str, 'foo'))
+        await asyncio.sleep(0.2)
+        await context.publish_lazy_resource(async_creator, str, alias='foo')
+        assert await future == 'hello'
 
     @pytest.mark.asyncio
     async def test_publish_lazy_resource_conflicting_resource(self, context):

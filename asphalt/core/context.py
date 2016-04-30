@@ -1,7 +1,6 @@
 import re
-from asyncio import iscoroutinefunction
-from asyncio.futures import Future, TimeoutError
-from asyncio.tasks import wait_for
+from asyncio import iscoroutinefunction, Future, TimeoutError, wait_for, ensure_future
+from inspect import isawaitable, iscoroutine
 from itertools import chain
 from typing import Optional, Callable, Any, Union, Iterable, Sequence, Dict  # noqa
 
@@ -41,6 +40,8 @@ class Resource:
         assert check_argument_types()
         if self.value is None and self.creator is not None:
             self.value = self.creator(ctx)
+            if iscoroutine(self.value):
+                self.value = ensure_future(self.value)
             if self.context_attr:
                 setattr(ctx, self.context_attr, self.value)
 
@@ -134,13 +135,13 @@ class Context(EventSource):
         assert check_argument_types()
         self._parent = parent
         self._resources = defaultdict(dict)  # type: Dict[str, Dict[str, Resource]]
-        self._resource_creators = {}  # type: Dict[str, Callable[[Context], Any]
+        self._lazy_resources = {}  # type: Dict[str, Resource]
         self.default_timeout = default_timeout
 
     def __getattr__(self, name):
-        creator = self._resource_creators.get(name)
-        if creator is not None:
-            value = creator(self)
+        resource = self._lazy_resources.get(name)
+        if resource is not None:
+            value = resource.get_value(self)
             setattr(self, name, value)
             return value
 
@@ -189,7 +190,7 @@ class Context(EventSource):
 
             # Check that there is no existing lazy resource using the
             # same context attribute
-            if context_attr in self._resource_creators:
+            if context_attr in self._lazy_resources:
                 raise ResourceConflict(
                     'this context has an existing lazy resource using the attribute "{}"'
                     .format(context_attr))
@@ -200,10 +201,9 @@ class Context(EventSource):
             self._resources[typename][resource.alias] = resource
 
         if creator is not None and context_attr is not None:
-            self._resource_creators[context_attr] = creator
+            self._lazy_resources[context_attr] = resource
 
-        # Add the resource as an attribute of this context if
-        # context_attr is defined
+        # Add the resource as an attribute of this context if context_attr is defined
         if creator is None and resource.context_attr:
             setattr(self, context_attr, value)
 
@@ -243,8 +243,9 @@ class Context(EventSource):
         The return value of the creator callable will be cached so the creator will only be called
         once per context instance.
 
-        .. note:: The creator callable can **NOT** be a coroutine function, as coroutines cannot be
-            run as a side effect of attribute access.
+        If the creator callable is a coroutine function or returns an awaitable, it is resolved
+        before storing the resource value and returning it to the requester. Note that this will
+        **NOT** work when a context attribute has been specified for the resource.
 
         :param creator: a callable taking a context instance as argument
         :param types: type(s) to register the resource as
@@ -257,7 +258,6 @@ class Context(EventSource):
         """
         assert check_argument_types()
         assert callable(creator), 'creator must be callable'
-        assert not iscoroutinefunction(creator), 'creator cannot be a coroutine function'
         return await self._publish_resource(None, alias, context_attr, types, creator)
 
     async def remove_resource(self, resource: Resource):
@@ -277,7 +277,7 @@ class Context(EventSource):
 
         # Remove the creator from the resource creators
         if resource.creator is not None:
-            del self._resource_creators[resource.context_attr]
+            del self._lazy_resources[resource.context_attr]
 
         # Remove the attribute from this context
         if resource.context_attr and resource.context_attr in self.__dict__:
@@ -291,7 +291,8 @@ class Context(EventSource):
         Request a resource matching the given type and alias.
 
         If no such resource was found, this method will wait ``timeout`` seconds for it to become
-        available.
+        available. The timeout does not apply to resolving awaitables created by lazy resource
+        creators.
 
         :param type: type of the requested resource
         :param alias: alias of the requested resource
@@ -321,7 +322,8 @@ class Context(EventSource):
         for ctx in context_chain:
             resource = ctx._resources.get(resource_type, {}).get(alias)
             if resource is not None:
-                return resource.get_value(self)
+                value = resource.get_value(self)
+                return await value if isawaitable(value) else value
 
         # Listen to resource publish events in the whole chain and wait for the right kind of
         # resource to be published
@@ -337,7 +339,8 @@ class Context(EventSource):
         except TimeoutError:
             raise ResourceNotFound(resource_type, alias) from None
         else:
-            return resource.get_value(self)
+            value = resource.get_value(self)
+            return await value if isawaitable(value) else value
         finally:
             for listener in listeners:
                 listener.remove()

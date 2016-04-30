@@ -28,7 +28,9 @@ This library adheres to `Semantic Versioning <http://semver.org/>`_.
   using the ``@register_topic`` class decorator instead of the ``_register_topic()`` method
 - **BACKWARD INCOMPATIBLE** Removed the ``asphalt.core.connectors`` module
 - **BACKWARD INCOMPATIBLE** Removed the ``optional`` argument of ``Context.request_resource()``
-- Added the ability to get a list of all the resources in a Context (``
+- Added the ability to use coroutine functions as lazy resource creators (though that just makes
+  them return a ``Future`` instead)
+- Added the ability to get a list of all the resources in a Context
 - Added the ability to listen to multiple topics in an EventSource with a single listener
 - Added the ability to stream events from an EventSource
 - Added a utility function to listen to a single event coming from an EventSource
