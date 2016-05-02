@@ -29,8 +29,8 @@ def run_application(component: Component, *, max_threads: int=None,
         level.
       * If the value is ``None``, logging setup is skipped entirely.
 
-    By default, the logging system is initialized using :func:`~logging.basicConfig` using the INFO
-    logging level.
+    By default, the logging system is initialized using :func:`~logging.basicConfig` using the
+    ``INFO`` logging level.
 
     The default executor in the event loop is replaced with a new
     :class:`~concurrent.futures.ThreadPoolExecutor` where the maximum number of threads is set to
@@ -66,6 +66,9 @@ def run_application(component: Component, *, max_threads: int=None,
             exception = e
             logger.exception('Error during application startup')
         else:
+            # Enable garbage collection of the component tree
+            del component
+
             # Finally, run the event loop until the process is terminated or Ctrl+C is pressed
             event_loop.run_forever()
     except (KeyboardInterrupt, SystemExit):
