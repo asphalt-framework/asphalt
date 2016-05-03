@@ -1,5 +1,5 @@
 import re
-from asyncio import iscoroutinefunction, Future, TimeoutError, wait_for, ensure_future
+from asyncio import Future, TimeoutError, wait_for, ensure_future
 from inspect import isawaitable, iscoroutine
 from itertools import chain
 from typing import Optional, Callable, Any, Union, Iterable, Sequence, Dict  # noqa
@@ -21,8 +21,8 @@ class Resource:
     :ivar str alias: alias of the resource
     :ivar Sequence[str] types: type names the resource was registered with
     :ivar str context_attr: the context attribute of the resource
-    :ivar Callable[['Context'], Any] creator: callable to create the value (in case of a lazy
-        resource)
+    :ivar creator: callable to create the value (in case of a lazy resource)
+    :vartype creator: Callable[[Context], Any]
     """
 
     __slots__ = 'value', 'types', 'alias', 'context_attr', 'creator'
@@ -96,8 +96,8 @@ class ContextFinishEvent(Event):
     """
     Dispatched when a context has served its purpose and is being torn down.
 
-    :ivar Optional[BaseException] exception: the exception that caused the context to finish
-        (or ``None``)
+    :ivar Optional[BaseException] exception: the exception that caused the context to finish, if
+        any
     """
 
     __slots__ = 'exception'
@@ -221,7 +221,8 @@ class Context(EventSource):
         :param context_attr: name of the context attribute this resource will be accessible as
         :param types: type(s) to register the resource as (omit to use the type of ``value``)
         :return: the resource handle
-        :raises ResourceConflict: if the resource conflicts with an existing one in any way
+        :raises asphalt.core.context.ResourceConflict: if the resource conflicts with an existing
+            one in any way
 
         """
         assert check_argument_types()
@@ -252,8 +253,8 @@ class Context(EventSource):
         :param alias: name of this resource (unique among all its registered types)
         :param context_attr: name of the context attribute this resource will be accessible as
         :return: the resource handle
-        :raises ResourceConflict: if there is an existing resource creator for the given types or
-            context variable
+        :raises asphalt.core.context.ResourceConflict: if there is an existing resource creator for
+            the given types or context variable
 
         """
         assert check_argument_types()
@@ -296,11 +297,11 @@ class Context(EventSource):
 
         :param type: type of the requested resource
         :param alias: alias of the requested resource
-        :param timeout: the timeout (in seconds; omit to use the  default timeout)
+        :param timeout: the timeout (in seconds; omit to use the context's default timeout)
         :return: the value contained by the requested resource (**NOT** a :class:`Resource`
             instance)
-        :raises ResourceNotFound: if the requested resource does not become available in the
-            allotted time
+        :raises asphalt.core.context.ResourceNotFound: if the requested resource does not become
+            available in the allotted time
 
         """
         assert check_argument_types()

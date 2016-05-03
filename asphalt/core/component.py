@@ -37,16 +37,22 @@ class ContainerComponent(Component):
     """
     A component that can contain other components.
 
-    This class is essential to building nontrivial applications.
+    :ivar child_components: dictionary of component alias ⭢ :class:`Component` instance (of child
+        components added with :meth:`add_component`)
+    :vartype child_components: Dict[str, Component]
+    :ivar component_configs: dictionary of component alias ⭢ externally provided component
+        configuration
+    :vartype component_configs: Dict[str, Dict[str, Any]]
     """
 
     __slots__ = 'child_components', 'component_configs'
 
-    def __init__(self, components: Dict[str, Any]=None):
+    def __init__(self, components: Dict[str, Dict[str, Any]] = None):
+        assert check_argument_types()
         self.child_components = OrderedDict()
         self.component_configs = components or {}
 
-    def add_component(self, alias: str, type: Union[str, type]=None, **config):
+    def add_component(self, alias: str, type: Union[str, type] = None, **config):
         """
         Add a child component.
 
@@ -55,7 +61,7 @@ class ContainerComponent(Component):
         If the second argument is omitted, the value of ``alias`` is used as its value.
 
         The locally given configuration can be overridden by component configuration parameters
-        supplied to the constructor (the ``components`` argument).
+        supplied to the constructor (via the ``components`` argument).
 
         When configuration values are provided both as keyword arguments to this method and
         component configuration through the ``components`` constructor argument, the configurations

@@ -64,8 +64,9 @@ class EventDispatchError(Exception):
     The tracebacks of all the exceptions are displayed in the exception message.
 
     :ivar Event event: the event
-    :ivar Sequence[Tuple[EventListener, Exception]]: a sequence containing tuples of
-        (listener, exception) for each exception that was raised by a listener callback
+    :ivar exceptions: a sequence containing tuples of (listener, exception) for each exception that
+        was raised by a listener callback
+    :vartype exceptions: Sequence[Tuple[EventListener, Exception]]
     """
 
     def __init__(self, event: Event, exceptions: Sequence[Tuple[EventListener, Exception]]):
@@ -193,9 +194,10 @@ class EventSource:
         :class:`EventDispatchError` is then raised, containing the listeners and the exceptions
         they raised.
 
-        :param event: an :class:`~asphalt.core.event.Event` instance or an event topic
+        :param event: an event instance or an event topic
         :raises LookupError: if the topic has not been registered in this event source
-        :raises EventDispatchError: if any of the listener callbacks raises an exception
+        :raises asphalt.core.event.EventDispatchError: if any of the listener callbacks raises an
+            exception
 
         """
         assert check_argument_types()

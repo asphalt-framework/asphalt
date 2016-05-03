@@ -37,7 +37,7 @@ def run_application(component: Component, *, max_threads: int=None,
     the value of ``max_threads`` or, if omitted, the return value of :func:`os.cpu_count()`.
 
     :param component: the root component
-    :param max_threads: the maximum number of threads in the thread pool
+    :param max_threads: the maximum number of worker threads in the default thread pool executor
     :param logging: a logging configuration dictionary, :ref:`logging level <python:levels>` or
         ``None``
 
