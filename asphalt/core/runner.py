@@ -9,7 +9,7 @@ from typeguard import check_argument_types
 
 from asphalt.core.component import Component
 from asphalt.core.context import Context
-from asphalt.core.util import PluginContainer
+from asphalt.core.util import PluginContainer, qualified_name
 
 __all__ = ('run_application',)
 
@@ -60,17 +60,20 @@ def run_application(component: Component, *, event_loop_policy: str = None,
     elif isinstance(logging, int):
         basicConfig(level=logging)
 
-    # Switch to an alternate event loop policy if one is provided
+    # Switch to an alternate event loop policy if one was provided
+    logger = getLogger(__name__)
     if event_loop_policy:
         create_policy = policies.resolve(event_loop_policy)
-        asyncio.set_event_loop_policy(create_policy())
+        policy = create_policy()
+        asyncio.set_event_loop_policy(policy)
+        logger.info('Switched event loop policy to %s', qualified_name(policy))
 
-    # Assign a new default executor with the given max worker thread limit, if one was given
+    # Assign a new default executor with the given max worker thread limit if one was provided
     event_loop = asyncio.get_event_loop()
     if max_threads is not None:
         event_loop.set_default_executor(ThreadPoolExecutor(max_threads))
+        logger.info('Installed a new thread pool executor with max_workers=%d', max_threads)
 
-    logger = getLogger(__name__)
     logger.info('Starting application')
     context = Context()
     exception = None
