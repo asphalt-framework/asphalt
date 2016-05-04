@@ -41,12 +41,15 @@ setup(
         'asyncio_extras',
         'click >= 6.6'
     ],
+    extras_require={
+        'uvloop': ['uvloop >= 0.4.10']
+    },
     entry_points={
         'console_scripts': [
             'asphalt = asphalt.core.command:main'
         ],
-        'asphalt.core.runners': [
-            'asyncio = asphalt.core.runner:run_application'
+        'asphalt.core.event_loop_policies': [
+            'uvloop = asphalt.core.runner:uvloop_policy [uvloop]'
         ]
     }
 )

@@ -1,4 +1,3 @@
-import asyncio
 import logging
 import sys
 from asyncio import new_event_loop, set_event_loop, get_event_loop
@@ -47,8 +46,7 @@ def event_loop():
     {'version': 1, 'loggers': {'asphalt': {'level': 'INFO'}}}
 ], ids=['disabled', 'loglevel', 'dictconfig'])
 def test_run_logging_config(logging_config):
-    """Checks that logging initialization happens as expected."""
-
+    """Test that logging initialization happens as expected."""
     with patch('asphalt.core.runner.basicConfig') as basicConfig,\
             patch('asphalt.core.runner.dictConfig') as dictConfig:
         run_application(ShutdownComponent(), logging=logging_config)
@@ -57,16 +55,15 @@ def test_run_logging_config(logging_config):
     assert dictConfig.call_count == (1 if isinstance(logging_config, dict) else 0)
 
 
-@pytest.mark.parametrize('coroutine_start', [False, True], ids=['coroutine', 'normal'])
-def test_run_callbacks(coroutine_start, caplog):
+@pytest.mark.parametrize('policy', [None, 'uvloop'], ids=['default', 'uvloop'])
+def test_run_callbacks(caplog, policy):
     """
     Test that the "finished" callbacks are run when the application is started and shut down
     properly and that the proper logging messages are emitted.
 
     """
     component = ShutdownComponent()
-    component.start = asyncio.coroutine(component.start) if coroutine_start else component.start
-    run_application(component)
+    run_application(component, event_loop_policy=policy)
 
     assert component.finish_callback_called
     records = [record for record in caplog.records if record.name == 'asphalt.core.runner']
@@ -76,6 +73,7 @@ def test_run_callbacks(coroutine_start, caplog):
 
 
 def test_run_sysexit(caplog):
+    """Test that calling sys.exit() will gracefully shut down the application."""
     component = ShutdownComponent(method='exit')
     run_application(component)
 

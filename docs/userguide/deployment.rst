@@ -123,8 +123,8 @@ configuration to test that the application correctly sends out emails (and to pr
 actually being sent to recipients!). See the documentation of the
 :func:`~asphalt.core.util.merge_config` function for details on how configuration merging works.
 
-Enabling optimizations
-----------------------
+Performance tuning
+------------------
 
 Asphalt's core code and many third part components employ a number of potentially expensive
 validation steps in its code. The performance hit of these checks is not a concern in development
@@ -134,3 +134,11 @@ To do this, you will want to disable Python's debugging mode by either setting t
 variable ``PYTHONOPTIMIZE`` to ``1`` or (if applicable) running Python with the ``-O`` switch.
 This has the effect of completely eliminating all ``assert`` statements and blocks starting with
 ``if __debug__:`` from the compiled bytecode.
+
+When you want maximum performance, you'll also want to use the fastest available event loop
+implementation. This can be done by specifying the ``event_loop_policy`` option in the
+configuration file or by using the ``-l`` or ``--loop`` switch. The core library has built-in
+support for the uvloop_ event loop implementation, which should provide a nice performance boost
+over the standard library implementation.
+
+.. _uvloop: http://magic.io/blog/uvloop-make-python-networking-great-again/

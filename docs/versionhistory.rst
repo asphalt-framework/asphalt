@@ -28,6 +28,9 @@ This library adheres to `Semantic Versioning <http://semver.org/>`_.
   using the ``@register_topic`` class decorator instead of the ``_register_topic()`` method
 - **BACKWARD INCOMPATIBLE** Removed the ``asphalt.core.connectors`` module
 - **BACKWARD INCOMPATIBLE** Removed the ``optional`` argument of ``Context.request_resource()``
+- **BACKWARD INCOMPATIBLE** Removed the ``asphalt.core.runners`` entry point namespace
+- Added the possibility to specify a custom event loop policy
+- Added support for `uvloop <https://github.com/MagicStack/uvloop>`
 - Added the ability to use coroutine functions as lazy resource creators (though that just makes
   them return a ``Future`` instead)
 - Added the ability to get a list of all the resources in a Context

@@ -10,12 +10,20 @@ from typeguard import check_argument_types
 
 from asphalt.core.component import Component
 from asphalt.core.context import Context
+from asphalt.core.util import PluginContainer
 
 __all__ = ('run_application',)
 
+policies = PluginContainer('asphalt.core.event_loop_policies')
 
-def run_application(component: Component, *, max_threads: int=None,
-                    logging: Union[Dict[str, Any], int, None]=INFO):
+
+def uvloop_policy():
+    import uvloop
+    return uvloop.EventLoopPolicy()
+
+
+def run_application(component: Component, *, event_loop_policy: str = None,
+                    max_threads: int = None, logging: Union[Dict[str, Any], int, None] = INFO):
     """
     Configure logging and start the given root component in the default asyncio event loop.
 
@@ -37,6 +45,8 @@ def run_application(component: Component, *, max_threads: int=None,
     the value of ``max_threads`` or, if omitted, the return value of :func:`os.cpu_count()`.
 
     :param component: the root component
+    :param event_loop_policy: entry point name (from the ``asphalt.core.event_loop_policies``
+        namespace) of an alternate event loop policy (or a module:varname reference to one)
     :param max_threads: the maximum number of worker threads in the default thread pool executor
     :param logging: a logging configuration dictionary, :ref:`logging level <python:levels>` or
         ``None``
@@ -49,6 +59,11 @@ def run_application(component: Component, *, max_threads: int=None,
         dictConfig(logging)
     elif isinstance(logging, int):
         basicConfig(level=logging)
+
+    # Switch to an alternate event loop policy if one is provided
+    if event_loop_policy:
+        create_policy = policies.resolve(event_loop_policy)
+        asyncio.set_event_loop_policy(create_policy())
 
     # Assign a new default executor with the given max worker thread limit
     max_threads = max_threads if max_threads is not None else os.cpu_count()
