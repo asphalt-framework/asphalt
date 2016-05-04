@@ -55,6 +55,22 @@ def test_run_logging_config(logging_config):
     assert dictConfig.call_count == (1 if isinstance(logging_config, dict) else 0)
 
 
+@pytest.mark.parametrize('max_threads', [None, 3])
+def test_run_max_threads(max_threads):
+    """
+    Test that a new default executor is installed if and only if the max_threads argument is given.
+
+    """
+    component = ShutdownComponent()
+    with patch('asphalt.core.runner.ThreadPoolExecutor') as mock_executor:
+        run_application(component, max_threads=max_threads)
+
+    if max_threads:
+        mock_executor.assert_called_once_with(max_threads)
+    else:
+        assert not mock_executor.called
+
+
 @pytest.mark.parametrize('policy', [None, 'uvloop'], ids=['default', 'uvloop'])
 def test_run_callbacks(caplog, policy):
     """

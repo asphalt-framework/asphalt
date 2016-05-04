@@ -1,5 +1,4 @@
 import asyncio
-import os
 import sys
 from concurrent.futures import ThreadPoolExecutor
 from logging import basicConfig, getLogger, INFO
@@ -48,6 +47,7 @@ def run_application(component: Component, *, event_loop_policy: str = None,
     :param event_loop_policy: entry point name (from the ``asphalt.core.event_loop_policies``
         namespace) of an alternate event loop policy (or a module:varname reference to one)
     :param max_threads: the maximum number of worker threads in the default thread pool executor
+        (the default value depends on the event loop implementation)
     :param logging: a logging configuration dictionary, :ref:`logging level <python:levels>` or
         ``None``
 
@@ -65,10 +65,10 @@ def run_application(component: Component, *, event_loop_policy: str = None,
         create_policy = policies.resolve(event_loop_policy)
         asyncio.set_event_loop_policy(create_policy())
 
-    # Assign a new default executor with the given max worker thread limit
-    max_threads = max_threads if max_threads is not None else os.cpu_count()
+    # Assign a new default executor with the given max worker thread limit, if one was given
     event_loop = asyncio.get_event_loop()
-    event_loop.set_default_executor(ThreadPoolExecutor(max_threads))
+    if max_threads is not None:
+        event_loop.set_default_executor(ThreadPoolExecutor(max_threads))
 
     logger = getLogger(__name__)
     logger.info('Starting application')
