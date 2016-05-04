@@ -46,7 +46,7 @@ Suppose you had the following component class as your root component::
             self.data_directory = data_directory
 
         async def start(ctx):
-            self.add_component('mailer', type='smtp')
+            self.add_component('mailer', backend='smtp')
             self.add_component('sqlalchemy')
             await super().start(ctx)
 
@@ -59,7 +59,8 @@ You could then write a configuration file like this:
       data_directory: /some/file/somewhere
       components:
         mailer:
-          connector: tcp+ssl://smtp.mycompany.com
+          host: smtp.mycompany.com
+          ssl: true
         sqlalchemy:
           url: postgresql:///mydatabase
     max_threads: 20
@@ -109,13 +110,14 @@ This allows you to avoid unnecessary duplication in your configuration file by p
 common parts of the component configuration in the code and only specifying the parts that are
 different in the actual configuration file.
 
-In the above example configuration, the ``mailer`` component gets passed two options:
+In the above example configuration, the ``mailer`` component gets passed three options:
 
 * ``type='smtp'``
-* ``connector: tcp+ssl://smtp.mycompany.com``
+* ``connector='smtp.mycompany.com'``
+* ``ssl=True``
 
-The first one is provided in the root component code while the second option comes from the YAML
-file. You could also override the mailer's type in the configuration file if you wanted. The same
+The first one is provided in the root component code while the other two options come from the YAML
+file. You could also override the mailer backend in the configuration file if you wanted. The same
 effect can be achieved programmatically by supplying the override configuration to the container
 component via its ``components`` constructor argument. This is very useful when writing tests
 against your application. For example, you might want to use the ``mock`` mailer in your test suite
