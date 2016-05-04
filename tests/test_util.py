@@ -92,6 +92,9 @@ class TestPluginContainer:
         exc = pytest.raises(TypeError, container.create_object, int)
         assert str(exc.value) == 'int is not a subclass of test_util.BaseDummyPlugin'
 
+    def test_names(self, container):
+        assert container.names == ['dummy']
+
     def test_all(self, container):
         assert container.all() == [DummyPlugin]
 

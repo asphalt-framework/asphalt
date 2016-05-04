@@ -149,6 +149,11 @@ class PluginContainer:
 
         return plugin_class(**constructor_kwargs)
 
+    @property
+    def names(self) -> List[str]:
+        """Return names of all entry points in this namespace."""
+        return list(self._entrypoints)
+
     def all(self) -> List[Any]:
         """
         Load all entry points (if not already loaded) in this namespace and return the resulting
