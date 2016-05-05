@@ -79,31 +79,25 @@ class TestContext:
         assert exc.value is events[0].exception
 
     @pytest.mark.asyncio
-    @pytest.mark.parametrize('delay', [False, True], ids=['immediate', 'delayed'])
-    async def test_publish_resource(self, context, event_loop, delay):
+    async def test_publish_resource(self, context):
         """Test that a resource is properly published in the context and listeners are notified."""
-        events = []
-        context.add_listener('resource_published', events.append)
-        if delay:
-            event_loop.create_task(
-                context.publish_resource(6, 'foo', 'foo.bar', types=(int, float)))
-        else:
-            await context.publish_resource(6, 'foo', 'foo.bar', types=(int, float))
+        future = Future()
+        context.add_listener('resource_published', future.set_result)
+        context.publish_resource(6, 'foo', 'foo.bar', types=(int, float))
 
         value = await context.request_resource(int, 'foo')
         assert value == 6
 
-        assert len(events) == 1
-        resource = events[0].resource
-        assert resource.types == ('int', 'float')
-        assert resource.alias == 'foo'
+        event = await future
+        assert event.resource.types == ('int', 'float')
+        assert event.resource.alias == 'foo'
 
     @pytest.mark.asyncio
     async def test_add_name_conflict(self, context):
         """Test that publishing a resource won't replace any existing resources."""
-        await context.publish_resource(5, 'foo')
+        context.publish_resource(5, 'foo')
         with pytest.raises(ResourceConflict) as exc:
-            await context.publish_resource(4, 'foo')
+            context.publish_resource(4, 'foo')
 
         assert str(exc.value) == (
             'this context has an existing resource of type int using the alias "foo"')
@@ -111,13 +105,13 @@ class TestContext:
     @pytest.mark.asyncio
     async def test_remove_resource(self, context):
         """Test that resources can be removed and that the listeners are notified."""
-        events = []
-        context.add_listener('resource_removed', events.append)
-        resource = await context.publish_resource(4)
-        await context.remove_resource(resource)
+        future = Future()
+        context.add_listener('resource_removed', future.set_result)
+        resource = context.publish_resource(4)
+        context.remove_resource(resource)
 
-        assert len(events) == 1
-        assert events[0].resource.types == ('int',)
+        event = await future
+        assert event.resource.types == ('int',)
 
         with pytest.raises(ResourceNotFound):
             await context.request_resource(int, timeout=0)
@@ -126,7 +120,7 @@ class TestContext:
     async def test_remove_nonexistent(self, context):
         resource = Resource(5, ('int',), 'default', None)
         with pytest.raises(LookupError) as exc:
-            await context.remove_resource(resource)
+            context.remove_resource(resource)
 
         assert str(exc.value) == ("Resource(types=('int',), alias='default', value=5, "
                                   "context_attr=None, creator=None) not found in this context")
@@ -157,9 +151,9 @@ class TestContext:
 
         Likewise, when they are removed, they are deleted from the context.
         """
-        resource = await context.publish_resource(1, context_attr='foo')
+        resource = context.publish_resource(1, context_attr='foo')
         assert context.foo == 1
-        await context.remove_resource(resource)
+        context.remove_resource(resource)
         assert 'foo' not in context.__dict__
 
     @pytest.mark.asyncio
@@ -171,7 +165,7 @@ class TestContext:
         """
         context.a = 2
         with pytest.raises(ResourceConflict) as exc:
-            await context.publish_resource(2, context_attr='a')
+            context.publish_resource(2, context_attr='a')
 
         assert str(exc.value) == 'this context already has an attribute "a"'
 
@@ -182,7 +176,7 @@ class TestContext:
     @pytest.mark.asyncio
     async def test_publish_resource_bad_alias(self, context, alias):
         with pytest.raises(AssertionError) as exc:
-            await context.publish_resource(1, alias)
+            context.publish_resource(1, alias)
 
         assert str(exc.value) == 'alias can only contain alphanumeric characters and underscores'
 
@@ -194,7 +188,7 @@ class TestContext:
             return next(counter)
 
         counter = count(1)
-        await context.publish_lazy_resource(creator, int, context_attr='foo')
+        context.publish_lazy_resource(creator, int, context_attr='foo')
         assert context.foo == 1
         assert context.foo == 1
         assert context.__dict__['foo'] == 1
@@ -208,7 +202,7 @@ class TestContext:
         async def async_creator(context):
             return 'hello'
 
-        await context.publish_lazy_resource(async_creator, str, 'foo', 'foo')
+        context.publish_lazy_resource(async_creator, str, 'foo', 'foo')
         hello = context.foo
         assert isinstance(hello, Future)
         assert await context.request_resource(str, 'foo') == 'hello'
@@ -225,21 +219,21 @@ class TestContext:
 
         future = event_loop.create_task(context.request_resource(str, 'foo'))
         await asyncio.sleep(0.2)
-        await context.publish_lazy_resource(async_creator, str, alias='foo')
+        context.publish_lazy_resource(async_creator, str, alias='foo')
         assert await future == 'hello'
 
     @pytest.mark.asyncio
     async def test_publish_lazy_resource_conflicting_resource(self, context):
-        await context.publish_lazy_resource(lambda ctx: 2, int, context_attr='a')
+        context.publish_lazy_resource(lambda ctx: 2, int, context_attr='a')
         with pytest.raises(ResourceConflict) as exc:
-            await context.publish_resource(2, 'foo', context_attr='a')
+            context.publish_resource(2, 'foo', context_attr='a')
 
         assert str(exc.value) == (
             'this context has an existing lazy resource using the attribute "a"')
 
     @pytest.mark.asyncio
     async def test_publish_lazy_resource_duplicate(self, context):
-        await context.publish_lazy_resource(lambda ctx: None, str, context_attr='foo')
+        context.publish_lazy_resource(lambda ctx: None, str, context_attr='foo')
         with pytest.raises(ResourceConflict) as exc:
             await context.publish_lazy_resource(lambda ctx: None, str, context_attr='foo')
 
@@ -268,14 +262,14 @@ class TestContext:
         """
         child_context = Context(context)
         task = event_loop.create_task(child_context.request_resource(int))
-        await context.publish_resource(6)
+        context.publish_resource(6)
         resource = await task
         assert resource == 6
 
     @pytest.mark.asyncio
     async def test_request_lazy_resource_context_attr(self, context):
         """Test that requesting a lazy resource also sets the context variable."""
-        await context.publish_lazy_resource(lambda ctx: 6, int, context_attr='foo')
+        context.publish_lazy_resource(lambda ctx: 6, int, context_attr='foo')
         await context.request_resource(int)
         assert context.__dict__['foo'] == 6
 
@@ -286,17 +280,17 @@ class TestContext:
         context variable is accessed.
 
         """
-        resource = await context.publish_lazy_resource(lambda ctx: 6, int, context_attr='foo')
-        await context.remove_resource(resource)
+        resource = context.publish_lazy_resource(lambda ctx: 6, int, context_attr='foo')
+        context.remove_resource(resource)
         exc = pytest.raises(AttributeError, getattr, context, 'foo')
         assert str(exc.value) == 'no such context variable: foo'
 
     @pytest.mark.asyncio
     async def test_get_resources(self, context):
-        resource1 = await context.publish_resource(6, 'int1')
-        resource2 = await context.publish_resource(8, 'int2')
-        resource3 = await context.publish_resource('foo', types=(str, 'collections.abc.Iterable'))
-        resource4 = await context.publish_resource(
+        resource1 = context.publish_resource(6, 'int1')
+        resource2 = context.publish_resource(8, 'int2')
+        resource3 = context.publish_resource('foo', types=(str, 'collections.abc.Iterable'))
+        resource4 = context.publish_resource(
             (5, 4), 'sometuple', types=(tuple, 'collections.abc.Iterable'))
 
         assert context.get_resources() == [resource1, resource2, resource3, resource4]
@@ -307,9 +301,9 @@ class TestContext:
     @pytest.mark.asyncio
     async def test_get_resources_include_parents(self, context):
         subcontext = Context(context)
-        resource1 = await context.publish_resource(6, 'int1')
-        resource2 = await subcontext.publish_resource(8, 'int2')
-        resource3 = await context.publish_resource('foo', 'str')
+        resource1 = context.publish_resource(6, 'int1')
+        resource2 = subcontext.publish_resource(8, 'int2')
+        resource3 = context.publish_resource('foo', 'str')
 
         assert subcontext.get_resources() == [resource1, resource2, resource3]
         assert subcontext.get_resources(include_parents=False) == [resource2]

@@ -14,6 +14,11 @@ This library adheres to `Semantic Versioning <http://semver.org/>`_.
   loop thread. Instead, use ``asyncio_extras.threads.call_async()`` to call asynchronous code if
   absolutely necessary.
 - **BACKWARD INCOMPATIBLE** The ``Component.start()`` method is now required to be a coroutine
+- **BACKWARD INCOMPATIBLE** The ``EventSource.dispatch_event()`` method is no longer a coroutine
+  but returns a Future instead
+- **BACKWARD INCOMPATIBLE** The ``Context.publish_resource()``,
+  ``Context.publish_lazy_resource()`` and ``Context.remove_resource()`` methods are no longer
+  coroutine methods
 - **BACKWARD INCOMPATIBLE** Removed the ``asphalt.command`` module from the public API
 - **BACKWARD INCOMPATIBLE** Removed the ``asphalt quickstart`` command
 - **BACKWARD INCOMPATIBLE** Removed regular context manager support from the ``Context`` class

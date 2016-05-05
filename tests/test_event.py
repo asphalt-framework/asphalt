@@ -236,7 +236,7 @@ class TestEventSource:
 @pytest.mark.asyncio
 async def test_wait_event(source, event_loop):
     event = DummyEvent(source, 'event_a')
-    event_loop.create_task(source.dispatch_event(event))
+    source.dispatch_event(event)
     received_event = await wait_event(source, 'event_a')
     assert received_event is event
 

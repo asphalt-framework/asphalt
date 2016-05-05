@@ -1,6 +1,6 @@
+import logging
 import re
-from asyncio import ensure_future, Future
-from asyncio.queues import Queue
+from asyncio import ensure_future, Future, get_event_loop, Queue
 from collections import defaultdict
 from inspect import isawaitable
 from traceback import format_exception
@@ -14,6 +14,8 @@ from asphalt.core.util import qualified_name
 
 __all__ = ('Event', 'EventListener', 'register_topic', 'EventSource', 'wait_event',
            'stream_events')
+
+logger = logging.getLogger(__name__)
 
 
 class Event:
@@ -181,7 +183,7 @@ class EventSource:
         except (KeyError, ValueError):
             raise LookupError('listener not found') from None
 
-    async def dispatch_event(self, event: Union[str, Event], *args, **kwargs) -> None:
+    def dispatch_event(self, event: Union[str, Event], *args, **kwargs) -> Future:
         """
         Dispatch an event, optionally constructing one first.
 
@@ -190,16 +192,38 @@ class EventSource:
         instantiates one, using this object as the source. Any extra positional and keyword
         arguments are passed directly to the constructor of the event class.
 
-        All listeners are always called. If any event listener raises an exception, an
-        :class:`EventDispatchError` is then raised, containing the listeners and the exceptions
-        they raised.
-
         :param event: an event instance or an event topic
         :raises LookupError: if the topic has not been registered in this event source
-        :raises asphalt.core.event.EventDispatchError: if any of the listener callbacks raises an
+        :returns: a future that resolves when all the listener callbacks have been handled and will
+            raise an :exc:`asphalt.core.event.EventDispatchError` if any of the callbacks raised an
             exception
 
         """
+        async def do_dispatch():
+            futures, exceptions = [], []
+            for listener in list(self._listeners[topic]):
+                try:
+                    retval = listener.callback(event, *listener.args, **listener.kwargs)
+                except Exception as e:
+                    logger.exception('uncaught exception in event listener')
+                    exceptions.append((listener, e))
+                else:
+                    if isawaitable(retval):
+                        future = ensure_future(retval, loop=loop)
+                        futures.append((listener, future))
+
+            # For any callbacks that returned awaitables, wait for their completion and collect any
+            # exceptions they raise
+            for listener, future in futures:
+                try:
+                    await future
+                except Exception as e:
+                    logger.exception('uncaught exception in event listener')
+                    exceptions.append((listener, e))
+
+            if exceptions:
+                raise EventDispatchError(event, exceptions)
+
         assert check_argument_types()
         topic = event.topic if isinstance(event, Event) else event
         try:
@@ -213,27 +237,8 @@ class EventSource:
         else:
             event = event_class(self, topic, *args, **kwargs)
 
-        futures, exceptions = [], []
-        for listener in list(self._listeners[topic]):
-            try:
-                retval = listener.callback(event, *listener.args, **listener.kwargs)
-            except Exception as e:
-                exceptions.append((listener, e))
-            else:
-                if isawaitable(retval):
-                    future = ensure_future(retval)
-                    futures.append((listener, future))
-
-        # For any callbacks that returned awaitables, wait for their completion and collect any
-        # exceptions they raise
-        for listener, future in futures:
-            try:
-                await future
-            except Exception as e:
-                exceptions.append((listener, e))
-
-        if exceptions:
-            raise EventDispatchError(event, exceptions)
+        loop = get_event_loop()
+        return loop.create_task(do_dispatch())
 
 
 async def wait_event(source: EventSource, topics: Union[str, Iterable[str]]) -> Event:

@@ -161,9 +161,9 @@ class Context(EventSource):
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         await self.dispatch_event('finished', exc_val)
 
-    async def _publish_resource(self, value, alias: str, context_attr: str,
-                                types: Iterable[Union[str, type]],
-                                creator: Optional[Callable[['Context'], Any]]):
+    def _publish_resource(self, value, alias: str, context_attr: str,
+                          types: Iterable[Union[str, type]],
+                          creator: Optional[Callable[['Context'], Any]]):
         assert isinstance(alias, str) and alias, 'alias must be a nonempty string'
         assert re.match(r'^\w+$', alias),\
             'alias can only contain alphanumeric characters and underscores'
@@ -207,10 +207,10 @@ class Context(EventSource):
         if creator is None and resource.context_attr:
             setattr(self, context_attr, value)
 
-        await self.dispatch_event('resource_published', resource)
+        self.dispatch_event('resource_published', resource)
         return resource
 
-    async def publish_resource(
+    def publish_resource(
             self, value, alias: str='default', context_attr: str=None, *,
             types: Union[Union[str, type], Iterable[Union[str, type]]]=()) -> Resource:
         """
@@ -230,11 +230,11 @@ class Context(EventSource):
         if not types:
             types = [type(value)]
 
-        return await self._publish_resource(value, alias, context_attr, types, None)
+        return self._publish_resource(value, alias, context_attr, types, None)
 
-    async def publish_lazy_resource(self, creator: Callable[['Context'], Any],
-                                    types: Union[Union[str, type], Iterable[Union[str, type]]],
-                                    alias: str='default', context_attr: str=None) -> Resource:
+    def publish_lazy_resource(self, creator: Callable[['Context'], Any],
+                              types: Union[Union[str, type], Iterable[Union[str, type]]],
+                              alias: str='default', context_attr: str=None) -> Resource:
         """
         Publish a "lazy" or "contextual" resource and dispatch a ``resource_published`` event.
 
@@ -259,9 +259,9 @@ class Context(EventSource):
         """
         assert check_argument_types()
         assert callable(creator), 'creator must be callable'
-        return await self._publish_resource(None, alias, context_attr, types, creator)
+        return self._publish_resource(None, alias, context_attr, types, creator)
 
-    async def remove_resource(self, resource: Resource):
+    def remove_resource(self, resource: Resource):
         """
         Remove the given resource from the collection and dispatch a ``resource_removed`` event.
 
@@ -284,7 +284,7 @@ class Context(EventSource):
         if resource.context_attr and resource.context_attr in self.__dict__:
             delattr(self, resource.context_attr)
 
-        await self.dispatch_event('resource_removed', resource)
+        self.dispatch_event('resource_removed', resource)
 
     async def request_resource(self, type: Union[str, type], alias: str='default', *,
                                timeout: Union[int, None]=None):

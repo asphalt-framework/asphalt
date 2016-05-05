@@ -25,13 +25,13 @@ The event listener can be either a regular function or a coroutine function::
         print(event)
 
 
-    async def event_test():
+    def event_test():
         context = Context()
         context.add_listener('finished', listener)
         context.add_listener('finished', asynclistener)
 
         # As we dispatch the "finished" event, the event object is printed twice
-        await context.dispatch_event('finished', None)
+        context.dispatch_event('finished', None)
 
 Waiting for a single event
 --------------------------
@@ -102,4 +102,6 @@ the topic(s)::
 
 And to dispatch a single ``MyCustomEvent`` from your new event source::
 
-    await MyEventSource().dispatch_event('sometopic', 'foo_value', bar='bar_value')
+    source = MyEventSource()
+    source.dispatch_event('sometopic', 'foo_value', bar='bar_value')
+
