@@ -1,0 +1,34 @@
+---
+component:
+  type: webnotifier:ApplicationComponent
+  components:
+    detector:
+      url: http://imgur.com/
+      delay: 15
+    mailer:
+      host: your.smtp.server.here
+      ssl: true
+      username: yourusername
+      password: yourpassword
+      message_defaults:
+        sender: your@email.here
+        to: your@email.here
+
+logging:
+  version: 1
+  disable_existing_loggers: false
+  formatters:
+    default:
+      format: '[%(asctime)s %(levelname)s] %(message)s'
+  handlers:
+    console:
+      class: logging.StreamHandler
+      formatter: default
+  loggers:
+    root:
+      handlers: [console]
+      level: INFO
+    webnotifier:
+      handlers: [console]
+      level: DEBUG
+      propagate: false

@@ -12,3 +12,4 @@ the
    :maxdepth: 2
 
    echo
+   webnotifier

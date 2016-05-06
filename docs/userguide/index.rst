@@ -2,7 +2,7 @@ User guide
 ==========
 
 This is the reference documentation. If you're looking to learn Asphalt from scratch, you should
-take a look at the :ref:`tutorials/index` first.
+take a look at the :doc:`../tutorials/index` first.
 
 .. toctree::
    :maxdepth: 2
@@ -10,6 +10,5 @@ take a look at the :ref:`tutorials/index` first.
    architecture
    concurrency
    events
-   components
    testing
    deployment

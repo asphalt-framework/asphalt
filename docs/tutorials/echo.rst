@@ -1,7 +1,7 @@
 .. highlight:: bash
 
-Getting your feet wet: a simple echo server and client
-======================================================
+Tutorial 1: Getting your feet wet – a simple echo server and client
+===================================================================
 
 This tutorial will get you started with Asphalt development from the ground up.
 You will be learn how to build a simple network server that echoes back messages sent to it, along
@@ -11,10 +11,10 @@ using the ``asphalt`` command to run an application with a configuration file.
 Prerequisites
 -------------
 
-Asphalt requires Python 3.5.0 or later. You will also need to have the ``venv``
- module installed for your Python version of choice.
-It should come with most Python installations, but if it does not, you can
-usually install it with your operating system's package manager (``python3-venv`` is a good guess).
+Asphalt requires Python 3.5.0 or later. You will also need to have the ``venv`` module installed
+for your Python version of choice. It should come with most Python installations, but if it does
+not, you can usually install it with your operating system's package manager (``python3-venv`` is a
+good guess).
 
 Setting up the virtual environment
 ----------------------------------
@@ -25,8 +25,8 @@ them from other projects, which may require different versions of the same libra
 
 Now, create a project directory and a virtualenv::
 
-    mkdir tutorial
-    cd tutorial
+    mkdir tutorial1
+    cd tutorial1
     python3.5 -m venv tutorialenv
     source tutorialenv/bin/activate
 
