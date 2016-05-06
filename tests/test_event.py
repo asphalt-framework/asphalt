@@ -189,17 +189,22 @@ class TestEventSource:
     async def test_dispatch_event_listener_exception_logging(self, event_loop, source, caplog):
         """Test that listener exceptions are logged when return_future is False."""
         def listener(event):
-            raise Exception('regular')
+            try:
+                raise Exception('regular')
+            finally:
+                future1.set_result(None)
 
         async def coro_listener(event):
-            raise Exception('coroutine')
+            try:
+                raise Exception('coroutine')
+            finally:
+                future2.set_result(None)
 
-        future = Future()
+        future1, future2 = Future(), Future()
         source.add_listener('event_a', listener)
         source.add_listener('event_a', coro_listener)
-        source.add_listener('event_a', future.set_result)
         source.dispatch_event('event_a')
-        await future
+        await asyncio.gather(future1, future2)
 
         assert len(caplog.records) == 2
         for record in caplog.records:

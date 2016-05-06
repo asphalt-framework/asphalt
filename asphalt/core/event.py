@@ -2,7 +2,7 @@ import logging
 import re
 from asyncio import Future, get_event_loop, Queue
 from collections import defaultdict
-from inspect import isawaitable
+from inspect import isawaitable, iscoroutine
 from traceback import format_exception
 from typing import Dict, Callable, Any, Sequence, Union, Iterable, Tuple, Optional
 
@@ -135,7 +135,7 @@ class EventSource:
             return self.__listeners
 
     def add_listener(self, topics: Union[str, Iterable[str]], callback: Callable,
-                     args: Sequence=(), kwargs: Dict[str, Any]=None) -> EventListener:
+                     args: Sequence = (), kwargs: Dict[str, Any] = None) -> EventListener:
         """
         Start listening to events specified by ``topic``.
 
@@ -197,8 +197,8 @@ class EventSource:
         :param return_future:
             If ``True``, return a :class:`~asyncio.Future` that completes when all the listener
             callbacks have been processed. If any one of them raised an exception, the future will
-            have an :exc:`asphalt.core.event.EventDispatchError` exception set in it which contains
-            all of the exceptions raised in the callbacks.
+            have an :exc:`~asphalt.core.event.EventDispatchError` exception set in it which
+            contains all of the exceptions raised in the callbacks.
 
             If set to ``False``, then ``None`` will be returned, and any exceptions raised in
             listener callbacks will be logged instead.
@@ -217,6 +217,9 @@ class EventSource:
                         logger.exception('uncaught exception in event listener')
                 else:
                     if isawaitable(retval):
+                        if iscoroutine(retval):
+                            retval = loop.create_task(retval)
+
                         futures.append((listener, retval))
 
             # For any callbacks that returned awaitables, wait for their completion and collect any
@@ -247,7 +250,8 @@ class EventSource:
 
         listeners = list(self._listeners[topic])
         if listeners:
-            future = get_event_loop().create_task(do_dispatch())
+            loop = get_event_loop()
+            future = loop.create_task(do_dispatch())
             return future if return_future else None
         elif return_future:
             # The event has no listeners, so skip the task creation and return an empty Future
