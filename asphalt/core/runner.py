@@ -21,6 +21,11 @@ def uvloop_policy():
     return uvloop.EventLoopPolicy()
 
 
+def gevent_policy():
+    import aiogevent
+    return aiogevent.EventLoopPolicy()
+
+
 def run_application(component: Component, *, event_loop_policy: str = None,
                     max_threads: int = None, logging: Union[Dict[str, Any], int, None] = INFO):
     """

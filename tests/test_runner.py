@@ -71,14 +71,18 @@ def test_run_max_threads(max_threads):
         assert not mock_executor.called
 
 
-def test_event_loop_policy(caplog):
+@pytest.mark.parametrize('policy, policy_name', [
+    ('uvloop', 'uvloop.EventLoopPolicy'),
+    ('gevent', 'aiogevent.EventLoopPolicy')
+], ids=['uvloop', 'gevent'])
+def test_event_loop_policy(caplog, policy, policy_name):
     """Test that a the runner switches to a different event loop policy when instructed to."""
     component = ShutdownComponent()
-    run_application(component, event_loop_policy='uvloop')
+    run_application(component, event_loop_policy=policy)
 
     records = [record for record in caplog.records if record.name == 'asphalt.core.runner']
     assert len(records) == 3
-    assert records[0].message == 'Switched event loop policy to uvloop.EventLoopPolicy'
+    assert records[0].message == 'Switched event loop policy to %s' % policy_name
     assert records[1].message == 'Starting application'
     assert records[2].message == 'Application stopped'
 

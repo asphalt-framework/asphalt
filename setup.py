@@ -42,14 +42,16 @@ setup(
         'click >= 6.6'
     ],
     extras_require={
-        'uvloop': ['uvloop >= 0.4.10']
+        'uvloop': ['uvloop >= 0.4.10'],
+        'gevent': ['aiogevent >= 0.2']
     },
     entry_points={
         'console_scripts': [
             'asphalt = asphalt.core.command:main'
         ],
         'asphalt.core.event_loop_policies': [
-            'uvloop = asphalt.core.runner:uvloop_policy [uvloop]'
+            'uvloop = asphalt.core.runner:uvloop_policy [uvloop]',
+            'gevent = asphalt.core.runner:gevent_policy [gevent]'
         ]
     }
 )

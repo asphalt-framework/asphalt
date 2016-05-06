@@ -41,6 +41,7 @@ This library adheres to `Semantic Versioning <http://semver.org/>`_.
 - **BACKWARD INCOMPATIBLE** Removed the ``asphalt.core.runners`` entry point namespace
 - Added the possibility to specify a custom event loop policy
 - Added support for `uvloop <https://github.com/MagicStack/uvloop>`_
+- Added support for `aiogevent <https://bitbucket.org/haypo/aiogevent>`_
 - Added the ability to use coroutine functions as lazy resource creators (though that just makes
   them return a ``Future`` instead)
 - Added the ability to get a list of all the resources in a Context
