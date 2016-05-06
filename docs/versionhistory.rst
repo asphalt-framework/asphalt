@@ -26,7 +26,6 @@ This library adheres to `Semantic Versioning <http://semver.org/>`_.
   that contains all the exceptions and the listeners who raised them.
 - **BACKWARD INCOMPATIBLE** Renamed the ``EventSource.dispatch()`` method to ``dispatch_event``
   to disambiguate the operation and to prevent name clashes with subclasses
-
 - **BACKWARD INCOMPATIBLE** The ``Context.publish_resource()``,
   ``Context.publish_lazy_resource()`` and ``Context.remove_resource()`` methods are no longer
   coroutine methods
@@ -41,7 +40,7 @@ This library adheres to `Semantic Versioning <http://semver.org/>`_.
 - **BACKWARD INCOMPATIBLE** Removed the ``optional`` argument of ``Context.request_resource()``
 - **BACKWARD INCOMPATIBLE** Removed the ``asphalt.core.runners`` entry point namespace
 - Added the possibility to specify a custom event loop policy
-- Added support for `uvloop <https://github.com/MagicStack/uvloop>`
+- Added support for `uvloop <https://github.com/MagicStack/uvloop>`_
 - Added the ability to use coroutine functions as lazy resource creators (though that just makes
   them return a ``Future`` instead)
 - Added the ability to get a list of all the resources in a Context
