@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 import pkg_resources
 
-
 extensions = [
     'sphinx.ext.autodoc',
     'sphinx.ext.intersphinx',

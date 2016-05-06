@@ -10,3 +10,4 @@ dependencies:
   - git+https://github.com/agronholm/sphinx.git
   - sphinx-autodoc-typehints>=1.0.5
   - sphinxcontrib-asyncio>=0.2.0
+  - /home/docs/checkouts/readthedocs.org/user_builds/asphalt/checkouts/latest
