@@ -14,8 +14,19 @@ This library adheres to `Semantic Versioning <http://semver.org/>`_.
   loop thread. Instead, use ``asyncio_extras.threads.call_async()`` to call asynchronous code if
   absolutely necessary.
 - **BACKWARD INCOMPATIBLE** The ``Component.start()`` method is now required to be a coroutine
-- **BACKWARD INCOMPATIBLE** The ``EventSource.dispatch_event()`` method is no longer a coroutine
-  but returns a Future instead
+- **BACKWARD INCOMPATIBLE** The ``EventSource.dispatch()`` method was refactored:
+
+  - renamed to ``dispatch_event``
+  - is no longer a coroutine
+  - now calls all event listeners unconditionally
+  - got a keyword argument ``return_future`` which causes it to return a ``Future`` once all
+    listeners have been called
+- **BACKWARD INCOMPATIBLE** Modified event dispatch logic in ``EventSource`` to always run all
+  event listeners even if some listeners raise exceptions. A uniform exception is then raised
+  that contains all the exceptions and the listeners who raised them.
+- **BACKWARD INCOMPATIBLE** Renamed the ``EventSource.dispatch()`` method to ``dispatch_event``
+  to disambiguate the operation and to prevent name clashes with subclasses
+
 - **BACKWARD INCOMPATIBLE** The ``Context.publish_resource()``,
   ``Context.publish_lazy_resource()`` and ``Context.remove_resource()`` methods are no longer
   coroutine methods
@@ -24,11 +35,6 @@ This library adheres to `Semantic Versioning <http://semver.org/>`_.
 - **BACKWARD INCOMPATIBLE** Removed regular context manager support from the ``Context`` class
   (asynchronous context manager support still remains)
 - **BACKWARD INCOMPATIBLE** Restricted resource names to alphanumeric characters and underscores
-- **BACKWARD INCOMPATIBLE** Modified event dispatch logic in ``EventSource`` to always run all
-  event listeners even if some listeners raise exceptions. A uniform exception is then raised
-  that contains all the exceptions and the listeners who raised them.
-- **BACKWARD INCOMPATIBLE** Renamed the ``EventSource.dispatch()`` method to ``dispatch_event``
-  to disambiguate the operation and to prevent name clashes with subclasses
 - **BACKWARD INCOMPATIBLE** Event topic registrations for ``EventSource`` subclasses are now done
   using the ``@register_topic`` class decorator instead of the ``_register_topic()`` method
 - **BACKWARD INCOMPATIBLE** Removed the ``asphalt.core.connectors`` module

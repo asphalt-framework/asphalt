@@ -1,4 +1,5 @@
 import asyncio
+from asyncio.futures import Future
 
 import pytest
 
@@ -79,7 +80,7 @@ class TestRegisterTopic:
         events = []
         source = target_class()
         source.add_listener('some_event', events.append)
-        await source.dispatch_event('some_event')
+        await source.dispatch_event('some_event', return_future=True)
         assert isinstance(events[0], event_subclass)
 
 
@@ -99,13 +100,14 @@ class TestEventSource:
         """Test that an event listener no longer receives events after it's been removed."""
         events = []
         handle = source.add_listener('event_a', events.append)
-        await source.dispatch_event('event_a', 1)
+        await source.dispatch_event('event_a', 1, return_future=True)
+
         if from_handle:
             handle.remove()
         else:
             source.remove_listener(handle)
 
-        await source.dispatch_event('event_a', 2)
+        await source.dispatch_event('event_a', 2, return_future=True)
 
         assert len(events) == 1
         assert events[0].args == (1,)
@@ -126,7 +128,7 @@ class TestEventSource:
 
         events = []
         source.add_listener('event_a', callback)
-        await source.dispatch_event('event_a', 'x', 'y', a=1, b=2)
+        await source.dispatch_event('event_a', 'x', 'y', return_future=True, a=1, b=2)
 
         assert len(events) == 1
         assert events[0].args == ('x', 'y')
@@ -144,9 +146,9 @@ class TestEventSource:
         source.add_listener('event_a', events.append)
         if construct_first:
             event = DummyEvent(source, 'event_a', 'x', 'y', a=1, b=2)
-            await source.dispatch_event(event)
+            await source.dispatch_event(event, return_future=True)
         else:
-            await source.dispatch_event('event_a', 'x', 'y', a=1, b=2)
+            await source.dispatch_event('event_a', 'x', 'y', return_future=True, a=1, b=2)
 
         assert len(events) == 1
         assert events[0].args == ('x', 'y')
@@ -159,7 +161,7 @@ class TestEventSource:
         source.add_listener(['event_a'],
                             lambda event, *args, **kwargs: arguments.append((args, kwargs)),
                             [1, 2], {'x': 6, 'y': 8})
-        await source.dispatch_event('event_a')
+        await source.dispatch_event('event_a', return_future=True)
 
         assert len(arguments) == 1
         assert arguments[0][0] == (1, 2)
@@ -174,14 +176,38 @@ class TestEventSource:
         """Test that a one add_listen() call can be made to subscribe to multiple topics."""
         events = []
         source.add_listener(topics, events.append)
-        await source.dispatch_event('event_a', 'x', 'y', a=1, b=2)
-        await source.dispatch_event('event_b', 'c', 'd', g=7, h=8)
+        await source.dispatch_event('event_a', 'x', 'y', return_future=True, a=1, b=2)
+        await source.dispatch_event('event_b', 'c', 'd', return_future=True, g=7, h=8)
 
         assert len(events) == 2
         assert events[0].args == ('x', 'y')
         assert events[0].kwargs == {'a': 1, 'b': 2}
         assert events[1].args == ('c', 'd')
         assert events[1].kwargs == {'g': 7, 'h': 8}
+
+    @pytest.mark.asyncio
+    async def test_dispatch_event_listener_exception_logging(self, event_loop, source, caplog):
+        """Test that listener exceptions are logged when return_future is False."""
+        def listener(event):
+            raise Exception('regular')
+
+        async def coro_listener(event):
+            raise Exception('coroutine')
+
+        future = Future()
+        source.add_listener('event_a', listener)
+        source.add_listener('event_a', coro_listener)
+        source.add_listener('event_a', future.set_result)
+        source.dispatch_event('event_a')
+        await future
+
+        assert len(caplog.records) == 2
+        for record in caplog.records:
+            assert 'uncaught exception in event listener' in record.message
+
+    def test_dispatch_event_no_listeners(self, source):
+        """Test that None is returned when no listeners are present and return_future is False."""
+        assert source.dispatch_event('event_a') is None
 
     @pytest.mark.asyncio
     async def test_dispatch_event_listener_exceptions(self, source):
@@ -201,7 +227,7 @@ class TestEventSource:
         async_listener = source.add_listener('event_a', async_error)
         event = DummyEvent(source, 'event_a')
         with pytest.raises(EventDispatchError) as exc:
-            await source.dispatch_event(event)
+            await source.dispatch_event(event, return_future=True)
 
         assert exc.value.event is event
         assert exc.value.exceptions == [
@@ -222,7 +248,7 @@ class TestEventSource:
     async def test_dispatch_event_pointless_args(self, source):
         """Test that passing variable arguments with an Event instance raises an AssertionError."""
         with pytest.raises(AssertionError) as exc:
-            await source.dispatch_event(DummyEvent(source, 'event_a'), 6)
+            source.dispatch_event(DummyEvent(source, 'event_a'), 6)
         assert str(exc.value) == 'passing extra arguments makes no sense here'
 
     @pytest.mark.asyncio
@@ -236,7 +262,7 @@ class TestEventSource:
 @pytest.mark.asyncio
 async def test_wait_event(source, event_loop):
     event = DummyEvent(source, 'event_a')
-    source.dispatch_event(event)
+    event_loop.call_soon(source.dispatch_event, event)
     received_event = await wait_event(source, 'event_a')
     assert received_event is event
 
@@ -244,17 +270,17 @@ async def test_wait_event(source, event_loop):
 @pytest.mark.asyncio
 async def test_stream_events(source, event_loop):
     async def generate_events():
-        await asyncio.sleep(0.2)
-        await source.dispatch_event('event_a', 1)
-        await asyncio.sleep(0.2)
-        await source.dispatch_event('event_a', 2)
-        await asyncio.sleep(0.2)
-        await source.dispatch_event('event_a', 3)
+        await asyncio.sleep(0.1)
+        source.dispatch_event('event_a', index=1)
+        await asyncio.sleep(0.1)
+        source.dispatch_event('event_a', index=2)
+        await asyncio.sleep(0.1)
+        source.dispatch_event('event_a', index=3)
 
     event_loop.create_task(generate_events())
     last_number = 0
     async for event in stream_events(source, 'event_a'):
-        assert event.args[0] == last_number + 1
+        assert event.kwargs['index'] == last_number + 1
         last_number += 1
         if last_number == 3:
             break

@@ -1,10 +1,10 @@
 import logging
 import re
-from asyncio import ensure_future, Future, get_event_loop, Queue
+from asyncio import Future, get_event_loop, Queue
 from collections import defaultdict
 from inspect import isawaitable
 from traceback import format_exception
-from typing import Dict, Callable, Any, Sequence, Union, Iterable, Tuple
+from typing import Dict, Callable, Any, Sequence, Union, Iterable, Tuple, Optional
 
 from asyncio_extras.asyncyield import yield_async
 from asyncio_extras.generator import async_generator
@@ -183,45 +183,53 @@ class EventSource:
         except (KeyError, ValueError):
             raise LookupError('listener not found') from None
 
-    def dispatch_event(self, event: Union[str, Event], *args, **kwargs) -> Future:
+    def dispatch_event(self, event: Union[str, Event], *args, return_future: bool = False,
+                       **kwargs) -> Optional[Future]:
         """
         Dispatch an event, optionally constructing one first.
 
-        This method has two forms: dispatch(``event``) and dispatch(``topic``, ``*args``,
-        ``**kwargs``). The former dispatches an existing event object while the latter
+        This method has two forms: dispatch_event(``event``) and dispatch_event(``topic``,
+        ``*args``, ``**kwargs``). The former dispatches an existing event object while the latter
         instantiates one, using this object as the source. Any extra positional and keyword
         arguments are passed directly to the constructor of the event class.
 
         :param event: an event instance or an event topic
+        :param return_future:
+            If ``True``, return a :class:`~asyncio.Future` that completes when all the listener
+            callbacks have been processed. If any one of them raised an exception, the future will
+            have an :exc:`asphalt.core.event.EventDispatchError` exception set in it which contains
+            all of the exceptions raised in the callbacks.
+
+            If set to ``False``, then ``None`` will be returned, and any exceptions raised in
+            listener callbacks will be logged instead.
         :raises LookupError: if the topic has not been registered in this event source
-        :returns: a future that resolves when all the listener callbacks have been handled and will
-            raise an :exc:`asphalt.core.event.EventDispatchError` if any of the callbacks raised an
-            exception
+        :returns: a future or ``None``, depending on the ``return_future`` argument
 
         """
         async def do_dispatch():
             futures, exceptions = [], []
-            for listener in list(self._listeners[topic]):
+            for listener in listeners:
                 try:
                     retval = listener.callback(event, *listener.args, **listener.kwargs)
                 except Exception as e:
-                    logger.exception('uncaught exception in event listener')
                     exceptions.append((listener, e))
+                    if not return_future:
+                        logger.exception('uncaught exception in event listener')
                 else:
                     if isawaitable(retval):
-                        future = ensure_future(retval, loop=loop)
-                        futures.append((listener, future))
+                        futures.append((listener, retval))
 
             # For any callbacks that returned awaitables, wait for their completion and collect any
             # exceptions they raise
-            for listener, future in futures:
+            for listener, awaitable in futures:
                 try:
-                    await future
+                    await awaitable
                 except Exception as e:
-                    logger.exception('uncaught exception in event listener')
                     exceptions.append((listener, e))
+                    if not return_future:
+                        logger.exception('uncaught exception in event listener')
 
-            if exceptions:
+            if exceptions and return_future:
                 raise EventDispatchError(event, exceptions)
 
         assert check_argument_types()
@@ -237,8 +245,17 @@ class EventSource:
         else:
             event = event_class(self, topic, *args, **kwargs)
 
-        loop = get_event_loop()
-        return loop.create_task(do_dispatch())
+        listeners = list(self._listeners[topic])
+        if listeners:
+            future = get_event_loop().create_task(do_dispatch())
+            return future if return_future else None
+        elif return_future:
+            # The event has no listeners, so skip the task creation and return an empty Future
+            future = Future()
+            future.set_result(None)
+            return future
+        else:
+            return None
 
 
 async def wait_event(source: EventSource, topics: Union[str, Iterable[str]]) -> Event:

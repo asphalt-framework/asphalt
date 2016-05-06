@@ -159,7 +159,7 @@ class Context(EventSource):
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
-        await self.dispatch_event('finished', exc_val)
+        await self.dispatch_event('finished', exc_val, return_future=True)
 
     def _publish_resource(self, value, alias: str, context_attr: str,
                           types: Iterable[Union[str, type]],
