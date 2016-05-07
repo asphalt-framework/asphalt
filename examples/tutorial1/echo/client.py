@@ -14,8 +14,8 @@ class ClientComponent(Component):
         writer.write(self.message.encode() + b'\n')
         response = await reader.readline()
         writer.close()
-        get_event_loop().stop()
         print('Server responded:', response.decode().rstrip())
+        get_event_loop().stop()
 
 if __name__ == '__main__':
     msg = sys.argv[1]

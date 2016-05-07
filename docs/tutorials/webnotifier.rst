@@ -267,8 +267,9 @@ Asphalt application::
             logging.info('Started web page change detector for url "%s" with a delay of %d seconds',
                          self.url, self.delay)
 
-The component's ``start()`` method starts the detection process, publishes the detector object as
-resource and installs a callback that will shut down the detector when the context finishes.
+The component's ``start()`` method starts the detector's ``run()`` method as a new task, publishes
+the detector object as resource and installs a callback that will shut down the detector when the
+context finishes.
 
 Now that you've moved the change detection code to its own module, ``ApplicationComponent`` will
 become somewhat lighter::
@@ -292,7 +293,11 @@ become somewhat lighter::
 
 The main application component will now use the detector resource published by
 ``ChangeDetectorComponent``. It adds one event listener which reacts to change events by creating
-a HTML formatted difference and sending it to the default recipient.
+an HTML formatted difference and sending it to the default recipient.
+
+Once the ``start()`` method here has run to completion, the event loop finally has a chance to run
+the task created for ``Detector.run()``. This will allow the detector to do its work and dispatch
+those ``changed`` events that the ``page_changed()`` listener callback expects.
 
 .. _separation of concerns: https://en.wikipedia.org/wiki/Separation_of_concerns
 
@@ -341,8 +346,8 @@ In your project directory, create a file named ``config.yaml`` with the followin
           propagate: false
 
 The ``component`` section defines parameters for the root component. Aside from the special
-``type`` key which tells the runner where to find the component, all the keys in this section are
-passed to the constructor of ``ApplicationComponent`` as keyword arguments. Keys under
+``type`` key which tells the runner where to find the component class, all the keys in this section
+are passed to the constructor of ``ApplicationComponent`` as keyword arguments. Keys under
 ``components`` will match the alias of each child component, which is given as the first argument
 to :meth:`~asphalt.core.component.ContainerComponent.add_component`. Any component parameters given
 here can now be removed from the ``add_component()`` call in ``ApplicationComponent``'s code.
@@ -354,13 +359,13 @@ configuration, consult the :ref:`python:logging-config-dictschema` section in th
 documentation.
 
 You can now run your app with the ``asphalt run`` command, provided that the project directory is
-on Python's search path. When your application is `properly packaged`_, this won't be a problem,
-but for the purposes of this tutorial, you can temporarily add it to the search path by setting the
-``PYTHONPATH`` environment variable:
+on Python's search path. When your application is `properly packaged`_ and installed in
+``site-packages``, this won't be a problem. But for the purposes of this tutorial, you can
+temporarily add it to the search path by setting the ``PYTHONPATH`` environment variable:
 
 .. code-block:: bash
 
-    PYTHONPATH=$PWD asphalt run config.yaml
+    PYTHONPATH=. asphalt run config.yaml
 
 On Windows:
 
@@ -375,3 +380,17 @@ On Windows:
 
 .. _YAML: http://yaml.org/
 .. _properly packaged: https://packaging.python.org/
+
+Conclusion
+----------
+
+You now know how to take advantage of Asphalt's component system to add structure to your
+application. You've learned how to build reusable components and how to make the components work
+together through the use of resources. Last, but not least, you've learned to set up a YAML
+configuration file for your application and to set up a fine grained logging configuration in it.
+
+You now possess enough knowledge to leverage Asphalt to create practical applications. You are now
+encouraged to find out what `Asphalt component projects`_ exist to aid your application
+development. Happy coding ☺
+
+.. _Asphalt component projects: https://github.com/asphalt-framework

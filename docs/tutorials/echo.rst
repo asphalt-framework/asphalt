@@ -1,5 +1,3 @@
-.. highlight:: bash
-
 Tutorial 1: Getting your feet wet – a simple echo server and client
 ===================================================================
 
@@ -18,6 +16,8 @@ good guess).
 
 Setting up the virtual environment
 ----------------------------------
+
+.. highlight:: bash
 
 Now that you have your base tools installed, it's time to create a *virtual environment* (referred
 to as simply ``virtualenv`` later). Installing Python libraries in a virtual environment isolates
@@ -124,12 +124,19 @@ Here, :func:`asyncio.start_server` is used to listen to incoming TCP connections
 any other legal value you want to use.
 
 Whenever a new connection is established, the event loop launches ``client_connected()`` as a new
-task. It receives two arguments, a :class:`~asyncio.StreamReader` and a
-:class:`~asyncio.StreamWriter`. In the callback we read a line from the client, write it back to
-the client and then close the connection. To get at least some output from our application, we
-print the received message on the console (decoding it from ``bytes`` to ``str`` and stripping the
-trailing newline character first). In production applications, you will want to use the
-:mod:`logging` module for this instead.
+:class:`~asyncio.Task`. Tasks work much like `green threads`_ in that they're adjourned when
+waiting for something to happen and then resumed when the result is available. The main difference
+is that a coroutine running in a task needs to use the ``await`` statement (or ``async for`` or
+``async with``) to yield control back to the event loop. In ``client_connected()``, the ``await``
+on the first line will cause the task to be adjourned until a line of text has been read from the
+network socket.
+
+The ``client_connected()`` function receives two arguments: a :class:`~asyncio.StreamReader` and
+a :class:`~asyncio.StreamWriter`. In the callback we read a line from the client, write it back to
+the client and then close the connection. To get at least some output from the application, the
+function was made to print the received message on the console (decoding it from ``bytes`` to
+``str`` and stripping the trailing newline character first). In production applications, you will
+want to use the :mod:`logging` module for this instead.
 
 If you have the ``netcat`` utility or similar, you can already test the server like this:
 
@@ -138,6 +145,8 @@ If you have the ``netcat`` utility or similar, you can already test the server l
     echo Hello | nc localhost 64100
 
 This command, if available, should print "Hello" on the console, as echoed by the server.
+
+.. _green threads: https://en.wikipedia.org/wiki/Green_threads
 
 Creating the client
 -------------------
@@ -163,8 +172,8 @@ Create the file ``client.py`` file in the ``echo`` package directory as follows:
             writer.write(self.message.encode() + b'\n')
             response = await reader.readline()
             writer.close()
-            get_event_loop().stop()
             print('Server responded:', response.decode().rstrip())
+            get_event_loop().stop()
 
     if __name__ == '__main__':
         msg = sys.argv[1]
@@ -185,3 +194,17 @@ To send the "Hello" message to the server, run this in the project directory:
 .. code-block:: bash
 
     python -m echo.client Hello
+
+Conclusion
+----------
+
+This covers the basics of setting up a minimal Asphalt application. You've now learned to:
+
+* Create a virtual environment to isolate your application's dependencies from other applications
+* Create a package structure for your application
+* Start your application using :func:`~asphalt.core.runner.run_application`
+* Use :ref:`asyncio streams <python:asyncio-streams>` to create a basic client-server protocol
+
+This tutorial only scratches the surface of what's possible with Asphalt, however. The
+:doc:`second tutorial <webnotifier>` will build on the knowledge you gained here and teach you how
+to work with components, resources and configuration files to build more useful applications.
