@@ -4,33 +4,49 @@
 .. image:: https://coveralls.io/repos/asphalt-framework/asphalt/badge.svg?branch=master&service=github
   :target: https://coveralls.io/github/asphalt-framework/asphalt?branch=master
   :alt: Code Coverage
-.. image:: https://codeclimate.com/github/asphalt-framework/asphalt/badges/gpa.svg
-  :target: https://codeclimate.com/github/asphalt-framework/asphalt
-  :alt: Code Climate
 
-Asphalt is a microframework for network oriented applications.
+Asphalt is an asyncio_ based microframework for network oriented applications.
 
-It consists of the core (this) and an ecosystem of high level components that offer additional
-functionality, often by integrating third party libraries. Asphalt is unique in that it allows
-developers to use both coroutine-based (asynchronous) and traditional blocking programming styles
-in the same application and every API provided by any Asphalt component supports both approaches,
-nearly transparently to the developer. The whole Asphalt ecosystem also follows
-`semantic versioning`_, allowing for safe upgrades.
+Its highlight features are:
 
-Asphalt uses the standard library `asyncio`_ module and requires Python 3.4 or later.
+* An ecosystem of components for integrating functionality from third party libraries and external
+  services
+* A configuration system where hard-coded defaults can be selectively overridden by external
+  configuration
+* A sophisticated signal system that lets you connect different services to create complex
+  event-driven interactions
+* Supports uvloop_ and aiogevent_ as event loop policy providers (though YMMV with the latter one)
+* Elegant handling of blocking APIs through the use of `asyncio_extras`_
+* Run time type checking for development and testing to fail early when functions are called with
+  incompatible arguments (can be disabled with **zero** overhead for production deployments!)
+* `Type hints`_ and `Semantic versioning`_ used throughout the core and all component libraries
 
+Asphalt can be used to make any imaginable kind of networked application, ranging from trivial
+command line tools to highly complex component hierarchies that start multiple network servers
+and/or clients using different protocols.
+
+What really sets Asphalt apart from other frameworks is its resource sharing system – the kind of
+functionality usually only found in bulky application server software. Asphalt components publish
+their services as *resources* in a shared *context*. Components can build on resources provided by
+each other, making it possible to create components that offer highly sophisticated functionality
+with relatively little effort.
 
 Project links
 -------------
 
+* `Component projects`_
 * `Documentation`_
 * `Help and support`_
 * `Source code`_
 * `Issue tracker`_
 
-
-.. _semantic versioning: http://semver.org/
 .. _asyncio: https://docs.python.org/3/library/asyncio.html
+.. _uvloop: https://github.com/MagicStack/uvloop
+.. _aiogevent: https://bitbucket.org/haypo/aiogevent
+.. _asyncio_extras: https://github.com/agronholm/asyncio_extras
+.. _Type hints: https://www.python.org/dev/peps/pep-0484/
+.. _Semantic versioning: http://semver.org/
+.. _Component projects: https://github.com/asphalt-framework
 .. _Documentation: http://asphalt.readthedocs.org/en/latest/
 .. _Help and support: https://github.com/asphalt-framework/asphalt/wiki/Help-and-support
 .. _Source code: https://github.com/asphalt-framework/asphalt
