@@ -13,7 +13,7 @@ setup(
         'local_scheme': 'dirty-tag'
     },
     description='A microframework for network oriented applications',
-    long_description=Path(__file__).parent.joinpath('README.rst').read_text(),
+    long_description=Path(__file__).parent.joinpath('README.rst').read_text('utf-8'),
     author='Alex Grönholm',
     author_email='alex.gronholm@nextday.fi',
     url='https://github.com/asphalt-framework/asphalt',
