@@ -156,6 +156,25 @@ class Signal:
             pass
 
     def dispatch_event(self, event: Event, *, return_future: bool = False) -> Optional[Future]:
+        """
+        Dispatch the given event to all listeners.
+
+        Creates a new task in which all listener callbacks are called with the given event as
+        the only argument. Coroutine callbacks are converted to their own respective tasks and
+        waited for concurrently.
+
+        :param event: the event object to dispatch
+        :param return_future:
+            If ``True``, return a :class:`~asyncio.Future` that completes when all the listener
+            callbacks have been processed. If any one of them raised an exception, the future will
+            have an :exc:`~asphalt.core.event.EventDispatchError` exception set in it which
+            contains all of the exceptions raised in the callbacks.
+
+            If set to ``False``, then ``None`` will be returned, and any exceptions raised in
+            listener callbacks will be logged instead.
+        :returns: a future or ``None``, depending on the ``return_future`` argument
+
+        """
         async def do_dispatch():
             futures, exceptions = [], []
             for callback in listeners:
@@ -204,7 +223,7 @@ class Signal:
         """
         Create and dispatch an event.
 
-        This method constructs the event object and then passes it to :meth:`dispatch_event` for
+        This method constructs an event object and then passes it to :meth:`dispatch_event` for
         the actual dispatching.
 
         :param args: positional arguments to the constructor of the associated event class.
