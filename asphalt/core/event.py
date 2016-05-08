@@ -1,7 +1,7 @@
 import logging
 from asyncio import Future, get_event_loop, Queue
 from datetime import datetime, timezone
-from inspect import isawaitable, iscoroutine, getattr_static
+from inspect import isawaitable, iscoroutine, getmembers
 from time import time, monotonic
 from traceback import format_exception
 from types import CoroutineType
@@ -105,7 +105,7 @@ class Signal:
 
         # Find the attribute this Signal was assigned to
         if self.topic is None:
-            attrnames = [attr for attr in dir(owner) if getattr_static(owner, attr) is self]
+            attrnames = [attr for attr, value in getmembers(owner, lambda value: value is self)]
             if len(attrnames) > 1:
                 raise LookupError('this Signal was assigned to multiple attributes: ' +
                                   ', '.join(attrnames))
