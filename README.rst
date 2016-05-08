@@ -19,7 +19,7 @@ Its highlight features are:
 * Elegant handling of blocking APIs through the use of `asyncio_extras`_
 * Run time type checking for development and testing to fail early when functions are called with
   incompatible arguments (can be disabled with **zero** overhead for production deployments!)
-* `Type hints`_ and `Semantic versioning`_ used throughout the core and all component libraries
+* `Type hints`_ and `semantic versioning`_ used throughout the core and all component libraries
 
 Asphalt can be used to make any imaginable kind of networked application, ranging from trivial
 command line tools to highly complex component hierarchies that start multiple network servers
@@ -45,7 +45,7 @@ Project links
 .. _aiogevent: https://bitbucket.org/haypo/aiogevent
 .. _asyncio_extras: https://github.com/agronholm/asyncio_extras
 .. _Type hints: https://www.python.org/dev/peps/pep-0484/
-.. _Semantic versioning: http://semver.org/
+.. _semantic versioning: http://semver.org/
 .. _Component projects: https://github.com/asphalt-framework
 .. _Documentation: http://asphalt.readthedocs.org/en/latest/
 .. _Help and support: https://github.com/asphalt-framework/asphalt/wiki/Help-and-support
