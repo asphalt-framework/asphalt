@@ -6,21 +6,21 @@ from asyncio.events import get_event_loop
 import aiohttp
 from typeguard import check_argument_types
 
-from asphalt.core import Component, EventSource, Event, register_topic
+from asphalt.core import Component, Event, Signal
 
 logger = logging.getLogger(__name__)
 
 
 class WebPageChangeEvent(Event):
-    def __init__(self, source, topic, url, old_lines, new_lines):
+    def __init__(self, source, topic, old_lines, new_lines):
         super().__init__(source, topic)
-        self.url = url
         self.old_lines = old_lines
         self.new_lines = new_lines
 
 
-@register_topic('changed', WebPageChangeEvent)
-class Detector(EventSource):
+class Detector:
+    changed = Signal(WebPageChangeEvent)
+
     def __init__(self, url, delay):
         self.url = url
         self.delay = delay
@@ -36,9 +36,8 @@ class Detector(EventSource):
                     if resp.status == 200:
                         last_modified = resp.headers['date']
                         new_lines = (await resp.text()).split('\n')
-                        if old_lines is not None:
-                            self.dispatch_event('changed', url=self.url, old_lines=old_lines,
-                                                new_lines=new_lines)
+                        if old_lines is not None and old_lines != new_lines:
+                            self.changed.dispatch(old_lines, new_lines)
 
                         old_lines = new_lines
 
@@ -51,15 +50,14 @@ class ChangeDetectorComponent(Component):
         self.url = url
         self.delay = delay
 
-    @classmethod
-    def shutdown(cls, event, task):
-        task.cancel()
-        logging.info('Shut down web page change detector')
-
     async def start(self, ctx):
+        def shutdown(event):
+            task.cancel()
+            logging.info('Shut down web page change detector')
+
         detector = Detector(self.url, self.delay)
         ctx.publish_resource(detector, context_attr='detector')
         task = get_event_loop().create_task(detector.run())
-        ctx.add_listener('finished', self.shutdown, args=[task])
+        ctx.finished.connect(shutdown)
         logging.info('Started web page change detector for url "%s" with a delay of %d seconds',
                      self.url, self.delay)

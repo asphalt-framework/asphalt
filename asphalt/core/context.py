@@ -7,7 +7,7 @@ from typing import Optional, Callable, Any, Union, Iterable, Sequence, Dict  # n
 from collections import defaultdict
 from typeguard import check_argument_types
 
-from asphalt.core.event import EventSource, Event, register_topic
+from asphalt.core.event import Signal, Event
 from asphalt.core.util import qualified_name
 
 __all__ = ('Resource', 'ResourceEvent', 'ResourceConflict', 'ResourceNotFound',
@@ -108,10 +108,7 @@ class ContextFinishEvent(Event):
         self.exception = exception
 
 
-@register_topic('finished', ContextFinishEvent)
-@register_topic('resource_published', ResourceEvent)
-@register_topic('resource_removed', ResourceEvent)
-class Context(EventSource):
+class Context:
     """
     Contexts give request handlers and callbacks access to resources.
 
@@ -119,17 +116,21 @@ class Context(EventSource):
     context causes the attribute to be looked up in the parent instance and so on, until the
     attribute is found (or :class:`AttributeError` is raised).
 
-    Supported events:
-
-    * finished (:class:`~asphalt.core.event.Event`): the context has served its purpose and is
-      being discarded
-    * resource_published (:class:`ResourceEvent`): a resource has been published in this context
-    * resource_removed (:class:`ResourceEvent`): a resource has been removed from this context
-
     :param parent: the parent context, if any
     :param default_timeout: default timeout for :meth:`request_resource` if omitted from the call
         arguments
+
+    :var Signal finished: a signal (:class:`ContextFinishEvent`) dispatched when the context has
+        served its purpose and is beingdiscarded
+    :var Signal resource_published: a signal (:class:`ResourceEvent`) dispatched when a resource
+        has been published in this context
+    :var Signal resource_removed: a signal (:class:`ResourceEvent`): dispatched when a resource has
+        been removed from this context
     """
+
+    finished = Signal(ContextFinishEvent)
+    resource_published = Signal(ResourceEvent)
+    resource_removed = Signal(ResourceEvent)
 
     def __init__(self, parent: 'Context'=None, *, default_timeout: int=5):
         assert check_argument_types()
@@ -159,7 +160,7 @@ class Context(EventSource):
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
-        await self.dispatch_event('finished', exc_val, return_future=True)
+        await self.finished.dispatch(exc_val, return_future=True)
 
     def _publish_resource(self, value, alias: str, context_attr: str,
                           types: Iterable[Union[str, type]],
@@ -207,7 +208,7 @@ class Context(EventSource):
         if creator is None and resource.context_attr:
             setattr(self, context_attr, value)
 
-        self.dispatch_event('resource_published', resource)
+        self.resource_published.dispatch(resource)
         return resource
 
     def publish_resource(
@@ -284,7 +285,7 @@ class Context(EventSource):
         if resource.context_attr and resource.context_attr in self.__dict__:
             delattr(self, resource.context_attr)
 
-        self.dispatch_event('resource_removed', resource)
+        self.resource_removed.dispatch(resource)
 
     async def request_resource(self, type: Union[str, type], alias: str='default', *,
                                timeout: Union[int, None]=None):
@@ -333,8 +334,9 @@ class Context(EventSource):
                 future.set_result(event.resource)
 
         future = Future()
-        listeners = [ctx.add_listener('resource_published', resource_listener) for
-                     ctx in context_chain]
+        for ctx in context_chain:
+            ctx.resource_published.connect(resource_listener)
+
         try:
             resource = await wait_for(future, timeout)
         except TimeoutError:
@@ -343,8 +345,8 @@ class Context(EventSource):
             value = resource.get_value(self)
             return await value if isawaitable(value) else value
         finally:
-            for listener in listeners:
-                listener.remove()
+            for ctx in context_chain:
+                ctx.resource_published.disconnect(resource_listener)
 
     def get_resources(self, type: Union[str, type] = None, *,
                       include_parents: bool = True) -> Sequence[Resource]:

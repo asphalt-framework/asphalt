@@ -109,7 +109,7 @@ to the logger::
                         if resp.status == 200:
                             last_modified = resp.headers['date']
                             new_lines = (await resp.text()).split('\n')
-                            if old_lines is not None:
+                            if old_lines is not None and old_lines != new_lines:
                                 difference = '\n'.join(unified_diff(old_lines, new_lines))
                                 logger.info('Contents changed:\n%s', difference)
 
@@ -161,9 +161,9 @@ And to make the the results look nicer in an email message, you can switch to us
                         if resp.status == 200:
                             last_modified = resp.headers['date']
                             new_lines = (await resp.text()).split('\n')
-                            if old_lines is not None:
+                            if old_lines is not None and old_lines != new_lines:
                                 difference = diff.make_file(old_lines, new_lines, context=True)
-                                logger.info('Sent email with HTML changes')
+                                logger.info('Sent notification email')
 
                             old_lines = new_lines
 
@@ -195,17 +195,15 @@ class to it::
     from asyncio.events import get_event_loop
 
     import aiohttp
-    from typeguard import check_argument_types
 
-    from asphalt.core import Component, EventSource, Event, register_topic
+    from asphalt.core import Component, Event, Signal
 
     logger = logging.getLogger(__name__)
 
 
     class WebPageChangeEvent(Event):
-        def __init__(self, source, topic, url, old_lines, new_lines):
+        def __init__(self, source, topic, old_lines, new_lines):
             super().__init__(source, topic)
-            self.url = url
             self.old_lines = old_lines
             self.new_lines = new_lines
 
@@ -215,8 +213,9 @@ the output any way it wants.
 
 Next, add another class in the same module that will do the HTTP requests and change detection::
 
-    @register_topic('changed', WebPageChangeEvent)
-    class Detector(EventSource):
+    class Detector:
+        changed = Signal(WebPageChangeEvent)
+
         def __init__(self, url, delay):
             self.url = url
             self.delay = delay
@@ -232,16 +231,15 @@ Next, add another class in the same module that will do the HTTP requests and ch
                         if resp.status == 200:
                             last_modified = resp.headers['date']
                             new_lines = (await resp.text()).split('\n')
-                            if old_lines is not None:
-                                self.dispatch_event('changed', url=self.url, old_lines=old_lines,
-                                                    new_lines=new_lines)
+                            if old_lines is not None and old_lines != new_lines:
+                                self.changed.dispatch(old_lines, new_lines)
 
                             old_lines = new_lines
 
                     await asyncio.sleep(self.delay)
 
 The constructor arguments allow you to freely specify the parameters for the detection process.
-The class registers a single event named ``change`` using the previously created
+The class includes a signal named ``change`` that uses the previously created
 ``WebPageChangeEvent`` class. The code dispatches such an event when a change in the target web
 page is detected.
 
@@ -250,26 +248,24 @@ Asphalt application::
 
     class ChangeDetectorComponent(Component):
         def __init__(self, url, delay=10):
-            assert check_argument_types()
             self.url = url
             self.delay = delay
 
-        @staticmethod
-        def shutdown(event, task):
-            task.cancel()
-            logging.info('Web page change detector shut down')
-
         async def start(self, ctx):
+            def shutdown(event):
+                task.cancel()
+                logging.info('Shut down web page change detector')
+
             detector = Detector(self.url, self.delay)
             ctx.publish_resource(detector, context_attr='detector')
             task = get_event_loop().create_task(detector.run())
-            ctx.add_listener('finished', self.shutdown, args=[task])
+            ctx.finished.connect(shutdown)
             logging.info('Started web page change detector for url "%s" with a delay of %d seconds',
                          self.url, self.delay)
 
 The component's ``start()`` method starts the detector's ``run()`` method as a new task, publishes
-the detector object as resource and installs a callback that will shut down the detector when the
-context finishes.
+the detector object as resource and installs an event listener that will shut down the detector
+when the context finishes.
 
 Now that you've moved the change detection code to its own module, ``ApplicationComponent`` will
 become somewhat lighter::
@@ -282,14 +278,12 @@ become somewhat lighter::
                 message_defaults={'sender': 'your@email.here', 'to': 'your@email.here'})
             await super().start(ctx)
 
-            async def page_changed(event):
-                difference = diff.make_file(event.old_lines, event.new_lines, context=True)
-                await ctx.mailer.create_and_deliver(subject='Change detected in %s ' % event.url,
-                                                    html_body=difference)
-                logger.info('Sent email with HTML changes')
-
             diff = HtmlDiff()
-            ctx.detector.add_listener('changed', page_changed)
+            async for event in ctx.detector.changed.stream_events():
+                difference = diff.make_file(event.old_lines, event.new_lines, context=True)
+                await ctx.mailer.create_and_deliver(
+                    subject='Change detected in %s' % event.source.url, html_body=difference)
+                logger.info('Sent notification email')
 
 The main application component will now use the detector resource published by
 ``ChangeDetectorComponent``. It adds one event listener which reacts to change events by creating

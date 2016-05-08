@@ -21,7 +21,7 @@ class ShutdownComponent(Component):
         self.exception = event.exception
 
     async def start(self, ctx: Context):
-        ctx.add_listener('finished', self.finish_callback)
+        ctx.finished.connect(self.finish_callback)
 
         if self.method == 'stop':
             get_event_loop().stop()

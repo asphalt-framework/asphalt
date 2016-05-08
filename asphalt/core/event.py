@@ -1,10 +1,12 @@
 import logging
-import re
 from asyncio import Future, get_event_loop, Queue
-from collections import defaultdict
-from inspect import isawaitable, iscoroutine
+from datetime import datetime, timezone
+from inspect import isawaitable, iscoroutine, getattr_static
+from time import time, monotonic
 from traceback import format_exception
-from typing import Dict, Callable, Any, Sequence, Union, Iterable, Tuple, Optional
+from types import CoroutineType
+from typing import Callable, Any, Sequence, Tuple, Optional
+from weakref import WeakKeyDictionary
 
 from asyncio_extras.asyncyield import yield_async
 from asyncio_extras.generator import async_generator
@@ -12,8 +14,7 @@ from typeguard import check_argument_types
 
 from asphalt.core.util import qualified_name
 
-__all__ = ('Event', 'EventListener', 'register_topic', 'EventSource', 'wait_event',
-           'stream_events')
+__all__ = ('Event', 'EventDispatchError', 'Signal', 'wait_event', 'stream_events')
 
 logger = logging.getLogger(__name__)
 
@@ -22,56 +23,49 @@ class Event:
     """
     The base class for all events.
 
-    :ivar EventSource source: the event source where this event originated from
+    :param source: the object where this event originated from
+    :param topic: the event topic
+
+    :ivar source: the object where this event was dispatched from
     :ivar str topic: the topic
+    :ivar float time: event creation time as seconds from the UNIX epoch
+    :ivar float monotime: event creation time, as returned by :func:`time.monotonic`
     """
 
-    __slots__ = 'source', 'topic'
+    __slots__ = 'source', 'topic', 'time', 'monotime'
 
-    def __init__(self, source: 'EventSource', topic: str):
+    def __init__(self, source, topic: str):
         self.source = source
         self.topic = topic
+        self.time = time()
+        self.monotime = monotonic()
+
+    @property
+    def utc_timestamp(self) -> datetime:
+        """
+        Return a timezone aware :class:`~datetime.datetime` corresponding to the ``time`` variable,
+        using the UTC timezone.
+
+        """
+        return datetime.fromtimestamp(self.time, timezone.utc)
 
     def __repr__(self):
         return '{0.__class__.__name__}(source={0.source!r}, topic={0.topic!r})'.format(self)
 
 
-class EventListener:
-    """A handle that can be used to remove an event listener from its :class:`EventSource`."""
-
-    __slots__ = 'source', 'topics', 'callback', 'args', 'kwargs'
-
-    def __init__(self, source: 'EventSource', topics: Sequence[str], callback: Callable,
-                 args: Sequence, kwargs: Dict[str, Any]):
-        assert check_argument_types()
-        self.source = source
-        self.topics = topics
-        self.callback = callback
-        self.args = args
-        self.kwargs = kwargs
-
-    def remove(self) -> None:
-        """Remove this listener from its event source."""
-        self.source.remove_listener(self)
-
-    def __repr__(self):
-        return ('{0.__class__.__name__}(topics={0.topics!r}, callback={1}, args={0.args!r}, '
-                'kwargs={0.kwargs!r})'.format(self, qualified_name(self.callback)))
-
-
 class EventDispatchError(Exception):
     """
-    Raised when one or more event listener callback raises an exception.
+    Raised when one or more event listener callbacks raise an exception.
 
     The tracebacks of all the exceptions are displayed in the exception message.
 
     :ivar Event event: the event
-    :ivar exceptions: a sequence containing tuples of (listener, exception) for each exception that
+    :ivar exceptions: a sequence containing tuples of (callback, exception) for each exception that
         was raised by a listener callback
-    :vartype exceptions: Sequence[Tuple[EventListener, Exception]]
+    :vartype exceptions: Sequence[Tuple[Callable, Exception]]
     """
 
-    def __init__(self, event: Event, exceptions: Sequence[Tuple[EventListener, Exception]]):
+    def __init__(self, event: Event, exceptions: Sequence[Tuple[Callable, Exception]]):
         message = '-------------------------------\n'.join(
             ''.join(format_exception(type(exc), exc, exc.__traceback__)) for _, exc in exceptions)
         super().__init__('error dispatching event:\n' + message)
@@ -79,140 +73,96 @@ class EventDispatchError(Exception):
         self.exceptions = exceptions
 
 
-def register_topic(name: str, event_class: type = Event):
+class Signal:
     """
-    Return a class decorator that registers an event topic on the given class.
+    Declaration of a signal that can be used to dispatch events.
 
-    A subclass may override an event topic by re-registering it with an event class that is a
-    subclass of the previously registered event class. Attempting to override the topic with an
-    incompatible class will raise a :exc:`TypeError`.
+    This is a descriptor that returns itself on class level attribute access and a bound version of
+    itself on instance level access. Connecting listeners and dispatching events only works with
+    these bound instances.
 
-    :param name: name of the topic (must consist of alphanumeric characters and ``_``)
-    :param event_class: the event class associated with this topic
+    Each signal must be assigned to a class attribute, but only once. Assigning the same Signal
+    instance to more than one attribute will raise a :exc:`LookupError` on attribute access.
 
+    :param event_class: an event class
     """
-    def wrapper(cls: type):
-        if not isinstance(cls, type) or not issubclass(cls, EventSource):
-            raise TypeError('cls must be a subclass of EventSource')
+    __slots__ = 'event_class', 'source', 'topic', 'listeners', 'bound_signals'
 
-        topics = cls.__dict__.get('_eventsource_topics')
-        if topics is None:
-            # Collect all the topics from superclasses
-            topics = cls._eventsource_topics = {}
-            for supercls in cls.__mro__[1:]:
-                supercls_topics = getattr(supercls, '_eventsource_topics', {})
-                topics.update(supercls_topics)
-
-        if name in topics and not issubclass(event_class, topics[name]):
-            existing_classname = qualified_name(topics[name])
-            new_classname = qualified_name(event_class)
-            raise TypeError('cannot override event class for topic "{}" -- event class {} is not '
-                            'a subclass of {}'.format(name, new_classname, existing_classname))
-
-        topics[name] = event_class
-        return cls
-
-    assert check_argument_types()
-    assert re.match('[a-z0-9_]+', name), 'invalid characters in topic name'
-    assert issubclass(event_class, Event), 'event_class must be a subclass of Event'
-    return wrapper
-
-
-class EventSource:
-    """A mixin class that provides support for dispatching and listening to events."""
-
-    __slots__ = '__listeners'
-
-    # Provided in subclasses using @register_topic(...)
-    _eventsource_topics = {}  # type: Dict[str, Callable[[Event], Any]]
-
-    @property
-    def _listeners(self):
-        try:
-            return self.__listeners
-        except AttributeError:
-            self.__listeners = defaultdict(list)
-            return self.__listeners
-
-    def add_listener(self, topics: Union[str, Iterable[str]], callback: Callable,
-                     args: Sequence = (), kwargs: Dict[str, Any] = None) -> EventListener:
-        """
-        Start listening to events specified by ``topic``.
-
-        The callback (which can be a coroutine function) will be called with a single argument (an
-        :class:`Event` instance). The exact event class used depends on the event class mappings
-        given to the constructor.
-
-        :param topics: either a comma separated list or an iterable of topic(s) to listen to
-        :param callback: a callable to call with the event object when the event is dispatched
-        :param args: positional arguments to call the callback with (in addition to the event)
-        :param kwargs: keyword arguments to call the callback with
-        :return: a listener handle which can be used with :meth:`remove_listener` to unlisten
-        :raises LookupError: if the named event has not been registered in this event source
-
-        """
+    def __init__(self, event_class: type, *, source=None, topic: str = None):
         assert check_argument_types()
-
-        if isinstance(topics, str):
-            topics = tuple(topic.strip() for topic in topics.split(','))
+        assert issubclass(event_class, Event), 'event_class must be a subclass of Event'
+        self.event_class = event_class
+        self.topic = topic
+        if source is not None:
+            self.source = source
+            self.listeners = []
         else:
-            topics = tuple(topics)
+            self.bound_signals = WeakKeyDictionary()
 
-        for topic in topics:
-            if topic not in self._eventsource_topics:
-                raise LookupError('no such topic registered: {}'.format(topic))
+    def __get__(self, instance, owner) -> 'Signal':
+        if instance is None:
+            return self
 
-        handle = EventListener(self, topics, callback, args, kwargs or {})
-        for topic in topics:
-            self._listeners[topic].append(handle)
+        # Find the attribute this Signal was assigned to
+        if self.topic is None:
+            attrnames = [attr for attr in dir(owner) if getattr_static(owner, attr) is self]
+            if len(attrnames) > 1:
+                raise LookupError('this Signal was assigned to multiple attributes: ' +
+                                  ', '.join(attrnames))
+            else:
+                self.topic = attrnames[0]
 
-        return handle
+        try:
+            return self.bound_signals[instance]
+        except KeyError:
+            bound_signal = Signal(self.event_class, source=instance, topic=self.topic)
+            self.bound_signals[instance] = bound_signal
+            return bound_signal
 
-    def remove_listener(self, handle: EventListener):
+    def connect(self, callback: Callable[[Event], Any]) -> Callable[[Event], Any]:
         """
-        Remove an event listener previously added via :meth:`add_listener`.
+        Connect a callback to this signal.
 
-        :param handle: the listener handle returned from :meth:`add_listener`
-        :raises LookupError: if the handle was not found among the registered listeners
+        Each callable can only be connected once. Duplicate registrations are ignored.
+
+        If you need to pass extra arguments to the callback, you can use :func:`functools.partial`
+        to wrap the callable.
+
+        :param callback: a callable that will receive an event object as its only argument.
+        :return: the value of ``callback`` argument
+
+        """
+        assert check_argument_types()
+        if callback not in self.listeners:
+            self.listeners.append(callback)
+
+        return callback
+
+    def disconnect(self, callback: Callable) -> None:
+        """
+        Disconnects the given callback.
+
+        The callback will no longer receive events from this signal.
+
+        No action is taken if the callback is not on the list of listener callbacks.
+
+        :param callback: the callable to remove
 
         """
         assert check_argument_types()
         try:
-            for topic in handle.topics:
-                self._listeners[topic].remove(handle)
-        except (KeyError, ValueError):
-            raise LookupError('listener not found') from None
+            self.listeners.remove(callback)
+        except ValueError:
+            pass
 
-    def dispatch_event(self, event: Union[str, Event], *args, return_future: bool = False,
-                       **kwargs) -> Optional[Future]:
-        """
-        Dispatch an event, optionally constructing one first.
-
-        This method has two forms: dispatch_event(``event``) and dispatch_event(``topic``,
-        ``*args``, ``**kwargs``). The former dispatches an existing event object while the latter
-        instantiates one, using this object as the source. Any extra positional and keyword
-        arguments are passed directly to the constructor of the event class.
-
-        :param event: an event instance or an event topic
-        :param return_future:
-            If ``True``, return a :class:`~asyncio.Future` that completes when all the listener
-            callbacks have been processed. If any one of them raised an exception, the future will
-            have an :exc:`~asphalt.core.event.EventDispatchError` exception set in it which
-            contains all of the exceptions raised in the callbacks.
-
-            If set to ``False``, then ``None`` will be returned, and any exceptions raised in
-            listener callbacks will be logged instead.
-        :raises LookupError: if the topic has not been registered in this event source
-        :returns: a future or ``None``, depending on the ``return_future`` argument
-
-        """
+    def dispatch_event(self, event: Event, *, return_future: bool = False) -> Optional[Future]:
         async def do_dispatch():
             futures, exceptions = [], []
-            for listener in listeners:
+            for callback in listeners:
                 try:
-                    retval = listener.callback(event, *listener.args, **listener.kwargs)
+                    retval = callback(event)
                 except Exception as e:
-                    exceptions.append((listener, e))
+                    exceptions.append((callback, e))
                     if not return_future:
                         logger.exception('uncaught exception in event listener')
                 else:
@@ -220,37 +170,26 @@ class EventSource:
                         if iscoroutine(retval):
                             retval = loop.create_task(retval)
 
-                        futures.append((listener, retval))
+                        futures.append((callback, retval))
 
             # For any callbacks that returned awaitables, wait for their completion and collect any
             # exceptions they raise
-            for listener, awaitable in futures:
+            for callback, awaitable in futures:
                 try:
                     await awaitable
                 except Exception as e:
-                    exceptions.append((listener, e))
+                    exceptions.append((callback, e))
                     if not return_future:
                         logger.exception('uncaught exception in event listener')
 
             if exceptions and return_future:
                 raise EventDispatchError(event, exceptions)
 
-        assert check_argument_types()
-        topic = event.topic if isinstance(event, Event) else event
-        try:
-            event_class = self._eventsource_topics[topic]
-        except KeyError:
-            raise LookupError('no such topic registered: {}'.format(topic)) from None
-
-        if isinstance(event, Event):
-            assert not args and not kwargs, 'passing extra arguments makes no sense here'
-            assert isinstance(event, event_class), 'event class mismatch'
-        else:
-            event = event_class(self, topic, *args, **kwargs)
-
-        listeners = list(self._listeners[topic])
-        if listeners:
+        assert isinstance(event, self.event_class), \
+            'event must be of type {}'.format(qualified_name(self.event_class))
+        if self.listeners:
             loop = get_event_loop()
+            listeners = self.listeners.copy()
             future = loop.create_task(do_dispatch())
             return future if return_future else None
         elif return_future:
@@ -261,40 +200,70 @@ class EventSource:
         else:
             return None
 
+    def dispatch(self, *args, return_future: bool = False, **kwargs) -> Optional[Future]:
+        """
+        Create and dispatch an event.
 
-async def wait_event(source: EventSource, topics: Union[str, Iterable[str]]) -> Event:
-    """
-    Listen to the given topic(s) on the event source and return the next received event.
+        This method constructs the event object and then passes it to :meth:`dispatch_event` for
+        the actual dispatching.
 
-    :param source: an event source
-    :param topics: topic or topics to listen to
-    :return: the received event object
+        :param args: positional arguments to the constructor of the associated event class.
+        :param return_future:
+            If ``True``, return a :class:`~asyncio.Future` that completes when all the listener
+            callbacks have been processed. If any one of them raised an exception, the future will
+            have an :exc:`~asphalt.core.event.EventDispatchError` exception set in it which
+            contains all of the exceptions raised in the callbacks.
 
-    """
+            If set to ``False``, then ``None`` will be returned, and any exceptions raised in
+            listener callbacks will be logged instead.
+        :returns: a future or ``None``, depending on the ``return_future`` argument
+
+        """
+        assert check_argument_types()
+        event = self.event_class(self.source, self.topic, *args, **kwargs)
+        return self.dispatch_event(event, return_future=return_future)
+
+    def wait_event(self) -> CoroutineType:
+        """Shortcut for calling :func:`wait_event` with this signal as the argument."""
+        return wait_event(self)
+
+    def stream_events(self, max_queue_size: int = 0):
+        """Shortcut for calling :func:`stream_events` with this signal as the argument."""
+        return stream_events(self, max_queue_size=max_queue_size)
+
+
+async def wait_event(*signals: Signal) -> Event:
+    """Return the first event dispatched from any of the given signals."""
     future = Future()
-    listener = source.add_listener(topics, future.set_result)
+    for signal in signals:
+        signal.connect(future.set_result)
+
     try:
         return await future
     finally:
-        listener.remove()
+        for signal in signals:
+            signal.disconnect(future.set_result)
 
 
 @async_generator
-async def stream_events(source: EventSource, topics: Union[str, Iterable[str]]):
+async def stream_events(*signals: Signal, max_queue_size: int = 0):
     """
     Generate event objects to the consumer as they're dispatched.
 
     This function is meant for use with ``async for``.
 
-    :param source: an event source
-    :param topics: topic or topics to listen to
+    :param signals: one or more signals to get events from
+    :param max_queue_size: maximum size of the queue, after which it will start to drop events
 
     """
-    queue = Queue()
-    listener = source.add_listener(topics, queue.put)
+    queue = Queue(max_queue_size)
+    for signal in signals:
+        signal.connect(queue.put_nowait)
+
     try:
         while True:
             event = await queue.get()
             await yield_async(event)
     finally:
-        listener.remove()
+        for signal in signals:
+            signal.disconnect(queue.put_nowait)

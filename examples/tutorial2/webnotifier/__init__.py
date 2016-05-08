@@ -15,11 +15,9 @@ class ApplicationComponent(ContainerComponent):
         self.add_component('mailer', backend='smtp')
         await super().start(ctx)
 
-        async def page_changed(event):
-            difference = diff.make_file(event.old_lines, event.new_lines, context=True)
-            await ctx.mailer.create_and_deliver(subject='Change detected in %s ' % event.url,
-                                                html_body=difference)
-            logger.info('Sent email with HTML changes')
-
         diff = HtmlDiff()
-        ctx.detector.add_listener('changed', page_changed)
+        async for event in ctx.detector.changed.stream_events():
+            difference = diff.make_file(event.old_lines, event.new_lines, context=True)
+            await ctx.mailer.create_and_deliver(
+                subject='Change detected in %s' % event.source.url, html_body=difference)
+            logger.info('Sent notification email')

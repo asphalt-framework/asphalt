@@ -97,7 +97,7 @@ def run_application(component: Component, *, event_loop_policy: str = None,
     except (KeyboardInterrupt, SystemExit):
         pass
     finally:
-        coro = context.dispatch_event('finished', exception, return_future=True)
+        coro = context.finished.dispatch(exception, return_future=True)
         event_loop.run_until_complete(coro)
 
     event_loop.close()

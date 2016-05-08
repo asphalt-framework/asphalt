@@ -2,106 +2,102 @@ Events
 ======
 
 Events are a handy way to make your code react to changes in another part of the application.
-Asphalt events originate from classes that inherit from the
-:class:`~asphalt.core.event.EventSource` mixin class.
-An example of such class is the :class:`~asphalt.core.context.Context` class.
+To dispatch and listen to events, you first need to have one or more
+:class:`~asphalt.core.event.Signal` instances as attributes of some class. Each signal needs to be
+associated with some :class:`~asphalt.core.event.Event` class. Then, when you dispatch a new event
+by calling :meth:`~asphalt.core.event.Signal.dispatch`, a new instance of this event class will be
+constructed and passed to all listener callbacks.
 
-Listening to events
--------------------
+To listen to events dispatched from a signal, you need to have a function or any other callable
+that accepts a single positional argument. You then pass this callable to
+:meth:`~asphalt.core.event.Signal.connect`. That's it!
 
-To listen to events dispatched from an :class:`~asphalt.core.event.EventSource`, call
-:meth:`~asphalt.core.event.EventSource.add_listener` to add an event listener callback.
+To disconnect the callback, simply call :meth:`~asphalt.core.event.Signal.disconnect` with whatever
+you passed to :meth:`~asphalt.core.event.Signal.connect` as argument.
 
-The event listener can be either a regular function or a coroutine function::
+Here's how it works::
 
-    from asphalt.core import Event, Context
-
-
-    def listener(event: Event):
-        print(event)
-
-
-    async def asynclistener(event: Event):
-        print(event)
+    from asphalt.core import Event, Signal
 
 
-    def event_test():
-        context = Context()
-        context.add_listener('finished', listener)
-        context.add_listener('finished', asynclistener)
+    class CustomEvent(Event):
+        def __init__(source, topic, extra_argument):
+            super().__init__(source, topic)
+            self.extra_argument = extra_argument
 
-        # As we dispatch the "finished" event, the event object is printed twice
-        context.dispatch_event('finished', None)
+
+    class MyEventSource:
+        somesignal = Signal(Event)
+        customsignal = Signal(CustomEvent)
+
+
+    def plain_listener(event):
+        print('received event: %s' % event)
+
+
+    async def coro_listener(event):
+        print('coroutine listeners are fine too: %s' % event)
+
+
+    async def some_handler():
+        source = MyEventSource()
+        source.somesignal.connect(plain_listener)
+        source.customsignal.connect(coro_listener)
+
+        # Dispatches an Event instance
+        source.somesignal.dispatch()
+
+        # Dispatches a CustomEvent instance (the extra argument is passed to its constructor)
+        source.customsignal.dispatch('extra argument here')
+
+Exception handling
+------------------
+
+By default, all exceptions raised by listener callbacks are just sent to the logger
+(``asphalt.core.event``). If the dispatcher needs to know about any exceptions raised by listeners,
+it can call :meth:`~asphalt.core.event.Signal.dispatch` with ``return_future=True``. This will
+cause a :class:`~asyncio.Future` to be returned and, when awaited, will raise a
+:class:`~asphalt.core.event.EventDispatchError` if any listener raised an exception. This exception
+will contain every exception that was raised, along with the information regarding which callback
+raised which exception.
 
 Waiting for a single event
 --------------------------
 
-Using the :func:`~asphalt.core.event.wait_event` function you can wait for the next event that
-matches one or more topics::
+To wait for the next event dispatched from a given signal, you can use the
+:meth:`~asphalt.core.event.Signal.wait_event` method::
 
-    from asphalt.core import EventSource, wait_event
-
-
-    async def print_next_event(source: EventSource):
-        event = await wait_event(source, 'topic_a')
+    async def print_next_event(source):
+        event = await source.somesignal.wait_event()
         print(event)
 
+You can even wait for the next event dispatched from any of several signals using the
+:func:`~asphalt.core.event.wait_event` function::
+
+    from asphalt.core import wait_event
+
+
+    async def print_next_event(source1, source2, source3):
+        event = await wait_event(source1.some_signal, source2.another_signal, source3.some_signal)
+        print(event)
 
 Receiving events iteratively
 ----------------------------
 
-With :func:`~asphalt.core.event.stream_events`, you can even asynchronously iterate over incoming
-events from an event source::
+With :meth:`~asphalt.core.event.Signal.stream_events`, you can even asynchronously iterate over
+events dispatched from a signal::
 
-    from asphalt.core import EventSource, stream_events
-
-
-    async def listen_to_events(source: EventSource):
-        async for event in stream_events(source, ['topic_a', 'topic_b']):
+    async def listen_to_events(source):
+        async for event in source.somesignal.stream_events():
             print(event)
 
+Using :func:`~asphalt.core.event.stream_events`, you can stream events from multiple signals::
 
-Creating new event sources and event types
-------------------------------------------
-
-Any class can be made into an event source simply by inheriting from the
-:class:`~asphalt.core.event.EventSource` mixin class. Then you'll just need to register one or
-more event topics by using the ``@register_topic`` decorator::
-
-    from asphalt.core import EventSource, Event, register_topic
+    from asphalt.core import stream_events
 
 
-    @register_topic('topic_1', Event)
-    @register_topic('topic_2', Event)
-    class MyClass(EventSource):
-        ...
-
-
-The second argument to :func:`~asphalt.core.event.register_topic` is the event class.
-
-When you register topic on your own event source classes, you may also want to create your own
-:class:`~asphalt.core.event.Event` subclasses::
-
-    from asphalt.core import Event
-
-
-    class MyCustomEvent(Event):
-        def __init__(source, topic, foo, bar):
-            super().__init__(source, topic)
-            self.foo = foo
-            self.bar = bar
-
-Here, ``foo`` and ``bar`` are properties specific to this event class.
-
-Now you can just pass this class to ``@register_topic`` as the second argument when registering
-the topic(s)::
-
-    @register_topic('sometopic', MyCustomEvent)
-    class MyEventSource(EventSource):
-        pass
-
-And to dispatch a single ``MyCustomEvent`` from your new event source::
-
-    source = MyEventSource()
-    source.dispatch_event('sometopic', 'foo_value', bar='bar_value')
+    async def listen_to_events(source1, source2, source3):
+        async for event in stream_events(source1.some_signal, source2.another_signal,
+                                         source3.some_signal):
+            print(event)
 

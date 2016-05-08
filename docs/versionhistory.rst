@@ -14,18 +14,16 @@ This library adheres to `Semantic Versioning <http://semver.org/>`_.
   loop thread. Instead, use ``asyncio_extras.threads.call_async()`` to call asynchronous code if
   absolutely necessary.
 - **BACKWARD INCOMPATIBLE** The ``Component.start()`` method is now required to be a coroutine
-- **BACKWARD INCOMPATIBLE** The ``EventSource.dispatch()`` method was refactored:
+- **BACKWARD INCOMPATIBLE** The event system was completely rewritten:
 
-  - renamed to ``dispatch_event``
-  - is no longer a coroutine
-  - now calls all event listeners unconditionally
-  - got a keyword argument ``return_future`` which causes it to return a ``Future`` once all
-    listeners have been called
-- **BACKWARD INCOMPATIBLE** Modified event dispatch logic in ``EventSource`` to always run all
-  event listeners even if some listeners raise exceptions. A uniform exception is then raised
-  that contains all the exceptions and the listeners who raised them.
-- **BACKWARD INCOMPATIBLE** Renamed the ``EventSource.dispatch()`` method to ``dispatch_event``
-  to disambiguate the operation and to prevent name clashes with subclasses
+  - instead of inheriting from ``EventSource``, event source classes now simply assign ``Signal``
+    instances to attributes and use ``object.signalname.connect()`` to listen to events
+  - all event listeners are now called independently of each other and coroutine listeners are run
+    concurrently
+  - the ``dispatch()`` method is no longer a coroutine, but optionally returns a ``Future`` that
+    resolves when all listeners have been run
+  - added the ability to stream events
+  - added the ability to wait for a single event to be dispatched
 - **BACKWARD INCOMPATIBLE** The ``Context.publish_resource()``,
   ``Context.publish_lazy_resource()`` and ``Context.remove_resource()`` methods are no longer
   coroutine methods
@@ -46,8 +44,6 @@ This library adheres to `Semantic Versioning <http://semver.org/>`_.
   them return a ``Future`` instead)
 - Added the ability to get a list of all the resources in a Context
 - Added the ability to listen to multiple topics in an EventSource with a single listener
-- Added the ability to stream events from an EventSource
-- Added a utility function to listen to a single event coming from an EventSource
 - Changed the ``asphalt.core.util.resolve_reference()`` function to return invalid reference
   strings as-is
 - Switched from argparse to click for the command line interface

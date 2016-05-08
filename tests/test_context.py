@@ -54,7 +54,7 @@ class TestContext:
 
         """
         events = []
-        context.add_listener('finished', events.append)
+        context.finished.connect(events.append)
 
         async with context:
             pass
@@ -69,7 +69,7 @@ class TestContext:
 
         """
         events = []
-        context.add_listener('finished', events.append)
+        context.finished.connect(events.append)
 
         with pytest.raises(RuntimeError) as exc:
             async with context:
@@ -82,7 +82,7 @@ class TestContext:
     async def test_publish_resource(self, context):
         """Test that a resource is properly published in the context and listeners are notified."""
         future = Future()
-        context.add_listener('resource_published', future.set_result)
+        context.resource_published.connect(future.set_result)
         context.publish_resource(6, 'foo', 'foo.bar', types=(int, float))
 
         value = await context.request_resource(int, 'foo')
@@ -93,7 +93,7 @@ class TestContext:
         assert event.resource.alias == 'foo'
 
     @pytest.mark.asyncio
-    async def test_add_name_conflict(self, context):
+    async def test_publish_resource_name_conflict(self, context):
         """Test that publishing a resource won't replace any existing resources."""
         context.publish_resource(5, 'foo')
         with pytest.raises(ResourceConflict) as exc:
@@ -103,49 +103,7 @@ class TestContext:
             'this context has an existing resource of type int using the alias "foo"')
 
     @pytest.mark.asyncio
-    async def test_remove_resource(self, context):
-        """Test that resources can be removed and that the listeners are notified."""
-        future = Future()
-        context.add_listener('resource_removed', future.set_result)
-        resource = context.publish_resource(4)
-        context.remove_resource(resource)
-
-        event = await future
-        assert event.resource.types == ('int',)
-
-        with pytest.raises(ResourceNotFound):
-            await context.request_resource(int, timeout=0)
-
-    @pytest.mark.asyncio
-    async def test_remove_nonexistent(self, context):
-        resource = Resource(5, ('int',), 'default', None)
-        with pytest.raises(LookupError) as exc:
-            context.remove_resource(resource)
-
-        assert str(exc.value) == ("Resource(types=('int',), alias='default', value=5, "
-                                  "context_attr=None, creator=None) not found in this context")
-
-    @pytest.mark.asyncio
-    async def test_request_timeout(self, context):
-        with pytest.raises(ResourceNotFound) as exc:
-            await context.request_resource(int, timeout=0.2)
-
-        assert str(exc.value) == "no matching resource was found for type='int' alias='default'"
-
-    @pytest.mark.asyncio
-    @pytest.mark.parametrize('bad_arg, errormsg', [
-        ('type', 'type must be a type or a nonempty string'),
-        ('alias', 'alias must be a nonempty string')
-    ], ids=['bad_type', 'bad_alias'])
-    async def test_bad_request(self, context, bad_arg, errormsg):
-        type_ = '' if bad_arg == 'type' else 'foo'
-        alias = '' if bad_arg == 'alias' else 'foo'
-        with pytest.raises(ValueError) as exc:
-            await context.request_resource(type_, alias)
-        assert str(exc.value) == errormsg
-
-    @pytest.mark.asyncio
-    async def test_resource_added_removed(self, context):
+    async def test_publish_resource_context_attr(self, context):
         """
         Test that when resources are published, they are also set as properties of the context.
 
@@ -196,7 +154,7 @@ class TestContext:
     @pytest.mark.asyncio
     async def test_publish_lazy_resource_coroutine(self, context):
         """
-        Test that a coroutine function can be a resource creator, and that it returns a Future.
+        Test that a coroutine function can be a resource creator and that it returns a Future.
 
         """
         async def async_creator(context):
@@ -239,6 +197,48 @@ class TestContext:
 
         assert (str(exc.value) ==
                 'this context has an existing resource of type str using the alias "default"')
+
+    @pytest.mark.asyncio
+    async def test_remove_resource(self, context):
+        """Test that resources can be removed and that the listeners are notified."""
+        future = Future()
+        context.resource_removed.connect(future.set_result)
+        resource = context.publish_resource(4)
+        context.remove_resource(resource)
+
+        event = await future
+        assert event.resource.types == ('int',)
+
+        with pytest.raises(ResourceNotFound):
+            await context.request_resource(int, timeout=0)
+
+    @pytest.mark.asyncio
+    async def test_remove_nonexistent(self, context):
+        resource = Resource(5, ('int',), 'default', None)
+        with pytest.raises(LookupError) as exc:
+            context.remove_resource(resource)
+
+        assert str(exc.value) == ("Resource(types=('int',), alias='default', value=5, "
+                                  "context_attr=None, creator=None) not found in this context")
+
+    @pytest.mark.asyncio
+    async def test_request_timeout(self, context):
+        with pytest.raises(ResourceNotFound) as exc:
+            await context.request_resource(int, timeout=0.2)
+
+        assert str(exc.value) == "no matching resource was found for type='int' alias='default'"
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize('bad_arg, errormsg', [
+        ('type', 'type must be a type or a nonempty string'),
+        ('alias', 'alias must be a nonempty string')
+    ], ids=['bad_type', 'bad_alias'])
+    async def test_bad_request(self, context, bad_arg, errormsg):
+        type_ = '' if bad_arg == 'type' else 'foo'
+        alias = '' if bad_arg == 'alias' else 'foo'
+        with pytest.raises(ValueError) as exc:
+            await context.request_resource(type_, alias)
+        assert str(exc.value) == errormsg
 
     def test_attribute_error(self, context):
         exc = pytest.raises(AttributeError, getattr, context, 'foo')
