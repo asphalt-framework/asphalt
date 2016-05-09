@@ -37,7 +37,7 @@ setup(
     install_requires=[
         'setuptools',  # this is here to tell downstream packagers that it needs pkg_resources
         'PyYAML >= 3.11',
-        'typeguard >= 1.1.2',
+        'typeguard >= 1.1.3',
         'asyncio_extras',
         'click >= 6.6'
     ],
