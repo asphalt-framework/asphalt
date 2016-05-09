@@ -31,4 +31,4 @@ html_static_path = ['_static']
 htmlhelp_basename = 'asphaltdoc'
 
 intersphinx_mapping = {'python': ('http://docs.python.org/3/', None),
-                       'asyncio_extras': ('http://pythonhosted.org/asyncio_extras/', None)}
+                       'asyncioextras': ('http://pythonhosted.org/asyncio_extras/', None)}
