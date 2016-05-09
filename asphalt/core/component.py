@@ -70,7 +70,8 @@ class ContainerComponent(Component):
         this method.
 
         :param alias: a name for the component instance, unique within this container
-        :param type: entry point name or :class:`Component` subclass or a textual reference to one
+        :param type: entry point name or :class:`Component` subclass or a ``module:varname``
+            reference to one
         :param config: keyword arguments passed to the component's constructor
 
         """

@@ -105,9 +105,9 @@ class PluginContainer:
         """
         Resolve a reference to an entry point or a variable in a module.
 
-        If ``obj`` is a textual reference to an object (contains ":"), :func:`resolve_reference` is
-        used to resolve. If it is a string of any other kind, the named entry point is loaded from
-        this container's namespace. Otherwise, ``obj`` is returned as is.
+        If ``obj`` is a ``module:varname`` reference to an object, :func:`resolve_reference` is
+        used to resolve it. If it is a string of any other kind, the named entry point is loaded
+        from this container's namespace. Otherwise, ``obj`` is returned as is.
 
         :param obj: an entry point identifier, an object reference or an arbitrary object
         :return: the loaded entry point, resolved object or the unchanged input value
@@ -135,7 +135,8 @@ class PluginContainer:
         The entry points in this namespace must point to subclasses of the ``base_class`` parameter
         passed to this container.
 
-        :param type: an entry point identifier, a textual reference to a class or an actual class
+        :param type: an entry point identifier, a ``module:varname`` reference to a class, or an
+            actual class object
         :param constructor_kwargs: keyword arguments passed to the constructor of the plugin class
         :return: the plugin instance
 
