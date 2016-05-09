@@ -116,12 +116,15 @@ class Context:
     context causes the attribute to be looked up in the parent instance and so on, until the
     attribute is found (or :class:`AttributeError` is raised).
 
+    Requesting or publishing of resources **MUST NOT** be attempted during or after the dispatch
+    of the ``finished`` event.
+
     :param parent: the parent context, if any
     :param default_timeout: default timeout for :meth:`request_resource` if omitted from the call
         arguments
 
     :var Signal finished: a signal (:class:`ContextFinishEvent`) dispatched when the context has
-        served its purpose and is beingdiscarded
+        served its purpose and is being discarded
     :var Signal resource_published: a signal (:class:`ResourceEvent`) dispatched when a resource
         has been published in this context
     :var Signal resource_removed: a signal (:class:`ResourceEvent`): dispatched when a resource has
