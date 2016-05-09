@@ -28,7 +28,7 @@ class Resource:
     __slots__ = 'value', 'types', 'alias', 'context_attr', 'creator'
 
     def __init__(self, value, types: Sequence[str], alias: str, context_attr: Optional[str],
-                 creator: Callable[['Context'], Any]=None):
+                 creator: Callable[['Context'], Any] = None):
         assert check_argument_types()
         self.value = value
         self.types = types
@@ -132,7 +132,7 @@ class Context:
     resource_published = Signal(ResourceEvent)
     resource_removed = Signal(ResourceEvent)
 
-    def __init__(self, parent: 'Context'=None, *, default_timeout: int=5):
+    def __init__(self, parent: 'Context' = None, *, default_timeout: int = 5):
         assert check_argument_types()
         self._parent = parent
         self._resources = defaultdict(dict)  # type: Dict[str, Dict[str, Resource]]
@@ -212,8 +212,8 @@ class Context:
         return resource
 
     def publish_resource(
-            self, value, alias: str='default', context_attr: str=None, *,
-            types: Union[Union[str, type], Iterable[Union[str, type]]]=()) -> Resource:
+            self, value, alias: str = 'default', context_attr: str = None, *,
+            types: Union[Union[str, type], Iterable[Union[str, type]]] = ()) -> Resource:
         """
         Publish a resource and dispatch a ``resource_published``  event.
 
@@ -235,7 +235,7 @@ class Context:
 
     def publish_lazy_resource(self, creator: Callable[['Context'], Any],
                               types: Union[Union[str, type], Iterable[Union[str, type]]],
-                              alias: str='default', context_attr: str=None) -> Resource:
+                              alias: str = 'default', context_attr: str = None) -> Resource:
         """
         Publish a "lazy" or "contextual" resource and dispatch a ``resource_published`` event.
 
@@ -287,8 +287,8 @@ class Context:
 
         self.resource_removed.dispatch(resource)
 
-    async def request_resource(self, type: Union[str, type], alias: str='default', *,
-                               timeout: Union[int, None]=None):
+    async def request_resource(self, type: Union[str, type], alias: str = 'default', *,
+                               timeout: Union[int, None] = None):
         """
         Request a resource matching the given type and alias.
 
