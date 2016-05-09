@@ -97,8 +97,13 @@ def run_application(component: Component, *, event_loop_policy: str = None,
     except (KeyboardInterrupt, SystemExit):
         pass
     finally:
-        coro = context.finished.dispatch(exception, return_future=True)
-        event_loop.run_until_complete(coro)
+        # Cancel all running tasks
+        for task in asyncio.Task.all_tasks(event_loop):
+            task.cancel()
+
+        # Run all the finish callbacks
+        future = context.finished.dispatch(exception, return_future=True)
+        event_loop.run_until_complete(future)
 
     event_loop.close()
     logger.info('Application stopped')
