@@ -48,7 +48,7 @@ adapt code from the `aiohttp HTTP client tutorial`_::
                     async with session.get('http://imgur.com') as resp:
                         await resp.text()
 
-                await asyncio.sleep(10)
+                    await asyncio.sleep(10)
 
     if __name__ == '__main__':
         run_application(ApplicationComponent(), logging=logging.DEBUG)
@@ -78,7 +78,7 @@ So, modify the code as follows::
                             await resp.text()
                             logger.info('Contents changed')
 
-                await asyncio.sleep(10)
+                    await asyncio.sleep(10)
 
 The code here stores the ``date`` header from the first response and uses it in the
 ``if-modified-since`` header of the next request. A ``200`` response indicates that the web page
