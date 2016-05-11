@@ -1,6 +1,6 @@
 ---
 component:
-  type: webnotifier:ApplicationComponent
+  type: webnotifier.app:ApplicationComponent
   components:
     detector:
       url: http://imgur.com/

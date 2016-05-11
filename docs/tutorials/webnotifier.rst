@@ -22,8 +22,9 @@ use ``pip`` to install the ``asphalt-mailer`` and ``aiohttp`` libraries:
 
 This will also pull in the core Asphalt library as a dependency.
 
-Next, create a package directory named ``webnotifier``. The code in the following sections should
-be put in its ``__init__.py`` file (unless explicitly stated otherwise).
+Next, create a package directory named ``webnotifier`` and a module named ``app`` (``app.py``).
+The code in the following sections should be put in the ``app`` module (unless explicitly stated
+otherwise).
 
 Detecting changes in a web page
 -------------------------------
@@ -303,13 +304,14 @@ configure it. This is where YAML_ configuration files come in handy. They're cle
 are far less intimidating to end users than program code. And you can also have more than one of
 them, in case you want to run the program with a different configuration.
 
-In your project directory, create a file named ``config.yaml`` with the following contents:
+In your project directory (``tutorial2``), create a file named ``config.yaml`` with the following
+contents:
 
 .. code-block:: yaml
 
     ---
     component:
-      type: webnotifier:ApplicationComponent
+      type: webnotifier.app:ApplicationComponent
       components:
         detector:
           url: http://imgur.com/
