@@ -35,13 +35,13 @@ adapt code from the `aiohttp HTTP client tutorial`_::
     import logging
 
     import aiohttp
-    from asphalt.core import Component
+    from asphalt.core import Component, run_application
 
     logger = logging.getLogger(__name__)
 
 
     class ApplicationComponent(Component):
-        async def start(ctx):
+        async def start(self, ctx):
             with aiohttp.ClientSession() as session:
                 while True:
                     async with session.get('http://imgur.com') as resp:
@@ -65,7 +65,7 @@ respond with a ``304 Not Modified`` if the contents have not changed since that 
 So, modify the code as follows::
 
     class ApplicationComponent(Component):
-        async def start(ctx):
+        async def start(self, ctx):
             last_modified = None
             with aiohttp.ClientSession() as session:
                 while True:
