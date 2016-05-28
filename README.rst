@@ -1,7 +1,7 @@
 .. image:: https://travis-ci.org/asphalt-framework/asphalt.svg?branch=master
   :target: https://travis-ci.org/asphalt-framework/asphalt
   :alt: Build Status
-.. image:: https://coveralls.io/repos/asphalt-framework/asphalt/badge.svg?branch=master&service=github
+.. image:: https://coveralls.io/repos/github/asphalt-framework/asphalt/badge.svg?branch=master
   :target: https://coveralls.io/github/asphalt-framework/asphalt?branch=master
   :alt: Code Coverage
 
