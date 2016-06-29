@@ -3,6 +3,10 @@ Version history
 
 This library adheres to `Semantic Versioning <http://semver.org/>`_.
 
+**2.1.0**
+
+- Added the possibility to specify more than one configuration file on the command line
+
 **2.0.0** (2016-05-09)
 
 - **BACKWARD INCOMPATIBLE** Dropped Python 3.4 support in order to make the code fully rely on the
