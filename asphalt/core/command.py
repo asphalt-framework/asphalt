@@ -3,7 +3,6 @@ from typing import Optional
 import click
 import yaml
 
-from asphalt.core.component import component_types
 from asphalt.core.runner import run_application, policies
 from asphalt.core.util import merge_config
 
@@ -31,16 +30,8 @@ def run(configfile, unsafe: bool, loop: Optional[str]):
     if loop:
         config['event_loop_policy'] = loop
 
-    # Instantiate the root component
-    try:
-        component_config = config.pop('component')
-    except KeyError:
-        raise LookupError('missing configuration key: component') from None
-    else:
-        component = component_types.create_object(**component_config)
-
     # Start the application
-    run_application(component, **config)
+    run_application(**config)
 
 
 if __name__ == '__main__':  # pragma: no cover

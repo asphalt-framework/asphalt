@@ -7,7 +7,7 @@ from typing import Union, Dict, Any
 
 from typeguard import check_argument_types
 
-from asphalt.core.component import Component
+from asphalt.core.component import Component, component_types
 from asphalt.core.context import Context
 from asphalt.core.util import PluginContainer, qualified_name
 
@@ -26,7 +26,7 @@ def gevent_policy():
     return aiogevent.EventLoopPolicy()
 
 
-def run_application(component: Component, *, event_loop_policy: str = None,
+def run_application(component: Union[Component, Dict[str, Any]], *, event_loop_policy: str = None,
                     max_threads: int = None, logging: Union[Dict[str, Any], int, None] = INFO):
     """
     Configure logging and start the given root component in the default asyncio event loop.
@@ -48,7 +48,9 @@ def run_application(component: Component, *, event_loop_policy: str = None,
     :class:`~concurrent.futures.ThreadPoolExecutor` where the maximum number of threads is set to
     the value of ``max_threads`` or, if omitted, the return value of :func:`os.cpu_count()`.
 
-    :param component: the root component
+    :param component: the root component (either a component instance or a configuration dictionary
+        where the special ``type`` key is either a component class or a ``module:varname``
+        reference to one)
     :param event_loop_policy: entry point name (from the ``asphalt.core.event_loop_policies``
         namespace) of an alternate event loop policy (or a module:varname reference to one)
     :param max_threads: the maximum number of worker threads in the default thread pool executor
@@ -78,6 +80,10 @@ def run_application(component: Component, *, event_loop_policy: str = None,
     if max_threads is not None:
         event_loop.set_default_executor(ThreadPoolExecutor(max_threads))
         logger.info('Installed a new thread pool executor with max_workers=%d', max_threads)
+
+    # Instantiate the root component if a dict was given
+    if isinstance(component, dict):
+        component = component_types.create_object(**component)
 
     logger.info('Starting application')
     context = Context()

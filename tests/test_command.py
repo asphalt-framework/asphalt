@@ -52,10 +52,12 @@ logging:
         assert result.exit_code == 0
         assert run_app.call_count == 1
         args, kwargs = run_app.call_args
-        assert len(args) == 1
-        assert isinstance(args[0], DummyComponent)
-        assert args[0].dummyval1 == 'testval'
+        assert len(args) == 0
         assert kwargs == {
+            'component': {
+                'type': DummyComponent if unsafe else component_class,
+                'dummyval1': 'testval'
+            },
             'event_loop_policy': loop or 'bogus',
             'logging': {'version': 1, 'disable_existing_loggers': False}
         }
@@ -87,22 +89,8 @@ component:
         assert result.exit_code == 0
         assert run_app.call_count == 1
         args, kwargs = run_app.call_args
-        assert len(args) == 1
-        assert isinstance(args[0], DummyComponent)
-        assert args[0].dummyval1 == 'alternate'
-        assert args[0].dummyval2 == 10
+        assert len(args) == 0
         assert kwargs == {
+            'component': {'type': component_class, 'dummyval1': 'alternate', 'dummyval2': 10},
             'logging': {'version': 1, 'disable_existing_loggers': False}
         }
-
-
-def test_run_missing_component_key(tmpdir, runner):
-    path = tmpdir.join('test.yaml')
-    path.write("""\
----
-logging:
-  version: 1
-  disable_existing_loggers: false
-""")
-    result = runner.invoke(command.run, [str(path)])
-    assert str(result.exception) == 'missing configuration key: component'

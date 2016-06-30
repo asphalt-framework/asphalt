@@ -130,3 +130,14 @@ def test_run_start_exception(caplog):
     assert records[0].message == 'Starting application'
     assert records[1].message == 'Error during application startup'
     assert records[2].message == 'Application stopped'
+
+
+def test_dict_config(caplog):
+    """Test that component configuration passed as a dictionary works."""
+    component_class = '{0.__module__}:{0.__name__}'.format(ShutdownComponent)
+    run_application(component={'type': component_class})
+
+    records = [record for record in caplog.records if record.name == 'asphalt.core.runner']
+    assert len(records) == 2
+    assert records[0].message == 'Starting application'
+    assert records[1].message == 'Application stopped'
