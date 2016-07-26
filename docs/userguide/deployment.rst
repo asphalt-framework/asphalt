@@ -17,21 +17,20 @@ Running the launcher is very straightfoward:
 
 .. code-block:: bash
 
-    asphalt run yourconfig.yaml
+    asphalt run yourconfig.yaml [your-overrides.yml...]
 
 What this will do is:
 
-#. read ``yourconfig.yaml`` as a dictionary
-#. resolve the runner function from the ``runner`` option
-#. resolve and instantiate the root component
-#. call the runner function
-
-Except for the ``runner`` option, all keys in the configuration dictionary are passed to the runner
-function as keyword arguments. If no runner function has been defined,
-:func:`asphalt.core.runner.run_application` is used.
+#. read all the given configuration files, starting from ``yourconfig.yaml``
+#. merge the configuration files' contents into a single configuration dictionary using
+    :func:`~asphalt.core.util.merge_config`
+#. call :func:`~asphalt.core.runner.run_application` using the configuration dictionary as keyword
+    arguments
 
 Writing a configuration file
 ----------------------------
+
+.. highlight:: yaml
 
 A production-ready configuration file should contain at least the following options:
 
@@ -50,10 +49,9 @@ Suppose you had the following component class as your root component::
             self.add_component('sqlalchemy')
             await super().start(ctx)
 
-You could then write a configuration file like this:
+You could then write a configuration file like this::
 
-.. code-block:: yaml
-
+    ---
     component:
       type: myproject:MyRootComponent
       data_directory: /some/file/somewhere
@@ -79,7 +77,8 @@ You could then write a configuration file like this:
         level: INFO
 
 In the above configuration you have three top level configuration keys: ``component``,
-``max_threads`` and ``logging``.
+``max_threads`` and ``logging``, all of which are directly passed to
+:func:`~asphalt.core.runner.run_application` as keyword arguments.
 
 The ``component`` section defines the type of the root component using the specially processed
 ``type`` option. You can either specify a setuptools entry point name (from the
@@ -104,16 +103,24 @@ configuration file. See the
 Configuration overlays
 ----------------------
 
-Any options you specify in the configuration file override or augment the hard coded configuration,
-specified when you use :meth:`~asphalt.core.component.ContainerComponent.add_component`.
-This allows you to avoid unnecessary duplication in your configuration file by putting all the
-common parts of the component configuration in the code and only specifying the parts that are
-different in the actual configuration file.
+Component configuration can be specified on several levels:
 
-In the above example configuration, the ``mailer`` component gets passed three options:
+* Hard-coded arguments to :meth:`~asphalt.core.component.ContainerComponent.add_component`
+* First configuration file argument to ``asphalt run``
+* Second configuration file argument to ``asphalt run``
+* ...
 
-* ``type='smtp'``
-* ``connector='smtp.mycompany.com'``
+Any options you specify on each level override or augment any options given on previous levels.
+To minimize the effort required to build a working configuration file for your application, it is
+suggested that you pass as many of the options directly in the component initialization code and
+leave only deployment specific options like API keys, access credentials and such to the
+configuration file.
+
+With the configuration presented in the earlier paragraphs, the ``mailer`` component's constructor
+gets passed three keyword arguments:
+
+* ``backend='smtp'``
+* ``host='smtp.mycompany.com'``
 * ``ssl=True``
 
 The first one is provided in the root component code while the other two options come from the YAML
@@ -122,8 +129,21 @@ effect can be achieved programmatically by supplying the override configuration 
 component via its ``components`` constructor argument. This is very useful when writing tests
 against your application. For example, you might want to use the ``mock`` mailer in your test suite
 configuration to test that the application correctly sends out emails (and to prevent them from
-actually being sent to recipients!). See the documentation of the
-:func:`~asphalt.core.util.merge_config` function for details on how configuration merging works.
+actually being sent to recipients!).
+
+There is another neat trick that lets you easily modify a specific key in the configuration.
+By using dotted notation in a configuration key, you can target a specific key arbitrarily deep in
+the configuration structure. For example, to override the logging level for the root logger in the
+configuration above, you could use an override configuration such as::
+
+    ---
+    logging.root.level: DEBUG
+
+The keys don't need to be on the top level either, so the following has the same effect::
+
+    ---
+    logging:
+        root.level: DEBUG
 
 Performance tuning
 ------------------
