@@ -19,6 +19,10 @@ Running the launcher is very straightfoward:
 
     asphalt run yourconfig.yaml [your-overrides.yml...]
 
+Or alternatively:
+
+    python -m asphalt run yourconfig.yaml [your-overrides.yml...]
+
 What this will do is:
 
 #. read all the given configuration files, starting from ``yourconfig.yaml``
