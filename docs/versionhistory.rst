@@ -8,6 +8,7 @@ This library adheres to `Semantic Versioning <http://semver.org/>`_.
 - Added the possibility to specify more than one configuration file on the command line
 - Root component construction is now done after installing any alternate event loop policy provider
 - Added the possibility to use the command line interface via ``python -m asphalt ...``
+- Switched YAML library from PyYAML to ruamel.yaml
 
 **2.0.0** (2016-05-09)
 

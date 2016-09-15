@@ -1,7 +1,7 @@
 from typing import Optional
 
 import click
-import yaml
+from ruamel import yaml
 
 from asphalt.core.runner import run_application, policies
 from asphalt.core.util import merge_config
