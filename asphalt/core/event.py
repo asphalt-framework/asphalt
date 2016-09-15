@@ -1,5 +1,5 @@
 import logging
-from asyncio import Future, get_event_loop, Queue
+from asyncio import Future, get_event_loop, Queue, InvalidStateError
 from datetime import datetime, timezone
 from inspect import isawaitable, iscoroutine, getmembers
 from time import time, monotonic
@@ -253,9 +253,17 @@ class Signal:
 
 async def wait_event(*signals: Signal) -> Event:
     """Return the first event dispatched from any of the given signals."""
+    def callback(event):
+        # This might get called more than once before the signal is disconnected so guard against
+        # the exception raised in that situation
+        try:
+            future.set_result(event)
+        except InvalidStateError:
+            pass
+
     future = Future()
     for signal in signals:
-        signal.connect(future.set_result)
+        signal.connect(callback)
 
     try:
         return await future

@@ -211,6 +211,21 @@ async def test_wait_event(event_loop):
 
 
 @pytest.mark.asyncio
+async def test_wait_event_double_result(event_loop):
+    """Test that wait_event won't raise an exception when two events are sent in succession."""
+    async def signal_twice():
+        await source.event_a.dispatch(return_future=True)
+        await source.event_a.dispatch(return_future=True)
+
+    source = DummySource()
+    wait_task = event_loop.create_task(source.event_a.wait_event())
+    signal_task = event_loop.create_task(signal_twice())
+    received_event = await wait_task
+    await signal_task
+    assert received_event.topic == source.event_a.topic
+
+
+@pytest.mark.asyncio
 async def test_stream_events(event_loop):
     async def generate_events():
         await asyncio.sleep(0.1)
