@@ -36,6 +36,7 @@ Given this example component::
         def close():
             self.writer.close()
 
+
     class RemoteConnectionComponent(Component):
         def __init__(host: str, port: int):
             self.host = host
@@ -50,15 +51,16 @@ Given this example component::
             await ctx.publish_resource(server, context_attr='server')
 
             # Close the connection when the context is finished
-            ctx.add_listener('finished', lambda ctx: server.close())
+            ctx.finished.connect(lambda event: server.close())
 
 You could test it using `py.test`_ like this::
 
     import pytest
+
     from asphalt.core import Context
 
 
-    @pytest.yield_fixture
+    @pytest.fixture
     def context(event_loop):
         # The event_loop fixture is provided by pytest-asyncio
         ctx = Context()
@@ -67,7 +69,7 @@ You could test it using `py.test`_ like this::
         yield ctx
 
         # This is run at test teardown
-        event_loop.run_until_complete(ctx.dispatch_event('finished', None))
+        event_loop.run_until_complete(ctx.finished.dispatch(None, return_future=True))
 
 
     @pytest.fixture
