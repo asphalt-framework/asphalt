@@ -9,6 +9,8 @@ This library adheres to `Semantic Versioning <http://semver.org/>`_.
 - Root component construction is now done after installing any alternate event loop policy provider
 - Added the possibility to use the command line interface via ``python -m asphalt ...``
 - Switched YAML library from PyYAML to ruamel.yaml
+- Fixed a corner case where in ``wait_event()`` the future's result would be set twice, causing an
+  exception in the listener
 
 **2.0.0** (2016-05-09)
 
