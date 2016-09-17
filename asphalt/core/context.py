@@ -1,6 +1,6 @@
 import re
-from asyncio import Future, TimeoutError, wait_for, ensure_future
-from inspect import isawaitable, iscoroutine
+from asyncio import Future, TimeoutError, wait_for, ensure_future, iscoroutine
+from inspect import isawaitable
 from itertools import chain
 from typing import Optional, Callable, Any, Union, Iterable, Sequence, Dict  # noqa
 

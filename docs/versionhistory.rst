@@ -11,6 +11,8 @@ This library adheres to `Semantic Versioning <http://semver.org/>`_.
 - Switched YAML library from PyYAML to ruamel.yaml
 - Fixed a corner case where in ``wait_event()`` the future's result would be set twice, causing an
   exception in the listener
+- Fixed coroutine-based lazy resource returning a CoroWrapper instead of a Future when asyncio's
+  debug mode has been enabled
 
 **2.0.0** (2016-05-09)
 
