@@ -325,7 +325,7 @@ class Context:
 
         resource_type = qualified_name(type) if not isinstance(type, str) else type
         timeout = timeout if timeout is not None else self.default_timeout
-        assert timeout >= 0, 'timeout must be a positive integer'
+        assert timeout >= 0, 'timeout must be a non-negative integer'
 
         # Build a context chain from this context and its parents
         context_chain = [self]
