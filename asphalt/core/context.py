@@ -1,6 +1,6 @@
 import re
 from asyncio import Future, TimeoutError, wait_for, ensure_future, iscoroutine
-from inspect import isawaitable
+from inspect import isawaitable, getattr_static
 from itertools import chain
 from typing import Optional, Callable, Any, Union, Iterable, Sequence, Dict  # noqa
 
@@ -38,14 +38,14 @@ class Resource:
 
     def get_value(self, ctx: 'Context'):
         assert check_argument_types()
-        if self.value is None and self.creator is not None:
-            self.value = self.creator(ctx)
-            if iscoroutine(self.value):
-                self.value = ensure_future(self.value)
+        if self.creator is None:
+            return self.value
+        else:
+            value = self.creator(ctx)
             if self.context_attr:
-                setattr(ctx, self.context_attr, self.value)
+                setattr(ctx, self.context_attr, value)
 
-        return self.value
+            return ensure_future(value) if iscoroutine(value) else value
 
     def __repr__(self):
         return '{0.__class__.__name__}({0})'.format(self)
@@ -143,14 +143,23 @@ class Context:
         self.default_timeout = default_timeout
 
     def __getattr__(self, name):
-        resource = self._lazy_resources.get(name)
-        if resource is not None:
-            value = resource.get_value(self)
-            setattr(self, name, value)
-            return value
+        # First look for a lazy resource in the whole context chain
+        ctx = self
+        while ctx is not None:
+            resource = ctx._lazy_resources.get(name)
+            if resource is not None:
+                return resource.get_value(self)
+            else:
+                ctx = ctx.parent
 
-        if self._parent is not None:
-            return getattr(self._parent, name)
+        # When that fails, look directly for an attribute in the parents
+        ctx = self.parent
+        while ctx is not None:
+            value = getattr_static(ctx, name, None)
+            if value is not None:
+                return getattr(ctx, name)
+            else:
+                ctx = ctx.parent
 
         raise AttributeError('no such context variable: {}'.format(name))
 

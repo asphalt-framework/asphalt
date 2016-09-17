@@ -13,6 +13,8 @@ This library adheres to `Semantic Versioning <http://semver.org/>`_.
   exception in the listener
 - Fixed coroutine-based lazy resource returning a CoroWrapper instead of a Future when asyncio's
   debug mode has been enabled
+- Fixed a bug where a lazy resource would not be created separately for a context if a parent
+  context contained an instance of the same resource
 
 **2.0.0** (2016-05-09)
 

@@ -199,6 +199,18 @@ class TestContext:
                 'this context has an existing resource of type str using the alias "default"')
 
     @pytest.mark.asyncio
+    async def test_publish_lazy_resource_no_inherit(self, context):
+        """
+        Test that a subcontext gets its own version of a lazy resource even if a parent has one
+        instantiated already.
+
+        """
+        context.publish_lazy_resource(id, str, context_attr='foo')
+        subcontext = Context(context)
+        assert context.foo == id(context)
+        assert subcontext.foo == id(subcontext)
+
+    @pytest.mark.asyncio
     async def test_remove_resource(self, context):
         """Test that resources can be removed and that the listeners are notified."""
         future = Future()
