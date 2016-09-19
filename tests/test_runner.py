@@ -1,6 +1,6 @@
 import logging
 import sys
-from asyncio import new_event_loop, set_event_loop, get_event_loop
+import asyncio
 from unittest.mock import patch
 
 import pytest
@@ -24,20 +24,11 @@ class ShutdownComponent(Component):
         ctx.finished.connect(self.finish_callback)
 
         if self.method == 'stop':
-            get_event_loop().stop()
+            asyncio.get_event_loop().stop()
         elif self.method == 'exit':
-            get_event_loop().call_later(0.1, sys.exit)
+            asyncio.get_event_loop().call_later(0.1, sys.exit)
         elif self.method == 'exception':
             raise RuntimeError('this should crash the application')
-
-
-@pytest.yield_fixture(autouse=True)
-def event_loop():
-    event_loop = new_event_loop()
-    set_event_loop(event_loop)
-    yield event_loop
-    if event_loop.is_running():
-        event_loop.stop()
 
 
 @pytest.mark.parametrize('logging_config', [
@@ -45,7 +36,7 @@ def event_loop():
     logging.INFO,
     {'version': 1, 'loggers': {'asphalt': {'level': 'INFO'}}}
 ], ids=['disabled', 'loglevel', 'dictconfig'])
-def test_run_logging_config(logging_config):
+def test_run_logging_config(event_loop, logging_config):
     """Test that logging initialization happens as expected."""
     with patch('asphalt.core.runner.basicConfig') as basicConfig,\
             patch('asphalt.core.runner.dictConfig') as dictConfig:
@@ -56,7 +47,7 @@ def test_run_logging_config(logging_config):
 
 
 @pytest.mark.parametrize('max_threads', [None, 3])
-def test_run_max_threads(max_threads):
+def test_run_max_threads(event_loop, max_threads):
     """
     Test that a new default executor is installed if and only if the max_threads argument is given.
 
@@ -87,7 +78,7 @@ def test_event_loop_policy(caplog, policy, policy_name):
     assert records[2].message == 'Application stopped'
 
 
-def test_run_callbacks(caplog):
+def test_run_callbacks(event_loop, caplog):
     """
     Test that the "finished" callbacks are run when the application is started and shut down
     properly and that the proper logging messages are emitted.
@@ -103,7 +94,7 @@ def test_run_callbacks(caplog):
     assert records[1].message == 'Application stopped'
 
 
-def test_run_sysexit(caplog):
+def test_run_sysexit(event_loop, caplog):
     """Test that calling sys.exit() will gracefully shut down the application."""
     component = ShutdownComponent(method='exit')
     run_application(component)
@@ -115,7 +106,7 @@ def test_run_sysexit(caplog):
     assert records[1].message == 'Application stopped'
 
 
-def test_run_start_exception(caplog):
+def test_run_start_exception(event_loop, caplog):
     """
     Test that an exception caught during the application initialization is put into the
     application context and made available to finish callbacks.
@@ -132,7 +123,7 @@ def test_run_start_exception(caplog):
     assert records[2].message == 'Application stopped'
 
 
-def test_dict_config(caplog):
+def test_dict_config(event_loop, caplog):
     """Test that component configuration passed as a dictionary works."""
     component_class = '{0.__module__}:{0.__name__}'.format(ShutdownComponent)
     run_application(component={'type': component_class})
