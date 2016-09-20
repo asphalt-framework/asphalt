@@ -6,8 +6,10 @@ This library adheres to `Semantic Versioning <http://semver.org/>`_.
 **2.1.0**
 
 - Added the possibility to specify more than one configuration file on the command line
-- Root component construction is now done after installing any alternate event loop policy provider
 - Added the possibility to use the command line interface via ``python -m asphalt ...``
+- Added the ``CLIApplicationComponent`` class to facilitate the creation of Asphalt based command
+  line tools
+- Root component construction is now done after installing any alternate event loop policy provider
 - Switched YAML library from PyYAML to ruamel.yaml
 - Fixed a corner case where in ``wait_event()`` the future's result would be set twice, causing an
   exception in the listener

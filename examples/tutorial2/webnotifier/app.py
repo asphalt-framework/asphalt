@@ -2,19 +2,20 @@
 import logging
 from difflib import HtmlDiff
 
-from asphalt.core import ContainerComponent
+from asphalt.core import CLIApplicationComponent
 
 from webnotifier.detector import ChangeDetectorComponent
 
 logger = logging.getLogger(__name__)
 
 
-class ApplicationComponent(ContainerComponent):
+class ApplicationComponent(CLIApplicationComponent):
     async def start(self, ctx):
         self.add_component('detector', ChangeDetectorComponent)
         self.add_component('mailer', backend='smtp')
         await super().start(ctx)
 
+    async def run(self, ctx):
         diff = HtmlDiff()
         async for event in ctx.detector.changed.stream_events():
             difference = diff.make_file(event.old_lines, event.new_lines, context=True)

@@ -158,36 +158,37 @@ be sent as a command line argument.
 Create the file ``client.py`` file in the ``echo`` package directory as follows::
 
     import sys
-    from asyncio import get_event_loop, open_connection
+    from asyncio import open_connection
 
-    from asphalt.core import Component, run_application
+    from asphalt.core import CLIApplicationComponent, run_application
 
 
-    class ClientComponent(Component):
-        def __init__(self, message):
-            self.message = message
-
-        async def start(self, ctx):
+    class ClientComponent(CLIApplicationComponent):
+        async def run(self, ctx):
+            message = sys.argv[1].encode() + b'\n'
             reader, writer = await open_connection('localhost', 64100)
-            writer.write(self.message.encode() + b'\n')
+            writer.write(message)
             response = await reader.readline()
             writer.close()
             print('Server responded:', response.decode().rstrip())
-            get_event_loop().stop()
 
     if __name__ == '__main__':
-        msg = sys.argv[1]
-        component = ClientComponent(msg)
+        component = ClientComponent()
         run_application(component)
 
-In the client component, the message to be sent is first extracted from the list of command line
-arguments. It is then given to ``ClientComponent`` as a constructor argument and saved as an
-attribute of the component instance for later use in ``start()``.
+You may have noticed that ``ClientComponent`` inherits from
+:class:`~asphalt.core.component.CLIApplicationComponent` instead of
+:class:`~asphalt.core.component.Component` and that instead of overriding the
+:meth:`~asphalt.core.component.Component.start` method,
+:meth:`~asphalt.core.component.CLIApplicationComponent.run` is overridden instead.
+This is standard practice for Asphalt applications that just do one specific thing and then exit.
 
-When the client component starts, it connects to ``localhost`` on port 64100. Then it converts the
-message to bytes for transport (adding a newline character so the server can use ``readline()``).
-Then it reads a response line from the server. Finally, it closes the connection and stops the
-event loop, allowing the application to exit.
+When the client component runs, it grabs the message to be sent from the list of command line
+arguments (``sys.argv``), converts it from a unicode string to a bytestring and adds a newline
+character (so the server can use ``readline()``). Then, it connects to ``localhost`` on port 64100
+and sends the bytestring to the other end. Next, it reads a response line from the server, closes
+the connection and prints the (decoded) response. When the ``run()`` method returns, the
+application exits.
 
 To send the "Hello" message to the server, run this in the project directory:
 

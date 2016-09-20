@@ -36,13 +36,13 @@ adapt code from the `aiohttp HTTP client tutorial`_::
     import logging
 
     import aiohttp
-    from asphalt.core import Component, run_application
+    from asphalt.core import CLIApplicationComponent, run_application
 
     logger = logging.getLogger(__name__)
 
 
-    class ApplicationComponent(Component):
-        async def start(self, ctx):
+    class ApplicationComponent(CLIApplicationComponent):
+        async def run(self, ctx):
             with aiohttp.ClientSession() as session:
                 while True:
                     async with session.get('http://imgur.com') as resp:
@@ -65,7 +65,7 @@ respond with a ``304 Not Modified`` if the contents have not changed since that 
 
 So, modify the code as follows::
 
-    class ApplicationComponent(Component):
+    class ApplicationComponent(CLIApplicationComponent):
         async def start(self, ctx):
             last_modified = None
             with aiohttp.ClientSession() as session:
@@ -98,7 +98,7 @@ to the logger::
     from difflib import unified_diff
 
 
-    class ApplicationComponent(Component):
+    class ApplicationComponent(CLIApplicationComponent):
         async def start(self, ctx):
             with aiohttp.ClientSession() as session:
                 last_modified, old_lines = None, None
@@ -144,13 +144,14 @@ And to make the the results look nicer in an email message, you can switch to us
     from asphalt.core import ContainerComponent
 
 
-    class ApplicationComponent(ContainerComponent):
+    class ApplicationComponent(CLIApplicationComponent):
         async def start(self, ctx):
             self.add_component(
                 'mailer', backend='smtp', host='your.smtp.server.here',
                 message_defaults={'sender': 'your@email.here', 'to': 'your@email.here'})
             await super().start(ctx)
 
+        async def run(self, ctx):
             with aiohttp.ClientSession() as session:
                 last_modified, old_lines = None, None
                 diff = HtmlDiff()
@@ -271,7 +272,7 @@ when the context finishes.
 Now that you've moved the change detection code to its own module, ``ApplicationComponent`` will
 become somewhat lighter::
 
-    class ApplicationComponent(ContainerComponent):
+    class ApplicationComponent(CLIApplicationComponent):
         async def start(self, ctx):
             self.add_component('detector', ChangeDetectorComponent, url='http://imgur.com')
             self.add_component(
@@ -279,6 +280,7 @@ become somewhat lighter::
                 message_defaults={'sender': 'your@email.here', 'to': 'your@email.here'})
             await super().start(ctx)
 
+        async def run(self, ctx):
             diff = HtmlDiff()
             async for event in ctx.detector.changed.stream_events():
                 difference = diff.make_file(event.old_lines, event.new_lines, context=True)

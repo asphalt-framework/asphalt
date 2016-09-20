@@ -1,14 +1,17 @@
 import asyncio
+import sys
 from abc import ABCMeta, abstractmethod
 from collections import OrderedDict
-from typing import Dict, Any, Union
+from traceback import print_exception
+from typing import Dict, Any, Union, Optional
+from warnings import warn
 
 from typeguard import check_argument_types
 
 from asphalt.core.context import Context
-from asphalt.core.util import PluginContainer, merge_config
+from asphalt.core.util import PluginContainer, merge_config, qualified_name
 
-__all__ = ('Component', 'ContainerComponent')
+__all__ = ('Component', 'ContainerComponent', 'CLIApplicationComponent')
 
 
 class Component(metaclass=ABCMeta):
@@ -104,5 +107,56 @@ class ContainerComponent(Component):
         if tasks:
             await asyncio.gather(*tasks)
 
+
+class CLIApplicationComponent(ContainerComponent):
+    """
+    Specialized subclass of :class:`.ContainerComponent` for command line tools.
+
+    Command line tools and similar applications should use this as their root component and
+    implement their main code in the :meth:`run` method.
+
+    When all the subcomponents have been started, :meth:`run` is started as a new task.
+    When the task is finished, the application will exit using the return value as its exit code.
+
+    If :meth:`run` raises an exception, a stack trace is printed and the exit code will be set
+    to 1. If the returned exit code is out of range or of the wrong data type, it is set to 1 and a
+    warning is emitted.
+    """
+
+    async def start(self, ctx: Context):
+        def run_complete(f):
+            # If run() raised an exception, print it with a traceback and exit with code 1
+            exc = f.exception()
+            if exc is not None:
+                print_exception(type(exc), exc, exc.__traceback__)
+                sys.exit(1)
+
+            retval = f.result()
+            if isinstance(retval, int):
+                if 0 <= retval <= 127:
+                    sys.exit(retval)
+                else:
+                    warn('exit code out of range: %d' % retval)
+                    sys.exit(1)
+            elif retval is not None:
+                warn('run() must return an integer or None, not %s' %
+                     qualified_name(retval.__class__))
+                sys.exit(1)
+            else:
+                sys.exit(0)
+
+        await super().start(ctx)
+        task = asyncio.get_event_loop().create_task(self.run(ctx))
+        task.add_done_callback(run_complete)
+
+    @abstractmethod
+    async def run(self, ctx: Context) -> Optional[int]:
+        """
+        Run the business logic of the command line tool.
+
+        Do not call this method yourself.
+
+        :return: the application's exit code (0-127; ``None`` = 0)
+        """
 
 component_types = PluginContainer('asphalt.components', Component)

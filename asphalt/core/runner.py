@@ -94,13 +94,15 @@ def run_application(component: Union[Component, Dict[str, Any]], *, event_loop_p
         except Exception as e:
             exception = e
             logger.exception('Error during application startup')
+            sys.exit(1)
         else:
             # Enable garbage collection of the component tree
             del component
 
             # Finally, run the event loop until the process is terminated or Ctrl+C is pressed
+            logger.info('Application started')
             event_loop.run_forever()
-    except (KeyboardInterrupt, SystemExit):
+    except KeyboardInterrupt:
         pass
     finally:
         # Cancel all running tasks
@@ -111,8 +113,5 @@ def run_application(component: Union[Component, Dict[str, Any]], *, event_loop_p
         future = context.finished.dispatch(exception, return_future=True)
         event_loop.run_until_complete(future)
 
-    event_loop.close()
-    logger.info('Application stopped')
-
-    if exception is not None:
-        sys.exit(1)
+        event_loop.close()
+        logger.info('Application stopped')
