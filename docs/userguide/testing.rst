@@ -24,31 +24,31 @@ Given this example component::
 
 
     class RemoteServer:
-        def __init__(reader, writer):
+        def __init__(self, reader, writer):
             self.reader = reader
             self.writer = writer
 
-        async def ping():
+        async def ping(self):
             self.writer.write(b'PING')
             line = await self.reader.readline()
             return line.rstrip()
 
-        def close():
+        def close(self):
             self.writer.close()
 
 
     class RemoteConnectionComponent(Component):
-        def __init__(host: str, port: int):
+        def __init__(self, host: str, port: int):
             self.host = host
             self.port = port
 
-        async def start(ctx: Context):
+        async def start(self, ctx: Context):
             # Open a TCP connection to the remote host
             reader, writer = await asyncio.open_connection(self.host, self.port)
             server = RemoteServer(reader, writer)
 
             # Make the RemoteServer instance available as ctx.server
-            await ctx.publish_resource(server, context_attr='server')
+            ctx.publish_resource(server, context_attr='server')
 
             # Close the connection when the context is finished
             ctx.finished.connect(lambda event: server.close())
