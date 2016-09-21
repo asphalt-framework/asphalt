@@ -13,7 +13,6 @@ class ClientComponent(CLIApplicationComponent):
         response = await reader.readline()
         writer.close()
         print('Server responded:', response.decode().rstrip())
-        return 4
 
 if __name__ == '__main__':
     component = ClientComponent()
