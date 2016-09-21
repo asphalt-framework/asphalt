@@ -40,6 +40,8 @@ class ContainerComponent(Component):
     """
     A component that can contain other components.
 
+    :param components: dictionary of component alias ⭢ component configuration dictionary
+
     :ivar child_components: dictionary of component alias ⭢ :class:`Component` instance (of child
         components added with :meth:`add_component`)
     :vartype child_components: Dict[str, Component]
