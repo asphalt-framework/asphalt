@@ -89,6 +89,7 @@ def run_application(component: Union[Component, Dict[str, Any]], *, event_loop_p
     context = Context()
     exception = None
     try:
+        # Start the root component
         try:
             event_loop.run_until_complete(component.start(context))
         except Exception as e:
@@ -96,14 +97,15 @@ def run_application(component: Union[Component, Dict[str, Any]], *, event_loop_p
             logger.exception('Error during application startup')
             sys.exit(1)
         else:
-            # Enable garbage collection of the component tree
+            # Enable the component tree to be garbage collected
             del component
 
             # Finally, run the event loop until the process is terminated or Ctrl+C is pressed
             logger.info('Application started')
-            event_loop.run_forever()
-    except KeyboardInterrupt:
-        pass
+            try:
+                event_loop.run_forever()
+            except KeyboardInterrupt:
+                pass
     finally:
         # Cancel all running tasks
         for task in asyncio.Task.all_tasks(event_loop):

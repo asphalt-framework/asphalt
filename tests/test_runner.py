@@ -20,6 +20,9 @@ class ShutdownComponent(Component):
         self.finish_callback_called = True
         self.exception = event.exception
 
+    def press_ctrl_c(self):
+        raise KeyboardInterrupt
+
     async def start(self, ctx: Context):
         ctx.finished.connect(self.finish_callback)
 
@@ -27,6 +30,8 @@ class ShutdownComponent(Component):
             asyncio.get_event_loop().stop()
         elif self.method == 'exit':
             asyncio.get_event_loop().call_later(0.1, sys.exit)
+        elif self.method == 'keyboard':
+            asyncio.get_event_loop().call_later(0.1, self.press_ctrl_c)
         elif self.method == 'exception':
             raise RuntimeError('this should crash the application')
 
@@ -102,6 +107,22 @@ def test_run_sysexit(event_loop, caplog):
     pytest.raises(SystemExit, run_application, component)
 
     assert component.finish_callback_called
+    records = [record for record in caplog.records if record.name == 'asphalt.core.runner']
+    assert len(records) == 3
+    assert records[0].message == 'Starting application'
+    assert records[1].message == 'Application started'
+    assert records[2].message == 'Application stopped'
+
+
+def test_run_ctrl_c(event_loop, caplog):
+    """
+    Test that when Ctrl+C is pressed during event_loop.run_forever(), run_application() exits
+    cleanly.
+
+    """
+    component = ShutdownComponent(method='keyboard')
+    run_application(component)
+
     records = [record for record in caplog.records if record.name == 'asphalt.core.runner']
     assert len(records) == 3
     assert records[0].message == 'Starting application'
