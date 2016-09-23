@@ -19,3 +19,14 @@ notifications:
     on_failure: change
     use_notice: true
     skip_join: true
+
+deploy:
+  provider: pypi
+  user: agronholm
+  password:
+    secure: 6BLcxekzVRvabI7xGH5G0z+tFE90Ql5PsfiszxVe+SSvuT9Cqbswk79geRAW4XPcTISncMrsETYQy/kbbZhU6TICfbEdZ2yh+rOIJWGs6oVFgRl8fZNja+rjKtBlQ7WRlL+aH60XLHKwrmWxFG5aU1VkZyKS+mq79ZtfUHJBT9Y6yWsLVwDjZ2tm1EHZIxeFrX87iBztzb8rJV26XRTocNqoTHf0iG1b6zP+CXEYrTfHjLfpXwSdVqD8n5L11fCnpjQ1ySU2FoqVedwsNIQcVYIEYVKTySLz5jwLDKk/0YjVvIwVF0qFn5HbX38gL7mOJhPxrIDlckTSl4SMY4bmljn19r87nIaVdVIvZV5wN8of+bLYoQztY2oEYm9M7LnkLr01tLJut90k/FDMvXnqGsb1o2W8Acht5V1bvY+o6sRWPMPCiEg4fQgKs1bUZxlRhYqCWmavR6AdKmKlQozyezvMl0pfs4FZVBM6dSK3zfzboktE3B+Z1J4MVuQlGC1a4+6hKXYxqUCB1gDxLjEsaKLNoBShrAQRNuLM+QuySCz0c5v8F+VEEPuLJRRTNcJ0zEr91DjRMLZat2Zn4UUufTsEzh8+4F3ur3PiCSfoxFsuWBL3IE8TlVNrn7R9gYwamuE6f8BnQnGwN/9kKPNPqI/MERZjGfOMGosjzIOGYKE=
+  distributions: sdist bdist_wheel
+  on:
+    tags: true
+    python: "3.5"
+    repo: asphalt-framework/asphalt
