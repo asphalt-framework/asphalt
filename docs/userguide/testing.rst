@@ -94,7 +94,7 @@ To run the test suite, make sure you're in the project directory and then do:
 
 .. code-block:: bash
 
-    $ pytest tests
+    pytest tests
 
 For more elaborate examples, please see the test suites of various `Asphalt subprojects`_.
 

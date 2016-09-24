@@ -164,16 +164,19 @@ Create the file ``client.py`` file in the ``echo`` package directory as follows:
 
 
     class ClientComponent(CLIApplicationComponent):
+        def __init__(self, message: str):
+            super().__init__()
+            self.message = message
+
         async def run(self, ctx):
-            message = sys.argv[1].encode() + b'\n'
             reader, writer = await open_connection('localhost', 64100)
-            writer.write(message)
+            writer.write(self.message.encode() + b'\n')
             response = await reader.readline()
             writer.close()
             print('Server responded:', response.decode().rstrip())
 
     if __name__ == '__main__':
-        component = ClientComponent()
+        component = ClientComponent(sys.argv[1])
         run_application(component)
 
 You may have noticed that ``ClientComponent`` inherits from
@@ -182,6 +185,11 @@ You may have noticed that ``ClientComponent`` inherits from
 :meth:`~asphalt.core.component.Component.start` method,
 :meth:`~asphalt.core.component.CLIApplicationComponent.run` is overridden instead.
 This is standard practice for Asphalt applications that just do one specific thing and then exit.
+
+The script instantiates ``ClientComponent`` using the first command line argument as the
+``message`` argument to the component's constructor. Doing this instead of directly accessing
+``sys.argv`` from the ``run()`` method makes this component easier to test and allows you to
+specify the message in a configuration file (covered in the next tutorial).
 
 When the client component runs, it grabs the message to be sent from the list of command line
 arguments (``sys.argv``), converts it from a unicode string to a bytestring and adds a newline
