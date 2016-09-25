@@ -3,7 +3,7 @@ Version history
 
 This library adheres to `Semantic Versioning <http://semver.org/>`_.
 
-**2.1.0**
+**2.1.0** (2016-09-26)
 
 - Added the possibility to specify more than one configuration file on the command line
 - Added the possibility to use the command line interface via ``python -m asphalt ...``
