@@ -26,7 +26,7 @@ pygments_style = 'sphinx'
 highlight_language = 'python3'
 todo_include_todos = False
 
-html_theme = 'classic'
+html_theme = 'sphinx_rtd_theme'
 html_static_path = ['_static']
 htmlhelp_basename = 'asphaltdoc'
 

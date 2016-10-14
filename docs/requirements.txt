@@ -1,5 +1,6 @@
 # Sphinx 1.5a0 fork w/ PRs #2431 and #2432 merged
 git+https://github.com/agronholm/sphinx.git
 
+sphinx_rtd_theme
 sphinx-autodoc-typehints >= 1.0.5
 sphinxcontrib-asyncio >= 0.2.0

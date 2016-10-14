@@ -31,23 +31,18 @@ their services as *resources* in a shared *context*. Components can build on res
 each other, making it possible to create components that offer highly sophisticated functionality
 with relatively little effort.
 
-Project links
--------------
-
-* `Component projects`_
-* `Documentation`_
-* `Help and support`_
-* `Source code`_
-* `Issue tracker`_
-
 .. _asyncio: https://docs.python.org/3/library/asyncio.html
 .. _uvloop: https://github.com/MagicStack/uvloop
 .. _aiogevent: https://bitbucket.org/haypo/aiogevent
 .. _asyncio_extras: https://github.com/agronholm/asyncio_extras
 .. _Type hints: https://www.python.org/dev/peps/pep-0484/
 .. _semantic versioning: http://semver.org/
-.. _Component projects: https://github.com/asphalt-framework
-.. _Documentation: http://asphalt.readthedocs.org/en/latest/
-.. _Help and support: https://github.com/asphalt-framework/asphalt/wiki/Help-and-support
-.. _Source code: https://github.com/asphalt-framework/asphalt
-.. _Issue tracker: https://github.com/asphalt-framework/asphalt/issues
+
+Project links
+-------------
+
+* `Component projects <https://github.com/asphalt-framework>`_
+* `Documentation <http://asphalt.readthedocs.org/en/latest/>`_
+* `Help and support <https://github.com/asphalt-framework/asphalt/wiki/Help-and-support>`_
+* `Source code <https://github.com/asphalt-framework/asphalt>`_
+* `Issue tracker <https://github.com/asphalt-framework/asphalt/issues>`_
