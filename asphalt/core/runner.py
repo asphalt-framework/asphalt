@@ -46,7 +46,8 @@ def run_application(component: Union[Component, Dict[str, Any]], *, event_loop_p
 
     The default executor in the event loop is replaced with a new
     :class:`~concurrent.futures.ThreadPoolExecutor` where the maximum number of threads is set to
-    the value of ``max_threads`` or, if omitted, the return value of :func:`os.cpu_count()`.
+    the value of ``max_threads`` or, if omitted, the default value of
+    :class:`~concurrent.futures.ThreadPoolExecutor`.
 
     :param component: the root component (either a component instance or a configuration dictionary
         where the special ``type`` key is either a component class or a ``module:varname``
