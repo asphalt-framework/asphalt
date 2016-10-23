@@ -3,6 +3,11 @@ Version history
 
 This library adheres to `Semantic Versioning <http://semver.org/>`_.
 
+**2.2.0**
+
+- Log a message on startup that indicates whether optimizations (``-O`` or ``PYTHONOPTIMIZE``) are
+  enabled
+
 **2.1.0** (2016-09-26)
 
 - Added the possibility to specify more than one configuration file on the command line

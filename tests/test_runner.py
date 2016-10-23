@@ -77,11 +77,12 @@ def test_event_loop_policy(caplog, policy, policy_name):
     run_application(component, event_loop_policy=policy)
 
     records = [record for record in caplog.records if record.name == 'asphalt.core.runner']
-    assert len(records) == 4
-    assert records[0].message == 'Switched event loop policy to %s' % policy_name
-    assert records[1].message == 'Starting application'
-    assert records[2].message == 'Application started'
-    assert records[3].message == 'Application stopped'
+    assert len(records) == 5
+    assert records[0].message == 'Running in development mode'
+    assert records[1].message == 'Switched event loop policy to %s' % policy_name
+    assert records[2].message == 'Starting application'
+    assert records[3].message == 'Application started'
+    assert records[4].message == 'Application stopped'
 
 
 def test_run_callbacks(event_loop, caplog):
@@ -95,10 +96,11 @@ def test_run_callbacks(event_loop, caplog):
 
     assert component.finish_callback_called
     records = [record for record in caplog.records if record.name == 'asphalt.core.runner']
-    assert len(records) == 3
-    assert records[0].message == 'Starting application'
-    assert records[1].message == 'Application started'
-    assert records[2].message == 'Application stopped'
+    assert len(records) == 4
+    assert records[0].message == 'Running in development mode'
+    assert records[1].message == 'Starting application'
+    assert records[2].message == 'Application started'
+    assert records[3].message == 'Application stopped'
 
 
 def test_run_sysexit(event_loop, caplog):
@@ -108,10 +110,11 @@ def test_run_sysexit(event_loop, caplog):
 
     assert component.finish_callback_called
     records = [record for record in caplog.records if record.name == 'asphalt.core.runner']
-    assert len(records) == 3
-    assert records[0].message == 'Starting application'
-    assert records[1].message == 'Application started'
-    assert records[2].message == 'Application stopped'
+    assert len(records) == 4
+    assert records[0].message == 'Running in development mode'
+    assert records[1].message == 'Starting application'
+    assert records[2].message == 'Application started'
+    assert records[3].message == 'Application stopped'
 
 
 def test_run_ctrl_c(event_loop, caplog):
@@ -124,10 +127,11 @@ def test_run_ctrl_c(event_loop, caplog):
     run_application(component)
 
     records = [record for record in caplog.records if record.name == 'asphalt.core.runner']
-    assert len(records) == 3
-    assert records[0].message == 'Starting application'
-    assert records[1].message == 'Application started'
-    assert records[2].message == 'Application stopped'
+    assert len(records) == 4
+    assert records[0].message == 'Running in development mode'
+    assert records[1].message == 'Starting application'
+    assert records[2].message == 'Application started'
+    assert records[3].message == 'Application stopped'
 
 
 def test_run_start_exception(event_loop, caplog):
@@ -141,10 +145,11 @@ def test_run_start_exception(event_loop, caplog):
 
     assert str(component.exception) == 'this should crash the application'
     records = [record for record in caplog.records if record.name == 'asphalt.core.runner']
-    assert len(records) == 3
-    assert records[0].message == 'Starting application'
-    assert records[1].message == 'Error during application startup'
-    assert records[2].message == 'Application stopped'
+    assert len(records) == 4
+    assert records[0].message == 'Running in development mode'
+    assert records[1].message == 'Starting application'
+    assert records[2].message == 'Error during application startup'
+    assert records[3].message == 'Application stopped'
 
 
 def test_dict_config(event_loop, caplog):
@@ -153,7 +158,8 @@ def test_dict_config(event_loop, caplog):
     run_application(component={'type': component_class})
 
     records = [record for record in caplog.records if record.name == 'asphalt.core.runner']
-    assert len(records) == 3
-    assert records[0].message == 'Starting application'
-    assert records[1].message == 'Application started'
-    assert records[2].message == 'Application stopped'
+    assert len(records) == 4
+    assert records[0].message == 'Running in development mode'
+    assert records[1].message == 'Starting application'
+    assert records[2].message == 'Application started'
+    assert records[3].message == 'Application stopped'

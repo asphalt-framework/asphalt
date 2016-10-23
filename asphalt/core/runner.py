@@ -67,8 +67,11 @@ def run_application(component: Union[Component, Dict[str, Any]], *, event_loop_p
     elif isinstance(logging, int):
         basicConfig(level=logging)
 
-    # Switch to an alternate event loop policy if one was provided
+    # Inform the user whether -O or PYTHONOPTIMIZE was set when Python was launched
     logger = getLogger(__name__)
+    logger.info('Running in %s mode', 'development' if __debug__ else 'production')
+
+    # Switch to an alternate event loop policy if one was provided
     if event_loop_policy:
         create_policy = policies.resolve(event_loop_policy)
         policy = create_policy()
