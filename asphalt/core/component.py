@@ -161,4 +161,5 @@ class CLIApplicationComponent(ContainerComponent):
         :return: the application's exit code (0-127; ``None`` = 0)
         """
 
+
 component_types = PluginContainer('asphalt.components', Component)
