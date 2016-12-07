@@ -1,4 +1,4 @@
-Sphinx >= 1.5b1
+Sphinx >= 1.5
 sphinx_rtd_theme
 sphinx-autodoc-typehints >= 1.0.5
 sphinxcontrib-asyncio >= 0.2.0
