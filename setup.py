@@ -23,7 +23,7 @@ setup(
         'License :: OSI Approved :: Apache Software License',
         'Topic :: Software Development :: Libraries :: Application Frameworks',
         'Programming Language :: Python',
-        'Programming Language :: Python :: 3',
+        'Programming Language :: Python :: 3 :: Only',
         'Programming Language :: Python :: 3.5'
     ],
     license='Apache License 2.0',
@@ -34,6 +34,7 @@ setup(
     setup_requires=[
         'setuptools_scm >= 1.7.0'
     ],
+    python_requires='>=3.5',
     install_requires=[
         'setuptools',  # this is here to tell downstream packagers that it needs pkg_resources
         'ruamel.yaml >= 0.12',
