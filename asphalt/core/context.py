@@ -300,7 +300,7 @@ class Context:
         self.resource_removed.dispatch(resource)
 
     async def request_resource(self, type: Union[str, type], alias: str = 'default', *,
-                               timeout: Union[int, None] = None):
+                               timeout: Union[int, float, None] = None):
         """
         Request a resource matching the given type and alias.
 
