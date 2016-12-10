@@ -45,7 +45,13 @@ setup(
     ],
     extras_require={
         'uvloop': ['uvloop >= 0.4.10'],
-        'gevent': ['aiogevent >= 0.2']
+        'gevent': ['aiogevent >= 0.2'],
+        'testing': [
+            'pytest',
+            'pytest-asyncio',
+            'pytest-catchlog',
+            'pytest-cov'
+        ]
     },
     entry_points={
         'console_scripts': [
