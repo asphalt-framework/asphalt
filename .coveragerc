@@ -1,5 +1,6 @@
 [run]
 source = asphalt.core
+branch = 1
 
 [report]
 show_missing = true

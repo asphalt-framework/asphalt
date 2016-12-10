@@ -96,6 +96,12 @@ class TestPluginContainer:
         assert container.names == ['dummy']
 
     def test_all(self, container):
+        """
+        Test that all() returns the same results before and after the entry points have been
+        loaded.
+
+        """
+        assert container.all() == [DummyPlugin]
         assert container.all() == [DummyPlugin]
 
     def test_repr(self, container):
