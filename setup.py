@@ -33,9 +33,10 @@ setup(
         'asphalt.core'
     ],
     setup_requires=[
+        'setuptools >= 24.2.1',
         'setuptools_scm >= 1.7.0'
     ],
-    python_requires='>=3.5',
+    python_requires='>= 3.5',
     install_requires=[
         'setuptools',  # this is here to tell downstream packagers that it needs pkg_resources
         'ruamel.yaml >= 0.12',
