@@ -194,11 +194,11 @@ class to it::
 
     import asyncio
     import logging
-    from asyncio.events import get_event_loop
 
     import aiohttp
+    from async_generator import yield_
 
-    from asphalt.core import Component, Event, Signal
+    from asphalt.core import Component, Event, Signal, context_finisher
 
     logger = logging.getLogger(__name__)
 
@@ -253,17 +253,20 @@ Asphalt application::
             self.url = url
             self.delay = delay
 
+        @context_finisher
         async def start(self, ctx):
-            def shutdown(event):
-                task.cancel()
-                logging.info('Shut down web page change detector')
-
             detector = Detector(self.url, self.delay)
             ctx.publish_resource(detector, context_attr='detector')
-            task = get_event_loop().create_task(detector.run())
-            ctx.finished.connect(shutdown)
+            task = asyncio.get_event_loop().create_task(detector.run())
             logging.info('Started web page change detector for url "%s" with a delay of %d seconds',
                          self.url, self.delay)
+
+            # Can be replaced with plain "yield" on Python 3.6+
+            await yield_()
+
+            # This part is run when the context is finished
+            task.cancel()
+            logging.info('Shut down web page change detector')
 
 The component's ``start()`` method starts the detector's ``run()`` method as a new task, publishes
 the detector object as resource and installs an event listener that will shut down the detector

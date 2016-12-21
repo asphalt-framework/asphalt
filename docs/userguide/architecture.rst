@@ -39,7 +39,7 @@ set of responsibilities:
 #. Validate the configuration
 #. Publish resources (in :meth:`~asphalt.core.component.Component.start`)
 #. Close/shut down/cleanup resources when the context is finished (by adding a callback on the
-   ``finished`` signal of the context)
+   ``finished`` signal of the context, or by using :func:`~asphalt.core.context.context_finisher`)
 
 In the :meth:`~asphalt.core.component.Component.start` method, the component receives a
 :class:`~asphalt.core.context.Context` as its only argument. The component can use the context to

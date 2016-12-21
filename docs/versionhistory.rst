@@ -5,6 +5,8 @@ This library adheres to `Semantic Versioning <http://semver.org/>`_.
 
 **2.2.0**
 
+- Added a decorator for handling resource cleanup after a context finish
+  (``asphalt.core.context.context_finisher``)
 - Log a message on startup that indicates whether optimizations (``-O`` or ``PYTHONOPTIMIZE``) are
   enabled
 
