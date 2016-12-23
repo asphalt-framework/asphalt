@@ -82,8 +82,8 @@ class Signal:
     itself on instance level access. Connecting listeners and dispatching events only works with
     these bound instances.
 
-    Each signal must be assigned to a class attribute, but only once. Assigning the same Signal
-    instance to more than one attribute will raise a :exc:`LookupError` on attribute access.
+    Each signal must be assigned to a class attribute, but only once. The Signal will not function
+    correctly if the same Signal instance is assigned to multiple attributes.
 
     :param event_class: an event class
     """
@@ -104,14 +104,10 @@ class Signal:
         if instance is None:
             return self
 
-        # Find the attribute this Signal was assigned to
+        # Find the attribute this Signal was assigned to (needed only on Python 3.5)
         if self.topic is None:
-            attrnames = [attr for attr, value in getmembers(owner, lambda value: value is self)]
-            if len(attrnames) > 1:
-                raise LookupError('this Signal was assigned to multiple attributes: ' +
-                                  ', '.join(attrnames))
-            else:
-                self.topic = attrnames[0]
+            self.topic = next(
+                attr for attr, value in getmembers(owner, lambda value: value is self))
 
         try:
             return self.bound_signals[instance]
@@ -119,6 +115,9 @@ class Signal:
             bound_signal = Signal(self.event_class, source=instance, topic=self.topic)
             self.bound_signals[instance] = bound_signal
             return bound_signal
+
+    def __set_name__(self, owner, name) -> None:
+        self.topic = name
 
     def connect(self, callback: Callable[[Event], Any]) -> Callable[[Event], Any]:
         """

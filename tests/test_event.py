@@ -49,24 +49,6 @@ class TestSignal:
 
         assert EventSource.dummysignal is signal
 
-    def test_multi_attribute_assignment(self):
-        """
-        Test that assigning the signal object to multiple class attributes raises a ``LookupError``
-        on instance attribute access.
-
-        """
-        signal = Signal(DummyEvent)
-
-        class EventSource:
-            dummysignal = signal
-            dummysignal2 = signal
-
-        with pytest.raises(LookupError) as exc:
-            getattr(EventSource(), 'dummysignal')
-
-        assert str(exc.value) == \
-            'this Signal was assigned to multiple attributes: dummysignal, dummysignal2'
-
     @pytest.mark.asyncio
     async def test_disconnect(self, source):
         """Test that an event listener no longer receives events after it's been removed."""
