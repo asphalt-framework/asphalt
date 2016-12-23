@@ -27,7 +27,7 @@ What this will do is:
 
 #. read all the given configuration files, starting from ``yourconfig.yaml``
 #. merge the configuration files' contents into a single configuration dictionary using
-    :func:`~asphalt.core.util.merge_config`
+    :func:`~asphalt.core.utils.merge_config`
 #. call :func:`~asphalt.core.runner.run_application` using the configuration dictionary as keyword
     arguments
 
@@ -87,7 +87,7 @@ In the above configuration you have three top level configuration keys: ``compon
 The ``component`` section defines the type of the root component using the specially processed
 ``type`` option. You can either specify a setuptools entry point name (from the
 ``asphalt.components`` namespace) or a text reference like ``module:class`` (see
-:func:`~asphalt.core.util.resolve_reference` for details). The rest of the keys in this section are
+:func:`~asphalt.core.utils.resolve_reference` for details). The rest of the keys in this section are
 passed directly to the constructor of the ``MyRootComponent`` class.
 
 The ``components`` section within ``component`` is processed in a similar fashion.

@@ -8,7 +8,7 @@ from typing import Optional, Callable, Any, Union, Iterable, Sequence, Dict  # n
 from typeguard import check_argument_types
 
 from asphalt.core.event import Signal, Event
-from asphalt.core.util import qualified_name
+from asphalt.core.utils import qualified_name
 
 __all__ = ('Resource', 'ResourceEvent', 'ResourceConflict', 'ResourceNotFound',
            'ContextFinishEvent', 'Context')

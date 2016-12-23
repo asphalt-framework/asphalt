@@ -9,7 +9,7 @@ from typeguard import check_argument_types
 
 from asphalt.core.component import Component, component_types
 from asphalt.core.context import Context
-from asphalt.core.util import PluginContainer, qualified_name
+from asphalt.core.utils import PluginContainer, qualified_name
 
 __all__ = ('run_application',)
 

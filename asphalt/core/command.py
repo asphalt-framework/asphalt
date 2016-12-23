@@ -4,7 +4,7 @@ import click
 from ruamel import yaml
 
 from asphalt.core.runner import run_application, policies
-from asphalt.core.util import merge_config
+from asphalt.core.utils import merge_config
 
 
 @click.group()

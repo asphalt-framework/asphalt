@@ -13,7 +13,7 @@ from asyncio_extras.asyncyield import yield_async
 from asyncio_extras.generator import async_generator
 from typeguard import check_argument_types
 
-from asphalt.core.util import qualified_name
+from asphalt.core.utils import qualified_name
 
 __all__ = ('Event', 'EventDispatchError', 'Signal', 'wait_event', 'stream_events')
 

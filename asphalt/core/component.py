@@ -9,7 +9,7 @@ from warnings import warn
 from typeguard import check_argument_types
 
 from asphalt.core.context import Context
-from asphalt.core.util import PluginContainer, merge_config, qualified_name
+from asphalt.core.utils import PluginContainer, merge_config, qualified_name
 
 __all__ = ('Component', 'ContainerComponent', 'CLIApplicationComponent')
 

@@ -4,7 +4,7 @@ from unittest.mock import Mock
 import pytest
 from pkg_resources import EntryPoint
 
-from asphalt.core.util import resolve_reference, qualified_name, PluginContainer, merge_config
+from asphalt.core.utils import resolve_reference, qualified_name, PluginContainer, merge_config
 
 
 class BaseDummyPlugin:
