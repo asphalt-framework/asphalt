@@ -6,6 +6,8 @@ This library adheres to `Semantic Versioning <http://semver.org/>`_.
 **3.0.0**
 
 - **BACKWARD INCOMPATIBLE** Renamed the ``asphalt.core.util`` module to ``asphalt.core.utils``
+- **BACKWARD INCOMPATIBLE** Removed the ``monotime`` attribute from the
+  ``asphalt.core.event.Event`` class
 - Switched from ``asyncio_extras`` to ``async_generator`` as the async generator compatibility
   library
 

@@ -3,7 +3,7 @@ import weakref
 from asyncio import Future, get_event_loop, Queue, InvalidStateError
 from datetime import datetime, timezone
 from inspect import isawaitable, iscoroutine, getmembers
-from time import time, monotonic
+from time import time
 from traceback import format_exception
 from types import CoroutineType
 from typing import Callable, Any, Sequence, Tuple, Optional
@@ -27,19 +27,17 @@ class Event:
     :param source: the object where this event originated from
     :param topic: the event topic
 
-    :ivar source: the object where this event was dispatched from
+    :ivar source: the object where this event originated from
     :ivar str topic: the topic
     :ivar float time: event creation time as seconds from the UNIX epoch
-    :ivar float monotime: event creation time, as returned by :func:`time.monotonic`
     """
 
-    __slots__ = 'source', 'topic', 'time', 'monotime'
+    __slots__ = 'source', 'topic', 'time'
 
     def __init__(self, source, topic: str):
         self.source = source
         self.topic = topic
         self.time = time()
-        self.monotime = monotonic()
 
     @property
     def utc_timestamp(self) -> datetime:
