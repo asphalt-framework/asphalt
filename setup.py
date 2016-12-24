@@ -41,7 +41,6 @@ setup(
         'setuptools',  # this is here to tell downstream packagers that it needs pkg_resources
         'ruamel.yaml >= 0.12',
         'typeguard >= 1.1.3',
-        'asyncio_extras',
         'async-generator ~= 1.4',
         'click >= 6.6'
     ],

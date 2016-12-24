@@ -9,8 +9,8 @@ from types import CoroutineType
 from typing import Callable, Any, Sequence, Tuple, Optional
 from weakref import WeakKeyDictionary
 
-from asyncio_extras.asyncyield import yield_async
-from asyncio_extras.generator import async_generator
+from async_generator import async_generator
+from async_generator import yield_
 from typeguard import check_argument_types
 
 from asphalt.core.utils import qualified_name
@@ -290,7 +290,7 @@ async def stream_events(*signals: Signal, max_queue_size: int = 0):
     try:
         while True:
             event = await queue.get()
-            await yield_async(event)
+            await yield_(event)
     finally:
         for signal in signals:
             signal.disconnect(queue.put_nowait)
