@@ -3,6 +3,7 @@ import logging
 from difflib import HtmlDiff
 
 from asphalt.core import CLIApplicationComponent
+from async_generator import aclosing
 
 from webnotifier.detector import ChangeDetectorComponent
 
@@ -17,8 +18,9 @@ class ApplicationComponent(CLIApplicationComponent):
 
     async def run(self, ctx):
         diff = HtmlDiff()
-        async for event in ctx.detector.changed.stream_events():
-            difference = diff.make_file(event.old_lines, event.new_lines, context=True)
-            await ctx.mailer.create_and_deliver(
-                subject='Change detected in %s' % event.source.url, html_body=difference)
-            logger.info('Sent notification email')
+        async with aclosing(ctx.detector.changed.stream_events()) as stream:
+            async for event in stream:
+                difference = diff.make_file(event.old_lines, event.new_lines, context=True)
+                await ctx.mailer.create_and_deliver(
+                    subject='Change detected in %s' % event.source.url, html_body=difference)
+                logger.info('Sent notification email')

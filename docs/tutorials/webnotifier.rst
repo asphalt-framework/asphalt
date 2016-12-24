@@ -273,6 +273,9 @@ when the context finishes.
 Now that you've moved the change detection code to its own module, ``ApplicationComponent`` will
 become somewhat lighter::
 
+    from async_generator import aclosing
+
+
     class ApplicationComponent(CLIApplicationComponent):
         async def start(self, ctx):
             self.add_component('detector', ChangeDetectorComponent, url='http://imgur.com')
@@ -283,11 +286,12 @@ become somewhat lighter::
 
         async def run(self, ctx):
             diff = HtmlDiff()
-            async for event in ctx.detector.changed.stream_events():
-                difference = diff.make_file(event.old_lines, event.new_lines, context=True)
-                await ctx.mailer.create_and_deliver(
-                    subject='Change detected in %s' % event.source.url, html_body=difference)
-                logger.info('Sent notification email')
+            async with aclosing(ctx.detector.changed.stream_events()) as stream:
+                async for event in stream:
+                    difference = diff.make_file(event.old_lines, event.new_lines, context=True)
+                    await ctx.mailer.create_and_deliver(
+                        subject='Change detected in %s' % event.source.url, html_body=difference)
+                    logger.info('Sent notification email')
 
 The main application component will now use the detector resource published by
 ``ChangeDetectorComponent``. It adds one event listener which reacts to change events by creating

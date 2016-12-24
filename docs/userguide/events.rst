@@ -87,9 +87,13 @@ Receiving events iteratively
 With :meth:`~asphalt.core.event.Signal.stream_events`, you can even asynchronously iterate over
 events dispatched from a signal::
 
+    from async_generator import aclosing
+
+
     async def listen_to_events(source):
-        async for event in source.somesignal.stream_events():
-            print(event)
+        async with aclosing(source.somesignal.stream_events()) as stream:
+            async for event in events:
+                print(event)
 
 Using :func:`~asphalt.core.event.stream_events`, you can stream events from multiple signals::
 
@@ -97,7 +101,8 @@ Using :func:`~asphalt.core.event.stream_events`, you can stream events from mult
 
 
     async def listen_to_events(source1, source2, source3):
-        async for event in stream_events(source1.some_signal, source2.another_signal,
-                                         source3.some_signal):
-            print(event)
+        stream = stream_events(source1.some_signal, source2.another_signal, source3.some_signal)
+        async with aclosing(stream):
+            async for event in stream):
+                print(event)
 
