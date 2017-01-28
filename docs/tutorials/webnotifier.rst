@@ -141,8 +141,6 @@ And to make the the results look nicer in an email message, you can switch to us
 
     from difflib import HtmlDiff
 
-    from asphalt.core import ContainerComponent
-
 
     class ApplicationComponent(CLIApplicationComponent):
         async def start(self, ctx):
