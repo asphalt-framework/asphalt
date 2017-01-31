@@ -5,6 +5,7 @@ This library adheres to `Semantic Versioning <http://semver.org/>`_.
 
 **2.2.0**
 
+- Fixed memory leak which prevented objects containing Signals from being garbage collected
 - Added a decorator for handling resource cleanup after a context finish
   (``asphalt.core.context.context_finisher``)
 - Log a message on startup that indicates whether optimizations (``-O`` or ``PYTHONOPTIMIZE``) are

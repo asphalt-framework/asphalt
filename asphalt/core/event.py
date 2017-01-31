@@ -1,4 +1,5 @@
 import logging
+import weakref
 from asyncio import Future, get_event_loop, Queue, InvalidStateError
 from datetime import datetime, timezone
 from inspect import isawaitable, iscoroutine, getmembers
@@ -94,7 +95,7 @@ class Signal:
         self.event_class = event_class
         self.topic = topic
         if source is not None:
-            self.source = source
+            self.source = weakref.ref(source)
             self.listeners = []
         else:
             self.bound_signals = WeakKeyDictionary()
@@ -239,7 +240,7 @@ class Signal:
 
         """
         assert check_argument_types()
-        event = self.event_class(self.source, self.topic, *args, **kwargs)
+        event = self.event_class(self.source(), self.topic, *args, **kwargs)
         return self.dispatch_event(event, return_future=return_future)
 
     def wait_event(self) -> CoroutineType:

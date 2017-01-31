@@ -2,6 +2,7 @@ import asyncio
 from asyncio.futures import Future
 from datetime import datetime, timezone
 
+import gc
 import pytest
 
 from asphalt.core.event import Event, EventDispatchError, Signal, stream_events, wait_event
@@ -196,6 +197,21 @@ class TestSignal:
             last_number += 1
             if last_number == 3:
                 break
+
+    def test_memory_leak(self):
+        """
+        Test that activating a Signal does not prevent its owner object from being garbage
+        collected.
+
+        """
+        class SignalOwner:
+            dummy = Signal(Event)
+
+        owner = SignalOwner()
+        owner.dummy
+        del owner
+        gc.collect()  # needed on PyPy
+        assert next((x for x in gc.get_objects() if isinstance(x, SignalOwner)), None) is None
 
 
 @pytest.mark.asyncio
