@@ -5,9 +5,8 @@ from itertools import count
 import pytest
 from async_generator import yield_
 
-from asphalt.core.context import ResourceConflict, ResourceNotFound, Resource, Context, \
-    context_finisher
-from asphalt.core.event import EventDispatchError
+from asphalt.core.context import (
+    ResourceConflict, ResourceNotFound, Resource, Context, context_finisher)
 
 
 class TestResource:
