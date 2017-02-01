@@ -3,7 +3,7 @@ Version history
 
 This library adheres to `Semantic Versioning <http://semver.org/>`_.
 
-**2.2.0**
+**2.1.1** (2017-02-01)
 
 - Fixed memory leak which prevented objects containing Signals from being garbage collected
 - Log a message on startup that indicates whether optimizations (``-O`` or ``PYTHONOPTIMIZE``) are
