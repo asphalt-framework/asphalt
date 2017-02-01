@@ -5,8 +5,7 @@ from itertools import count
 import pytest
 from async_generator import yield_
 
-from asphalt.core.context import (
-    ResourceConflict, ResourceNotFound, Resource, Context, context_finisher)
+from asphalt.core.context import ResourceConflict, ResourceNotFound, Resource, Context
 
 
 class TestResource:
@@ -321,91 +320,3 @@ class TestContext:
 
         assert subcontext.get_resources() == [resource1, resource2, resource3]
         assert subcontext.get_resources(include_parents=False) == [resource2]
-
-
-class TestContextFinisher:
-    @pytest.mark.parametrize('expected_exc', [
-        None, Exception('foo')
-    ], ids=['no_exception', 'exception'])
-    @pytest.mark.asyncio
-    async def test_function(self, expected_exc):
-        @context_finisher
-        async def start(ctx: Context):
-            nonlocal phase, received_exception
-            phase = 'started'
-            exc = await yield_()
-            phase = 'finished'
-            received_exception = exc
-
-        phase = received_exception = None
-        context = Context()
-        await start(context)
-        assert phase == 'started'
-
-        await context.finished.dispatch(expected_exc, return_future=True)
-        assert phase == 'finished'
-        assert received_exception == expected_exc
-
-    @pytest.mark.parametrize('expected_exc', [
-        None, Exception('foo')
-    ], ids=['no_exception', 'exception'])
-    @pytest.mark.asyncio
-    async def test_method(self, expected_exc):
-        class SomeComponent:
-            @context_finisher
-            async def start(self, ctx: Context):
-                nonlocal phase, received_exception
-                phase = 'started'
-                exc = await yield_()
-                phase = 'finished'
-                received_exception = exc
-
-        phase = received_exception = None
-        context = Context()
-        await SomeComponent().start(context)
-        assert phase == 'started'
-
-        await context.finished.dispatch(expected_exc, return_future=True)
-        assert phase == 'finished'
-        assert received_exception == expected_exc
-
-    def test_plain_function(self):
-        def start(ctx):
-            pass
-
-        pytest.raises(TypeError, context_finisher, start).\
-            match(' must be an async generator function')
-
-    @pytest.mark.asyncio
-    async def test_bad_args(self):
-        @context_finisher
-        async def start(ctx):
-            pass
-
-        with pytest.raises(RuntimeError) as exc_info:
-            await start(None)
-
-        exc_info.match('either the first or second argument needs to be a Context instance')
-
-    @pytest.mark.asyncio
-    async def test_exception(self):
-        @context_finisher
-        async def start(ctx):
-            raise Exception('dummy error')
-
-        context = Context()
-        with pytest.raises(Exception) as exc_info:
-            await start(context)
-
-        exc_info.match('dummy error')
-
-    @pytest.mark.asyncio
-    async def test_missing_yield(self):
-        @context_finisher
-        async def start(ctx: Context):
-            pass
-
-        with pytest.raises(RuntimeError) as exc_info:
-            await start(Context())
-
-        exc_info.match(' did not do "await yield_\(\)"$')

@@ -1,20 +1,17 @@
 import re
-from asyncio import Future, TimeoutError, wait_for, ensure_future, iscoroutine, iscoroutinefunction
-from functools import wraps
+from asyncio import Future, TimeoutError, wait_for, ensure_future, iscoroutine
+from collections import defaultdict
 from inspect import isawaitable, getattr_static
 from itertools import chain
 from typing import Optional, Callable, Any, Union, Iterable, Sequence, Dict  # noqa
 
-from collections import defaultdict
-
-from async_generator import isasyncgenfunction, async_generator
 from typeguard import check_argument_types
 
 from asphalt.core.event import Signal, Event
 from asphalt.core.util import qualified_name
 
 __all__ = ('Resource', 'ResourceEvent', 'ResourceConflict', 'ResourceNotFound',
-           'ContextFinishEvent', 'Context', 'context_finisher')
+           'ContextFinishEvent', 'Context')
 
 
 class Resource:
@@ -381,65 +378,3 @@ class Context:
             resources = (resource for resource in resources if resource_type in resource.types)
 
         return sorted(resources, key=lambda resource: (resource.types, resource.alias))
-
-
-def context_finisher(func: Callable):
-    """
-    Wrap an async generator function to handle the context finish callback.
-
-    This function returns an async function, which, when called, starts the wrapped async
-    generator. The wrapped async function is run until the first ``yield`` statement
-    (``await async_generator.yield_()`` on Python 3.5). When the context is finished,
-    the generator's ``yield`` statement will return the exception contained in the finish event,
-    if any.
-
-    For example::
-
-        class SomeComponent(Component):
-            @context_finisher
-            async def start(self, ctx: Context):
-                service = SomeService()
-                ctx.publish_resource(service)
-                yield
-                service.stop()
-
-    :param func: an async generator function
-    :return: an async function
-
-    """
-    @wraps(func)
-    async def wrapper(*args, **kwargs) -> None:
-        async def finish_callback(event: ContextFinishEvent):
-            try:
-                await generator.asend(event.exception)
-            except StopAsyncIteration:
-                pass
-            finally:
-                await generator.aclose()
-
-        if len(args) > 0 and isinstance(args[0], Context):
-            ctx = args[0]
-        elif len(args) > 1 and isinstance(args[1], Context):
-            ctx = args[1]
-        else:
-            raise RuntimeError('either the first or second argument needs to be a '
-                               'Context instance')
-
-        generator = func(*args, **kwargs)
-        try:
-            await generator.asend(None)
-        except StopAsyncIteration:
-            raise RuntimeError('{} did not do "await yield_()"'.format(qualified_name(func)))
-        except Exception:
-            await generator.aclose()
-            raise
-        else:
-            ctx.finished.connect(finish_callback)
-
-    if iscoroutinefunction(func):
-        func = async_generator(func)
-    elif not isasyncgenfunction(func):
-        raise TypeError('{} must be an async generator function'.
-                        format(qualified_name(func)))
-
-    return wrapper
