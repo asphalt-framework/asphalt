@@ -8,7 +8,7 @@ from typing import Optional, Callable, Any, Union, Iterable, Sequence, Dict  # n
 from typeguard import check_argument_types
 
 from asphalt.core.event import Signal, Event
-from asphalt.core.utils import qualified_name
+from asphalt.core.utils import qualified_name, callable_name
 
 __all__ = ('Resource', 'ResourceEvent', 'ResourceConflict', 'ResourceNotFound',
            'ContextFinishEvent', 'Context')
@@ -53,7 +53,7 @@ class Resource:
     def __str__(self):
         return ('types={0.types!r}, alias={0.alias!r}, value={0.value!r}, '
                 'context_attr={0.context_attr!r}, creator={1}'
-                .format(self, qualified_name(self.creator) if self.creator else None))
+                .format(self, callable_name(self.creator) if self.creator else None))
 
 
 class ResourceEvent(Event):

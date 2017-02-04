@@ -4,7 +4,8 @@ from unittest.mock import Mock
 import pytest
 from pkg_resources import EntryPoint
 
-from asphalt.core.utils import resolve_reference, qualified_name, PluginContainer, merge_config
+from asphalt.core.utils import resolve_reference, qualified_name, PluginContainer, merge_config, \
+    callable_name
 
 
 class BaseDummyPlugin:
@@ -17,7 +18,7 @@ class DummyPlugin(BaseDummyPlugin):
 
 
 @pytest.mark.parametrize('inputval', [
-    'asphalt.core.util:resolve_reference',
+    'asphalt.core.utils:resolve_reference',
     resolve_reference
 ], ids=['reference', 'object'])
 def test_resolve_reference(inputval):
@@ -46,7 +47,7 @@ def test_merge_config(overrides):
 
 
 @pytest.mark.parametrize('inputval, expected', [
-    (qualified_name, 'asphalt.core.util.qualified_name'),
+    (qualified_name, 'function'),
     (asyncio.Event(), 'asyncio.locks.Event'),
     (int, 'int')
 ], ids=['func', 'instance', 'builtintype'])
@@ -54,18 +55,26 @@ def test_qualified_name(inputval, expected):
     assert qualified_name(inputval) == expected
 
 
+@pytest.mark.parametrize('inputval, expected', [
+    (qualified_name, 'asphalt.core.utils.qualified_name'),
+    (len, 'len')
+], ids=['python', 'builtin'])
+def test_callable_name(inputval, expected):
+    assert callable_name(inputval) == expected
+
+
 class TestPluginContainer:
     @pytest.fixture
     def container(self):
         container = PluginContainer('asphalt.core.test_plugin_container', BaseDummyPlugin)
-        entrypoint = EntryPoint('dummy', 'test_util')
+        entrypoint = EntryPoint('dummy', 'test_utils')
         entrypoint.load = Mock(return_value=DummyPlugin)
         container._entrypoints = {'dummy': entrypoint}
         return container
 
     @pytest.mark.parametrize('inputvalue', [
         'dummy',
-        'test_util:DummyPlugin',
+        'test_utils:DummyPlugin',
         DummyPlugin
     ], ids=['entrypoint', 'reference', 'arbitrary_object'])
     def test_resolve(self, container, inputvalue):
@@ -75,7 +84,7 @@ class TestPluginContainer:
         exc = pytest.raises(LookupError, container.resolve, 'blah')
         assert str(exc.value) == 'no such entry point in asphalt.core.test_plugin_container: blah'
 
-    @pytest.mark.parametrize('argument', [DummyPlugin, 'dummy', 'test_util:DummyPlugin'],
+    @pytest.mark.parametrize('argument', [DummyPlugin, 'dummy', 'test_utils:DummyPlugin'],
                              ids=['explicit_class', 'entrypoint', 'class_reference'])
     def test_create_object(self, container, argument):
         """
@@ -90,7 +99,7 @@ class TestPluginContainer:
 
     def test_create_object_bad_type(self, container):
         exc = pytest.raises(TypeError, container.create_object, int)
-        assert str(exc.value) == 'int is not a subclass of test_util.BaseDummyPlugin'
+        assert str(exc.value) == 'int is not a subclass of test_utils.BaseDummyPlugin'
 
     def test_names(self, container):
         assert container.names == ['dummy']
@@ -107,4 +116,4 @@ class TestPluginContainer:
     def test_repr(self, container):
         assert repr(container) == (
             "PluginContainer(namespace='asphalt.core.test_plugin_container', "
-            "base_class=test_util.BaseDummyPlugin)")
+            "base_class=test_utils.BaseDummyPlugin)")

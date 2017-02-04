@@ -1,10 +1,12 @@
 from importlib import import_module
-from typing import Any, Union, List, Dict
+from inspect import isclass
+from typing import Any, Union, List, Dict, Callable
 
 from pkg_resources import EntryPoint, iter_entry_points
 from typeguard import check_argument_types
 
-__all__ = ('resolve_reference', 'qualified_name', 'merge_config', 'PluginContainer')
+__all__ = ('resolve_reference', 'qualified_name', 'callable_name', 'merge_config',
+           'PluginContainer')
 
 
 def resolve_reference(ref):
@@ -35,22 +37,34 @@ def resolve_reference(ref):
     try:
         for name in rest.split('.'):
             obj = getattr(obj, name)
+
         return obj
     except AttributeError:
         raise LookupError('error resolving reference {}: error looking up object'.format(ref))
 
 
 def qualified_name(obj) -> str:
-    """Return the qualified name (e.g. package.module.Type) for the given object."""
-    try:
-        module = obj.__module__
-        qualname = obj.__qualname__
-    except AttributeError:
-        type_ = type(obj)
-        module = type_.__module__
-        qualname = type_.__qualname__
+    """
+    Return the qualified name (e.g. package.module.Type) for the given object.
 
-    return qualname if module in ('typing', 'builtins') else '{}.{}'.format(module, qualname)
+    If ``obj`` is not a class, the returned name will match its type instead.
+
+    """
+    if not isclass(obj):
+        obj = type(obj)
+
+    if obj.__module__ == 'builtins':
+        return obj.__name__
+    else:
+        return '{}.{}'.format(obj.__module__, obj.__qualname__)
+
+
+def callable_name(func: Callable) -> str:
+    """Return the qualified name (e.g. package.module.func) for the given callable."""
+    if func.__module__ == 'builtins':
+        return func.__name__
+    else:
+        return '{}.{}'.format(func.__module__, func.__qualname__)
 
 
 def merge_config(original: Dict[str, Any], overrides: Dict[str, Any]) -> Dict[str, Any]:
