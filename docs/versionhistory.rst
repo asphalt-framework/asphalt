@@ -11,6 +11,9 @@ This library adheres to `Semantic Versioning <http://semver.org/>`_.
   ``asphalt.core.event.Event`` class
 - Switched from ``asyncio_extras`` to ``async_generator`` as the async generator compatibility
   library
+- Made the current event loop accessible (from any thread) as the ``loop`` property from any
+  ``asphalt.core.context.Context`` instance to make it easier to schedule execution of async code
+  from worker threads
 
 **2.1.1** (2017-02-01)
 

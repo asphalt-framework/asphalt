@@ -1,6 +1,5 @@
 import logging
 import sys
-import asyncio
 from unittest.mock import patch
 
 import pytest
@@ -27,11 +26,11 @@ class ShutdownComponent(Component):
         ctx.finished.connect(self.finish_callback)
 
         if self.method == 'stop':
-            asyncio.get_event_loop().stop()
+            ctx.loop.stop()
         elif self.method == 'exit':
-            asyncio.get_event_loop().call_later(0.1, sys.exit)
+            ctx.loop.call_later(0.1, sys.exit)
         elif self.method == 'keyboard':
-            asyncio.get_event_loop().call_later(0.1, self.press_ctrl_c)
+            ctx.loop.call_later(0.1, self.press_ctrl_c)
         elif self.method == 'exception':
             raise RuntimeError('this should crash the application')
 

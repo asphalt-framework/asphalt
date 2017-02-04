@@ -1,5 +1,5 @@
 import re
-from asyncio import Future, TimeoutError, wait_for, ensure_future, iscoroutine
+from asyncio import Future, TimeoutError, wait_for, ensure_future, iscoroutine, get_event_loop
 from collections import defaultdict
 from inspect import isawaitable, getattr_static
 from itertools import chain
@@ -123,6 +123,9 @@ class Context:
     :param default_timeout: default timeout for :meth:`request_resource` if omitted from the call
         arguments
 
+    :ivar loop: the event loop associated with the context (comes from the parent context, or
+        :func:`~asyncio.get_event_loop()` when no parent context is given)
+    :vartype loop: asyncio.AbstractEventLoop
     :var Signal finished: a signal (:class:`ContextFinishEvent`) dispatched when the context has
         served its purpose and is being discarded
     :var Signal resource_published: a signal (:class:`ResourceEvent`) dispatched when a resource
@@ -141,6 +144,7 @@ class Context:
         self._resources = defaultdict(dict)  # type: Dict[str, Dict[str, Resource]]
         self._lazy_resources = {}  # type: Dict[str, Resource]
         self.default_timeout = default_timeout
+        self.loop = parent.loop if parent is not None else get_event_loop()
 
     def __getattr__(self, name):
         # First look for a lazy resource in the whole context chain
