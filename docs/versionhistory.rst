@@ -5,6 +5,7 @@ This library adheres to `Semantic Versioning <http://semver.org/>`_.
 
 **3.0.0**
 
+- **BACKWARD INCOMPATIBLE** Upped the minimum Python version to 3.5.2 from 3.5.0
 - **BACKWARD INCOMPATIBLE** Renamed the ``asphalt.core.util`` module to ``asphalt.core.utils``
 - **BACKWARD INCOMPATIBLE** Removed the ``monotime`` attribute from the
   ``asphalt.core.event.Event`` class
