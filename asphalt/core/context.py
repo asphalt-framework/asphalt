@@ -58,10 +58,10 @@ class Resource:
 
 class ResourceEvent(Event):
     """
-    Dispatched when a resource has been published to or removed from a context.
+    Dispatched when a resource has been published to a context.
 
     :ivar Context source: the relevant context
-    :ivar Resource resource: the resource that was published or removed
+    :ivar Resource resource: the resource that was published
     """
 
     __slots__ = 'resource'
@@ -130,13 +130,10 @@ class Context:
         served its purpose and is being discarded
     :var Signal resource_published: a signal (:class:`ResourceEvent`) dispatched when a resource
         has been published in this context
-    :var Signal resource_removed: a signal (:class:`ResourceEvent`): dispatched when a resource has
-        been removed from this context
     """
 
     finished = Signal(ContextFinishEvent)
     resource_published = Signal(ResourceEvent)
-    resource_removed = Signal(ResourceEvent)
 
     def __init__(self, parent: 'Context' = None, *, default_timeout: int = 5):
         assert check_argument_types()
@@ -277,31 +274,6 @@ class Context:
         assert check_argument_types()
         assert callable(creator), 'creator must be callable'
         return self._publish_resource(None, alias, context_attr, types, creator)
-
-    def remove_resource(self, resource: Resource):
-        """
-        Remove the given resource from the collection and dispatch a ``resource_removed`` event.
-
-        :param resource: the resource to be removed
-        :raises LookupError: the given resource was not in the collection
-
-        """
-        assert check_argument_types()
-        try:
-            for typename in resource.types:
-                del self._resources[typename][resource.alias]
-        except KeyError:
-            raise LookupError('{!r} not found in this context'.format(resource)) from None
-
-        # Remove the creator from the resource creators
-        if resource.creator is not None:
-            del self._lazy_resources[resource.context_attr]
-
-        # Remove the attribute from this context
-        if resource.context_attr and resource.context_attr in self.__dict__:
-            delattr(self, resource.context_attr)
-
-        self.resource_removed.dispatch(resource)
 
     async def request_resource(self, type: Union[str, type], alias: str = 'default', *,
                                timeout: Union[int, float, None] = None):

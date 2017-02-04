@@ -108,12 +108,9 @@ class TestContext:
         """
         Test that when resources are published, they are also set as properties of the context.
 
-        Likewise, when they are removed, they are deleted from the context.
         """
-        resource = context.publish_resource(1, context_attr='foo')
+        context.publish_resource(1, context_attr='foo')
         assert context.foo == 1
-        context.remove_resource(resource)
-        assert 'foo' not in context.__dict__
 
     @pytest.mark.asyncio
     async def test_publish_resource_conflicting_attribute(self, context):
@@ -212,29 +209,6 @@ class TestContext:
         assert subcontext.foo == id(subcontext)
 
     @pytest.mark.asyncio
-    async def test_remove_resource(self, context):
-        """Test that resources can be removed and that the listeners are notified."""
-        future = Future()
-        context.resource_removed.connect(future.set_result)
-        resource = context.publish_resource(4)
-        context.remove_resource(resource)
-
-        event = await future
-        assert event.resource.types == ('int',)
-
-        with pytest.raises(ResourceNotFound):
-            await context.request_resource(int, timeout=0)
-
-    @pytest.mark.asyncio
-    async def test_remove_nonexistent(self, context):
-        resource = Resource(5, ('int',), 'default', None)
-        with pytest.raises(LookupError) as exc:
-            context.remove_resource(resource)
-
-        assert str(exc.value) == ("Resource(types=('int',), alias='default', value=5, "
-                                  "context_attr=None, creator=None) not found in this context")
-
-    @pytest.mark.asyncio
     async def test_request_timeout(self, context):
         with pytest.raises(ResourceNotFound) as exc:
             await context.request_resource(int, timeout=0.2)
@@ -285,18 +259,6 @@ class TestContext:
         context.publish_lazy_resource(lambda ctx: 6, int, context_attr='foo')
         await context.request_resource(int)
         assert context.__dict__['foo'] == 6
-
-    @pytest.mark.asyncio
-    async def test_remove_lazy_resource(self, context):
-        """
-        Test that the lazy resource is no longer created when it has been removed and its
-        context variable is accessed.
-
-        """
-        resource = context.publish_lazy_resource(lambda ctx: 6, int, context_attr='foo')
-        context.remove_resource(resource)
-        exc = pytest.raises(AttributeError, getattr, context, 'foo')
-        assert str(exc.value) == 'no such context variable: foo'
 
     @pytest.mark.asyncio
     async def test_get_resources(self, context):
