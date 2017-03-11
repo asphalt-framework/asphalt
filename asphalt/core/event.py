@@ -1,21 +1,18 @@
 import logging
 import weakref
-from asyncio import Future, get_event_loop, Queue, InvalidStateError
+from asyncio import get_event_loop, Queue, wait
 from datetime import datetime, timezone
-from inspect import isawaitable, iscoroutine, getmembers
+from inspect import isawaitable, getmembers
 from time import time
-from traceback import format_exception
-from types import CoroutineType
-from typing import Callable, Any, Sequence, Tuple, Optional
 from weakref import WeakKeyDictionary
+from typing import Callable, Any, Sequence, Awaitable, AsyncIterator
 
-from async_generator import async_generator
-from async_generator import yield_
+from async_generator import async_generator, aclosing, yield_
 from typeguard import check_argument_types
 
 from asphalt.core.utils import qualified_name
 
-__all__ = ('Event', 'EventDispatchError', 'Signal', 'wait_event', 'stream_events')
+__all__ = ('Event', 'Signal', 'wait_event', 'stream_events')
 
 logger = logging.getLogger(__name__)
 
@@ -50,26 +47,6 @@ class Event:
 
     def __repr__(self):
         return '{0.__class__.__name__}(source={0.source!r}, topic={0.topic!r})'.format(self)
-
-
-class EventDispatchError(Exception):
-    """
-    Raised when one or more event listener callbacks raise an exception.
-
-    The tracebacks of all the exceptions are displayed in the exception message.
-
-    :ivar Event event: the event
-    :ivar exceptions: a sequence containing tuples of (callback, exception) for each exception that
-        was raised by a listener callback
-    :vartype exceptions: Sequence[Tuple[Callable, Exception]]
-    """
-
-    def __init__(self, event: Event, exceptions: Sequence[Tuple[Callable, Exception]]):
-        message = '-------------------------------\n'.join(
-            ''.join(format_exception(type(exc), exc, exc.__traceback__)) for _, exc in exceptions)
-        super().__init__('error dispatching event:\n' + message)
-        self.event = event
-        self.exceptions = exceptions
 
 
 class Signal:
@@ -153,7 +130,7 @@ class Signal:
         except ValueError:
             pass
 
-    def dispatch_event(self, event: Event, *, return_future: bool = False) -> Optional[Future]:
+    def dispatch_event(self, event: Event) -> Awaitable[bool]:
         """
         Dispatch the given event to all listeners.
 
@@ -161,126 +138,93 @@ class Signal:
         the only argument. Coroutine callbacks are converted to their own respective tasks and
         waited for concurrently.
 
-        :param event: the event object to dispatch
-        :param return_future:
-            If ``True``, return a :class:`~asyncio.Future` that completes when all the listener
-            callbacks have been processed. If any one of them raised an exception, the future will
-            have an :exc:`~asphalt.core.event.EventDispatchError` exception set in it which
-            contains all of the exceptions raised in the callbacks.
+        Before the dispatching is done, a snapshot of the listeners is taken and the event is only
+        dispatched to those listeners, so adding a listener between the call to this method and the
+        actual dispatching will only affect future calls to this method.
 
-            If set to ``False``, then ``None`` will be returned, and any exceptions raised in
-            listener callbacks will be logged instead.
-        :returns: a future or ``None``, depending on the ``return_future`` argument
+        :param event: the event object to dispatch
+        :returns: an awaitable that completes when all the callbacks have been called (and any
+            awaitables waited on) and resolves to ``True`` if there were no exceptions raised by
+            the callbacks, ``False``otherwise
 
         """
-        async def do_dispatch():
-            futures, exceptions = [], []
+        async def do_dispatch(listeners) -> bool:
+            awaitables = []
+            all_successful = True
             for callback in listeners:
                 try:
                     retval = callback(event)
-                except Exception as e:
-                    exceptions.append((callback, e))
-                    if not return_future:
-                        logger.exception('uncaught exception in event listener')
+                except Exception:
+                    logger.exception('uncaught exception in event listener')
+                    all_successful = False
                 else:
                     if isawaitable(retval):
-                        if iscoroutine(retval):
-                            retval = loop.create_task(retval)
+                        awaitables.append(retval)
 
-                        futures.append((callback, retval))
+            # For any callbacks that returned awaitables, wait for their completion and log any
+            # exceptions they raised
+            if awaitables:
+                done, _ = await wait(awaitables, loop=loop)
+                for future in done:
+                    exc = future.exception()
+                    if exc is not None:
+                        all_successful = False
+                        logger.error('uncaught exception in event listener', exc_info=exc)
 
-            # For any callbacks that returned awaitables, wait for their completion and collect any
-            # exceptions they raise
-            for callback, awaitable in futures:
-                try:
-                    await awaitable
-                except Exception as e:
-                    exceptions.append((callback, e))
-                    if not return_future:
-                        logger.exception('uncaught exception in event listener')
-
-            if exceptions and return_future:
-                raise EventDispatchError(event, exceptions)
+            return all_successful
 
         assert isinstance(event, self.event_class), \
             'event must be of type {}'.format(qualified_name(self.event_class))
+        loop = get_event_loop()
         if self.listeners:
-            loop = get_event_loop()
-            listeners = self.listeners.copy()
-            future = loop.create_task(do_dispatch())
-            return future if return_future else None
-        elif return_future:
-            # The event has no listeners, so skip the task creation and return an empty Future
-            future = Future()
-            future.set_result(None)
-            return future
+            return loop.create_task(do_dispatch(list(self.listeners)))
         else:
-            return None
+            f = loop.create_future()
+            f.set_result(True)
+            return f
 
-    def dispatch(self, *args, return_future: bool = False, **kwargs) -> Optional[Future]:
+    def dispatch(self, *args, **kwargs) -> Awaitable[bool]:
         """
         Create and dispatch an event.
 
         This method constructs an event object and then passes it to :meth:`dispatch_event` for
         the actual dispatching.
 
-        :param args: positional arguments to the constructor of the associated event class.
-        :param return_future:
-            If ``True``, return a :class:`~asyncio.Future` that completes when all the listener
-            callbacks have been processed. If any one of them raised an exception, the future will
-            have an :exc:`~asphalt.core.event.EventDispatchError` exception set in it which
-            contains all of the exceptions raised in the callbacks.
-
-            If set to ``False``, then ``None`` will be returned, and any exceptions raised in
-            listener callbacks will be logged instead.
-        :returns: a future or ``None``, depending on the ``return_future`` argument
+        :param args: positional arguments to the constructor of the associated event class
+        :param kwargs: keyword arguments to the constructor of the associated event class
+        :returns: an awaitable that completes when all the callbacks have been called (and any
+            awaitables waited on) and resolves to ``True`` if there were no exceptions raised by
+            the callbacks, ``False``otherwise
 
         """
-        assert check_argument_types()
         event = self.event_class(self.source(), self.topic, *args, **kwargs)
-        return self.dispatch_event(event, return_future=return_future)
+        return self.dispatch_event(event)
 
-    def wait_event(self) -> CoroutineType:
-        """Shortcut for calling :func:`wait_event` with this signal as the argument."""
-        return wait_event(self)
+    def wait_event(self, filter: Callable[[Event], bool] = None) -> Awaitable[Event]:
+        """Shortcut for calling :func:`wait_event` with this signal in the first argument."""
+        return wait_event([self], filter)
 
-    def stream_events(self, max_queue_size: int = 0):
-        """Shortcut for calling :func:`stream_events` with this signal as the argument."""
-        return stream_events(self, max_queue_size=max_queue_size)
-
-
-async def wait_event(*signals: Signal) -> Event:
-    """Return the first event dispatched from any of the given signals."""
-    def callback(event):
-        # This might get called more than once before the signal is disconnected so guard against
-        # the exception raised in that situation
-        try:
-            future.set_result(event)
-        except InvalidStateError:
-            pass
-
-    future = Future()
-    for signal in signals:
-        signal.connect(callback)
-
-    try:
-        return await future
-    finally:
-        for signal in signals:
-            signal.disconnect(future.set_result)
+    def stream_events(self, filter: Callable[[Event], bool] = None, *, max_queue_size: int = 0):
+        """Shortcut for calling :func:`stream_events` with this signal in the first argument."""
+        return stream_events([self], filter, max_queue_size=max_queue_size)
 
 
 @async_generator
-async def stream_events(*signals: Signal, max_queue_size: int = 0):
+async def stream_events(signals: Sequence[Signal], filter: Callable[[Event], bool] = None, *,
+                        max_queue_size: int = 0) -> AsyncIterator[Event]:
     """
-    Generate event objects to the consumer as they're dispatched.
+    Return an async generator that yields events from the given signals.
 
-    This function is meant for use with ``async for``.
+    Only events that pass the filter callable (if one has been given) are returned.
+    If no filter function was given, all events are yielded from the generator.
 
-    :param signals: one or more signals to get events from
+    :param signals: the signals to get events from
+    :param filter: a callable that takes an event object as an argument and returns ``True`` if
+        the event should pass, ``False`` if not
     :param max_queue_size: maximum size of the queue, after which it will start to drop events
 
     """
+    assert check_argument_types()
     queue = Queue(max_queue_size)
     for signal in signals:
         signal.connect(queue.put_nowait)
@@ -288,7 +232,25 @@ async def stream_events(*signals: Signal, max_queue_size: int = 0):
     try:
         while True:
             event = await queue.get()
-            await yield_(event)
+            if filter is None or filter(event):
+                await yield_(event)
     finally:
         for signal in signals:
             signal.disconnect(queue.put_nowait)
+
+
+async def wait_event(signals: Sequence[Signal], filter: Callable[[Event], bool] = None) -> Event:
+    """
+    Wait until any of the given signals dispatches an event that satisfies the filter (if any).
+
+    If no filter has been given, the first event dispatched from the signal is returned.
+    
+    :param signals: the signals to get events from
+    :param filter: a callable that takes an event object as an argument and returns ``True`` if
+        the event should pass, ``False`` if not
+    :return: the event that was dispatched
+
+    """
+    assert check_argument_types()
+    async with aclosing(stream_events(signals, filter)) as events:
+        return await events.asend(None)

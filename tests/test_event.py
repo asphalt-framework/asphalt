@@ -1,11 +1,10 @@
-import asyncio
-from asyncio.futures import Future
+import gc
 from datetime import datetime, timezone
 
-import gc
 import pytest
+from async_generator import aclosing
 
-from asphalt.core.event import Event, EventDispatchError, Signal, stream_events, wait_event
+from asphalt.core import Event, Signal, stream_events, wait_event
 
 
 class DummyEvent(Event):
@@ -54,10 +53,10 @@ class TestSignal:
         """Test that an event listener no longer receives events after it's been removed."""
         events = []
         source.event_a.connect(events.append)
-        await source.event_a.dispatch(1, return_future=True)
+        assert await source.event_a.dispatch(1)
 
         source.event_a.disconnect(events.append)
-        await source.event_a.dispatch(2, return_future=True)
+        assert await source.event_a.dispatch(2)
 
         assert len(events) == 1
         assert events[0].args == (1,)
@@ -74,7 +73,7 @@ class TestSignal:
 
         events = []
         source.event_a.connect(callback)
-        await source.event_a.dispatch('x', 'y', return_future=True, a=1, b=2)
+        assert await source.event_a.dispatch('x', 'y', a=1, b=2)
 
         assert len(events) == 1
         assert events[0].args == ('x', 'y')
@@ -86,67 +85,41 @@ class TestSignal:
         events = []
         source.event_a.connect(events.append)
         event = DummyEvent(source, 'event_a', 'x', 'y', a=1, b=2)
-        await source.event_a.dispatch_event(event, return_future=True)
+        assert await source.event_a.dispatch_event(event)
 
         assert events == [event]
 
     @pytest.mark.asyncio
-    async def test_dispatch_listener_exception_logging(self, event_loop, source, caplog):
-        """Test that listener exceptions are logged when return_future is False."""
+    async def test_dispatch_log_exceptions(self, event_loop, source, caplog):
+        """Test that listener exceptions are logged and that dispatch() resolves to ``False``."""
         def listener(event):
-            try:
-                raise Exception('regular')
-            finally:
-                future1.set_result(None)
+            raise Exception('regular')
 
         async def coro_listener(event):
-            try:
-                raise Exception('coroutine')
-            finally:
-                future2.set_result(None)
+            raise Exception('coroutine')
 
-        future1, future2 = Future(), Future()
         source.event_a.connect(listener)
         source.event_a.connect(coro_listener)
-        source.event_a.dispatch()
-        await asyncio.gather(future1, future2)
+        assert not await source.event_a.dispatch()
 
         assert len(caplog.records) == 2
         for record in caplog.records:
             assert 'uncaught exception in event listener' in record.message
 
-    def test_dispatch_event_no_listeners(self, source):
-        """Test that None is returned when no listeners are present and return_future is False."""
-        assert source.event_a.dispatch() is None
+    @pytest.mark.asyncio
+    async def test_dispatch_event_no_listeners(self, source):
+        """Test that dispatching an event when there are no listeners will still work."""
+        assert await source.event_a.dispatch()
 
     @pytest.mark.asyncio
-    async def test_dispatch_event_listener_exceptions(self, source):
-        """
-        Test that multiple exceptions raised by listeners are combined into one EventDispatchError.
+    async def test_connect_twice(self, source):
+        """Test that if the same callback is connected twice, the second connect is a no-op."""
+        events = []
+        source.event_a.connect(events.append)
+        source.event_a.connect(events.append)
+        assert await source.event_a.dispatch()
 
-        """
-        def listener(event):
-            raise plain_exception
-
-        async def coro_listener(event):
-            raise async_exception
-
-        plain_exception = ValueError('foo')
-        async_exception = KeyError('bar')
-        plain_listener = source.event_a.connect(listener)
-        async_listener = source.event_a.connect(coro_listener)
-        event = DummyEvent(source, 'event_a')
-        with pytest.raises(EventDispatchError) as exc:
-            await source.event_a.dispatch_event(event, return_future=True)
-
-        assert exc.value.event is event
-        assert exc.value.exceptions == [
-            (plain_listener, plain_exception),
-            (async_listener, async_exception)
-        ]
-        assert 'listener' in str(exc.value)
-        assert 'coro_listener' in str(exc.value)
-        assert '-------------------------------\n' in str(exc.value)
+        assert len(events) == 1
 
     @pytest.mark.asyncio
     async def test_dispatch_event_class_mismatch(self, source):
@@ -157,28 +130,30 @@ class TestSignal:
 
     @pytest.mark.asyncio
     async def test_wait_event(self, source, event_loop):
-        task = event_loop.create_task(source.event_a.wait_event())
         event_loop.call_soon(source.event_a.dispatch)
-        received_event = await task
+        received_event = await source.event_a.wait_event()
         assert received_event.topic == 'event_a'
 
+    @pytest.mark.parametrize('filter, expected_values', [
+        (None, [1, 2, 3]),
+        (lambda event: event.args[0] in (3, None), [3])
+    ], ids=['nofilter', 'filter'])
     @pytest.mark.asyncio
-    async def test_stream_events(self, source, event_loop):
-        async def generate_events():
-            await asyncio.sleep(0.1)
-            source.event_a.dispatch(1)
-            await asyncio.sleep(0.1)
-            source.event_a.dispatch(2)
-            await asyncio.sleep(0.1)
-            source.event_a.dispatch(3)
+    async def test_stream_events(self, event_loop, source, filter, expected_values):
+        values = []
+        for i in range(1, 4):
+            event_loop.call_soon(source.event_a.dispatch, i)
 
-        event_loop.create_task(generate_events())
-        last_number = 0
-        async for event in source.event_a.stream_events():
-            assert event.args[0] == last_number + 1
-            last_number += 1
-            if last_number == 3:
-                break
+        event_loop.call_soon(source.event_a.dispatch, None)
+
+        async with aclosing(source.event_a.stream_events(filter)) as stream:
+            async for event in stream:
+                if event.args[0] is not None:
+                    values.append(event.args[0])
+                else:
+                    break
+
+        assert values == expected_values
 
     def test_memory_leak(self):
         """
@@ -196,48 +171,44 @@ class TestSignal:
         assert next((x for x in gc.get_objects() if isinstance(x, SignalOwner)), None) is None
 
 
+@pytest.mark.parametrize('filter, expected_value', [
+    (None, 1),
+    (lambda event: event.args[0] == 3, 3)
+], ids=['nofilter', 'filter'])
 @pytest.mark.asyncio
-async def test_wait_event(event_loop):
-    """Test that wait_event catches events coming from any of the given signals."""
+async def test_wait_event(event_loop, filter, expected_value):
+    """
+    Test that wait_event returns the first event matched by the filter, or the first event if there
+    is no filter.
+
+    """
+    source1 = DummySource()
+    for i in range(1, 4):
+        event_loop.call_soon(source1.event_a.dispatch, i)
+
+    event = await wait_event([source1.event_a], filter)
+    assert event.args == (expected_value,)
+
+
+@pytest.mark.parametrize('filter, expected_values', [
+    (None, [1, 2, 3, 1, 2, 3]),
+    (lambda event: event.args[0] in (3, None), [3, 3])
+], ids=['nofilter', 'filter'])
+@pytest.mark.asyncio
+async def test_stream_events(event_loop, filter, expected_values):
     source1, source2 = DummySource(), DummySource()
+    values = []
+    for signal in [source1.event_a, source2.event_b]:
+        for i in range(1, 4):
+            event_loop.call_soon(signal.dispatch, i)
 
-    for signal in source1.event_a, source2.event_b:
-        task = event_loop.create_task(wait_event(signal))
-        event_loop.call_soon(signal.dispatch)
-        received_event = await task
-        assert received_event.topic == signal.topic
+    event_loop.call_soon(source1.event_a.dispatch, None)
 
+    async with aclosing(stream_events([source1.event_a, source2.event_b], filter)) as stream:
+        async for event in stream:
+            if event.args[0] is not None:
+                values.append(event.args[0])
+            else:
+                break
 
-@pytest.mark.asyncio
-async def test_wait_event_double_result(event_loop):
-    """Test that wait_event won't raise an exception when two events are sent in succession."""
-    async def signal_twice():
-        await source.event_a.dispatch(return_future=True)
-        await source.event_a.dispatch(return_future=True)
-
-    source = DummySource()
-    wait_task = event_loop.create_task(source.event_a.wait_event())
-    signal_task = event_loop.create_task(signal_twice())
-    received_event = await wait_task
-    await signal_task
-    assert received_event.topic == source.event_a.topic
-
-
-@pytest.mark.asyncio
-async def test_stream_events(event_loop):
-    async def generate_events():
-        await asyncio.sleep(0.1)
-        source1.event_a.dispatch(1)
-        await asyncio.sleep(0.1)
-        source2.event_b.dispatch(2)
-        await asyncio.sleep(0.1)
-        source1.event_a.dispatch(3)
-
-    source1, source2 = DummySource(), DummySource()
-    event_loop.create_task(generate_events())
-    last_number = 0
-    async for event in stream_events(source1.event_a, source2.event_b):
-        assert event.args[0] == last_number + 1
-        last_number += 1
-        if last_number == 3:
-            break
+    assert values == expected_values

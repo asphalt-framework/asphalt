@@ -10,6 +10,15 @@ This library adheres to `Semantic Versioning <http://semver.org/>`_.
 - **BACKWARD INCOMPATIBLE** Removed the ``monotime`` attribute from the
   ``asphalt.core.event.Event`` class
 - **BACKWARD INCOMPATIBLE** Removed the ability to remove resources from a ``Context``
+- **BACKWARD INCOMPATIBLE** The ``asphalt.core.event`` module was overhauled:
+
+  - the ``return_future`` argument was dropped from ``Signal.dispatch()`` and
+    ``Signal.dispatch_event()`` and they now always return an awaitable that resolves to a boolean,
+    indicating whether all callbacks were successful or not
+  - the ``max_queue_size`` argument of ``Signal.stream_events`` and ``stream_events()`` is now a
+    keyword-only argument
+  - ``Signal.stream_events()`` and ``stream_events()`` can now be given a callback that can
+    restrict the events that are yielded by them
 - Switched from ``asyncio_extras`` to ``async_generator`` as the async generator compatibility
   library
 - Made the current event loop accessible (from any thread) as the ``loop`` property from any
