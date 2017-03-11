@@ -19,6 +19,7 @@ This library adheres to `Semantic Versioning <http://semver.org/>`_.
     keyword-only argument
   - ``Signal.stream_events()`` and ``stream_events()`` can now be given a callback that can
     restrict the events that are yielded by them
+  - the ``Event`` class gained a new constructor argument, ``time``
 - Switched from ``asyncio_extras`` to ``async_generator`` as the async generator compatibility
   library
 - Made the current event loop accessible (from any thread) as the ``loop`` property from any

@@ -1,9 +1,9 @@
 import logging
 import weakref
 from asyncio import get_event_loop, Queue, wait
-from datetime import datetime, timezone
+from datetime import datetime, timezone, tzinfo
 from inspect import isawaitable, getmembers
-from time import time
+from time import time as stdlib_time
 from weakref import WeakKeyDictionary
 from typing import Callable, Any, Sequence, Awaitable, AsyncIterator
 
@@ -23,6 +23,7 @@ class Event:
 
     :param source: the object where this event originated from
     :param topic: the event topic
+    :param time: the time the event occurred
 
     :ivar source: the object where this event originated from
     :ivar str topic: the topic
@@ -31,10 +32,10 @@ class Event:
 
     __slots__ = 'source', 'topic', 'time'
 
-    def __init__(self, source, topic: str):
+    def __init__(self, source, topic: str, time: float = None):
         self.source = source
         self.topic = topic
-        self.time = time()
+        self.time = time or stdlib_time()
 
     @property
     def utc_timestamp(self) -> datetime:
@@ -46,7 +47,8 @@ class Event:
         return datetime.fromtimestamp(self.time, timezone.utc)
 
     def __repr__(self):
-        return '{0.__class__.__name__}(source={0.source!r}, topic={0.topic!r})'.format(self)
+        return '{self.__class__.__name__}(source={self.source!r}, topic={self.topic!r})'.\
+            format(self=self)
 
 
 class Signal:
@@ -62,6 +64,7 @@ class Signal:
 
     :param event_class: an event class
     """
+
     __slots__ = 'event_class', 'source', 'topic', 'listeners', 'bound_signals'
 
     def __init__(self, event_class: type, *, source=None, topic: str = None):

@@ -1,5 +1,5 @@
 import gc
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 import pytest
 from async_generator import aclosing
@@ -26,8 +26,9 @@ def source():
 
 class TestEvent:
     def test_utc_timestamp(self, source):
-        event = Event(source, 'sometopic')
-        assert isinstance(event.utc_timestamp, datetime)
+        timestamp = datetime.now(timezone(timedelta(hours=2)))
+        event = Event(source, 'sometopic', timestamp.timestamp())
+        assert event.utc_timestamp == timestamp
         assert event.utc_timestamp.tzinfo == timezone.utc
 
     def test_event_repr(self, source):
