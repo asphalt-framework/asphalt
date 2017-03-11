@@ -105,7 +105,7 @@ class TestSignal:
 
         assert len(caplog.records) == 2
         for record in caplog.records:
-            assert 'uncaught exception in event listener' in record.message
+            assert 'Uncaught exception in event listener' in record.message
 
     @pytest.mark.asyncio
     async def test_dispatch_event_no_listeners(self, source):

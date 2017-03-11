@@ -158,7 +158,7 @@ class Signal:
                 try:
                     retval = callback(event)
                 except Exception:
-                    logger.exception('uncaught exception in event listener')
+                    logger.exception('Uncaught exception in event listener')
                     all_successful = False
                 else:
                     if isawaitable(retval):
@@ -172,7 +172,7 @@ class Signal:
                     exc = future.exception()
                     if exc is not None:
                         all_successful = False
-                        logger.error('uncaught exception in event listener', exc_info=exc)
+                        logger.error('Uncaught exception in event listener', exc_info=exc)
 
             return all_successful
 
