@@ -47,12 +47,12 @@ class ContainerComponent(Component):
     :vartype child_components: Dict[str, Component]
     :ivar component_configs: dictionary of component alias ⭢ externally provided component
         configuration
-    :vartype component_configs: Dict[str, Dict[str, Any]]
+    :vartype component_configs: Dict[str, Optional[Dict[str, Any]]]
     """
 
     __slots__ = 'child_components', 'component_configs'
 
-    def __init__(self, components: Dict[str, Dict[str, Any]] = None):
+    def __init__(self, components: Dict[str, Optional[Dict[str, Any]]] = None):
         assert check_argument_types()
         self.child_components = OrderedDict()
         self.component_configs = components or {}
