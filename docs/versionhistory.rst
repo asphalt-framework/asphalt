@@ -12,6 +12,8 @@ This library adheres to `Semantic Versioning <http://semver.org/>`_.
 - **BACKWARD INCOMPATIBLE** Removed the ability to remove resources from a ``Context``
 - **BACKWARD INCOMPATIBLE** The ``asphalt.core.event`` module was overhauled:
 
+  - most methods in the ``Signal`` class were split off into the ``BoundSignal`` class, though this
+    does not affect how it's used
   - the ``return_future`` argument was dropped from ``Signal.dispatch()`` and
     ``Signal.dispatch_event()`` and they now always return an awaitable that resolves to a boolean,
     indicating whether all callbacks were successful or not

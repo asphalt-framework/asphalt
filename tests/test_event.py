@@ -1,4 +1,5 @@
 import gc
+from asyncio import Task
 from datetime import datetime, timezone, timedelta
 
 import pytest
@@ -62,9 +63,17 @@ class TestSignal:
         assert len(events) == 1
         assert events[0].args == (1,)
 
-    def test_remove_nonexistent_listener(self, source):
+    def test_disconnect_nonexistent_listener(self, source):
         """Test that attempting to remove a nonexistent event listener will not raise an error."""
-        source.event_a.disconnect(lambda: None)
+        source.event_a.connect(lambda event: None)
+        source.event_a.disconnect(lambda event: None)
+
+    def test_disconnect_no_listeners(self, source):
+        """
+        Test that disconnecting a nonexistent listener while listeners is None will still work.
+
+        """
+        source.event_a.disconnect(lambda event: None)
 
     @pytest.mark.asyncio
     async def test_dispatch_event_coroutine(self, source):
@@ -113,6 +122,15 @@ class TestSignal:
         assert await source.event_a.dispatch()
 
     @pytest.mark.asyncio
+    async def test_dispatch_event_cancel(self, source):
+        """Test that dispatching an event when there are no listeners will still work."""
+        source.event_a.connect(lambda event: None)
+        future = source.event_a.dispatch()
+        future.cancel()
+        task = next(t for t in Task.all_tasks() if t is not Task.current_task())
+        await task
+
+    @pytest.mark.asyncio
     async def test_connect_twice(self, source):
         """Test that if the same callback is connected twice, the second connect is a no-op."""
         events = []
@@ -125,8 +143,9 @@ class TestSignal:
     @pytest.mark.asyncio
     async def test_dispatch_event_class_mismatch(self, source):
         """Test that passing an event of the wrong type raises an AssertionError."""
-        with pytest.raises(AssertionError) as exc:
+        with pytest.raises(TypeError) as exc:
             await source.event_a.dispatch_event(Event(source, 'event_a'))
+
         assert str(exc.value) == 'event must be of type test_event.DummyEvent'
 
     @pytest.mark.asyncio
