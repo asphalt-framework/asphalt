@@ -7,6 +7,8 @@ This library adheres to `Semantic Versioning <http://semver.org/>`_.
 
 - **BACKWARD INCOMPATIBLE** Upped the minimum Python version to 3.5.2 from 3.5.0
 - **BACKWARD INCOMPATIBLE** Renamed the ``asphalt.core.util`` module to ``asphalt.core.utils``
+- **BACKWARD INCOMPATIBLE** The application runner no longer cancels all active tasks on exit –
+  make sure you add the proper cleanup callbacks for that!
 - **BACKWARD INCOMPATIBLE** The ``asphalt.core.event`` module was overhauled:
 
   - most methods in the ``Signal`` class were split off into the ``BoundSignal`` class, though this
@@ -32,6 +34,7 @@ This library adheres to `Semantic Versioning <http://semver.org/>`_.
     ``require_resource()``
   - ``Context.publish_resource()`` was renamed to ``Context.add_resource()``
   - ``Context.publish_lazy_resource()`` was renamed to ``Context.add_resource_factory()``
+- The application runner now shuts down asynchronous generators on exit
 - Switched from ``asyncio_extras`` to ``async_generator`` as the async generator compatibility
   library
 - Made the current event loop accessible (from any thread) as the ``loop`` property from any

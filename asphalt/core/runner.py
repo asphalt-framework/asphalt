@@ -111,11 +111,15 @@ def run_application(component: Union[Component, Dict[str, Any]], *, event_loop_p
             except KeyboardInterrupt:
                 pass
     finally:
-        # Cancel all running tasks
-        for task in asyncio.Task.all_tasks(event_loop):
-            task.cancel()
-
-        # Close the context and the event loop itself
+        # Close the root context
         event_loop.run_until_complete(context.close(exception))
+
+        # Shut down leftover async generators (requires Python 3.6+)
+        try:
+            event_loop.run_until_complete(event_loop.shutdown_asyncgens())
+        except (AttributeError, NotImplementedError):
+            pass
+
+        # Finally, close the event loop itself
         event_loop.close()
         logger.info('Application stopped')
