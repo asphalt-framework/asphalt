@@ -220,7 +220,7 @@ class Context:
                      types: Union[type, Sequence[Type]] = ()) -> ResourceContainer:
         """
         Add a resource to this context.
-        
+
         This will cause a ``resource_added`` event to be dispatched.
 
         :param value: the actual resource value
@@ -250,7 +250,7 @@ class Context:
             if (resource_type, name) in self._resources:
                 raise ResourceConflict(
                     'this context already contains a resource of type {} using the name {!r}'.
-                        format(qualified_name(resource_type), name))
+                    format(qualified_name(resource_type), name))
 
         resource = ResourceContainer(value, types, name, context_attr, False)
         for type_ in resource.types:
@@ -268,7 +268,7 @@ class Context:
                              context_attr: str = None) -> ResourceContainer:
         """
         Add a resource factory to this context.
-        
+
         This will cause a ``resource_added`` event to be dispatched.
 
         A resource factory is a callable that generates a "contextual" resource when it is
@@ -371,7 +371,7 @@ class Context:
 
         This is like :meth:`get_resource` except that instead of returning ``None`` when a resource
         is not found, it will raise :exc:`~asphalt.core.context.ResourceNotFound`.
-        
+
         :param type: type of the requested resource
         :param name: name of the requested resource
         :return: the requested resource

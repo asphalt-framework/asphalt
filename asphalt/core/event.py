@@ -51,6 +51,7 @@ class Event:
         return '{self.__class__.__name__}(source={self.source!r}, topic={self.topic!r})'.\
             format(self=self)
 
+
 T_Event = TypeVar('T_Event', bound=Event)
 
 
@@ -264,7 +265,7 @@ async def wait_event(signals: Sequence[BoundSignal],
     Wait until any of the given signals dispatches an event that satisfies the filter (if any).
 
     If no filter has been given, the first event dispatched from the signal is returned.
-    
+
     :param signals: the signals to get events from
     :param filter: a callable that takes an event object as an argument and returns ``True`` if
         the event should pass, ``False`` if not

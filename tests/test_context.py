@@ -136,10 +136,10 @@ class TestContext:
         with pytest.raises(ResourceConflict) as exc:
             context.add_resource(4, 'foo')
 
-        exc.match("this context has an existing resource of type int using the name 'foo'")
+        exc.match("this context already contains a resource of type int using the name 'foo'")
 
     @pytest.mark.asyncio
-    async def test_add_resource_name_conflict(self, context):
+    async def test_add_resource_none_value(self, context):
         """Test that None is not accepted as a resource value."""
         exc = pytest.raises(ValueError, context.add_resource, None)
         exc.match('"value" must not be None')
