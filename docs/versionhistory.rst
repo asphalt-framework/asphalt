@@ -9,31 +9,33 @@ This library adheres to `Semantic Versioning <http://semver.org/>`_.
 - **BACKWARD INCOMPATIBLE** Renamed the ``asphalt.core.util`` module to ``asphalt.core.utils``
 - **BACKWARD INCOMPATIBLE** The application runner no longer cancels all active tasks on exit –
   make sure you add the proper cleanup callbacks for that!
-- **BACKWARD INCOMPATIBLE** The ``asphalt.core.event`` module was overhauled:
+- The ``asphalt.core.event`` module was overhauled:
 
-  - most methods in the ``Signal`` class were split off into the ``BoundSignal`` class, though this
-    does not affect how it's used
-  - the ``return_future`` argument was dropped from ``Signal.dispatch()`` and
-    ``Signal.dispatch_event()`` and they now always return an awaitable that resolves to a boolean,
-    indicating whether all callbacks were successful or not
-  - the ``max_queue_size`` argument of ``Signal.stream_events`` and ``stream_events()`` is now a
-    keyword-only argument
-  - ``Signal.stream_events()`` and ``stream_events()`` can now be given a callback that can
+  - **BACKWARD INCOMPATIBLE** Removed the ``monotime`` attribute from the ``Event`` class
+  - Split off most methods in the ``Signal`` class into the ``BoundSignal`` class
+    (this does not affect how signals are used)
+  - **BACKWARD INCOMPATIBLE** Dropped the ``return_future`` argument from ``Signal.dispatch()``
+    and ``Signal.dispatch_event()`` – they now always return an awaitable that resolves to a
+    boolean, indicating whether all callbacks were successful or not
+  - **BACKWARD INCOMPATIBLE** Made the ``max_queue_size`` argument in ``Signal.stream_events`` and
+    ``stream_events()`` into a keyword-only argument
+  - Added the ``filter`` argument to ``Signal.stream_events()`` and ``stream_events()`` which can
     restrict the events that are yielded by them
-  - the ``Event`` class gained a new constructor argument, ``time``
-  - removed the ``monotime`` attribute from the ``Event`` class
-- **BACKWARD INCOMPATIBLE** The ``asphalt.core.context`` module was overhauled:
+  - Added the ``time`` constructor argument to the ``Event`` class
+- The ``asphalt.core.context`` module was overhauled:
 
   - "lazy resources" are now called "resource factories"
   - ``Context.get_resources()`` now returns a set of ``ResourceContainer``s (instead of a list)
-  - the ``Context.finished`` signal was removed in favor of the ``add_cleanup_callback()`` method
-    which has different semantics (callbacks are called in LIFO order and awaited for one at a
-    time)
-  - removed the ability to remove resources from a ``Context``
-  - added several new methods to the ``Context`` class: ``close()``, ``get_resource()``,
+  - **BACKWARD INCOMPATIBLE** Removed the ``Context.finished`` signal in favor of the new
+    ``add_cleanup_callback()`` method which has different semantics (callbacks are called in LIFO
+    order and awaited for one at a time)
+  - **BACKWARD INCOMPATIBLE** Removed the ability to remove resources from a ``Context``
+  - Added several new methods to the ``Context`` class: ``close()``, ``get_resource()``,
     ``require_resource()``
-  - ``Context.publish_resource()`` was renamed to ``Context.add_resource()``
-  - ``Context.publish_lazy_resource()`` was renamed to ``Context.add_resource_factory()``
+  - **BACKWARD INCOMPATIBLE** ``Context.publish_resource()`` was renamed to
+    ``Context.add_resource()``
+  - **BACKWARD INCOMPATIBLE** ``Context.publish_lazy_resource()`` was renamed to
+    ``Context.add_resource_factory()``
 - The application runner now shuts down asynchronous generators on exit
 - Switched from ``asyncio_extras`` to ``async_generator`` as the async generator compatibility
   library
