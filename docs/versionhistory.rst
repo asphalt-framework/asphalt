@@ -7,7 +7,6 @@ This library adheres to `Semantic Versioning <http://semver.org/>`_.
 
 - **BACKWARD INCOMPATIBLE** Upped the minimum Python version to 3.5.2 from 3.5.0
 - **BACKWARD INCOMPATIBLE** Renamed the ``asphalt.core.util`` module to ``asphalt.core.utils``
-- **BACKWARD INCOMPATIBLE** Removed the ability to remove resources from a ``Context``
 - **BACKWARD INCOMPATIBLE** The ``asphalt.core.event`` module was overhauled:
 
   - most methods in the ``Signal`` class were split off into the ``BoundSignal`` class, though this
@@ -21,6 +20,18 @@ This library adheres to `Semantic Versioning <http://semver.org/>`_.
     restrict the events that are yielded by them
   - the ``Event`` class gained a new constructor argument, ``time``
   - removed the ``monotime`` attribute from the ``Event`` class
+- **BACKWARD INCOMPATIBLE** The ``asphalt.core.context`` module was overhauled:
+
+  - "lazy resources" are now called "resource factories"
+  - ``Context.get_resources()`` now returns a set of ``ResourceContainer``s (instead of a list)
+  - the ``Context.finished`` signal was removed in favor of the ``add_cleanup_callback()`` method
+    which has different semantics (callbacks are called in LIFO order and awaited for one at a
+    time)
+  - removed the ability to remove resources from a ``Context``
+  - added several new methods to the ``Context`` class: ``close()``, ``get_resource()``,
+    ``require_resource()``
+  - ``Context.publish_resource()`` was renamed to ``Context.add_resource()``
+  - ``Context.publish_lazy_resource()`` was renamed to ``Context.add_resource_factory()``
 - Switched from ``asyncio_extras`` to ``async_generator`` as the async generator compatibility
   library
 - Made the current event loop accessible (from any thread) as the ``loop`` property from any

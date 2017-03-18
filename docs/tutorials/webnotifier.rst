@@ -254,7 +254,7 @@ Asphalt application::
         @context_finisher
         async def start(self, ctx):
             detector = Detector(self.url, self.delay)
-            ctx.publish_resource(detector, context_attr='detector')
+            ctx.add_resource(detector, context_attr='detector')
             task = asyncio.get_event_loop().create_task(detector.run())
             logging.info('Started web page change detector for url "%s" with a delay of %d seconds',
                          self.url, self.delay)
@@ -266,7 +266,7 @@ Asphalt application::
             task.cancel()
             logging.info('Shut down web page change detector')
 
-The component's ``start()`` method starts the detector's ``run()`` method as a new task, publishes
+The component's ``start()`` method starts the detector's ``run()`` method as a new task, adds
 the detector object as resource and installs an event listener that will shut down the detector
 when the context finishes.
 
@@ -293,7 +293,7 @@ become somewhat lighter::
                         subject='Change detected in %s' % event.source.url, html_body=difference)
                     logger.info('Sent notification email')
 
-The main application component will now use the detector resource published by
+The main application component will now use the detector resource added by
 ``ChangeDetectorComponent``. It adds one event listener which reacts to change events by creating
 an HTML formatted difference and sending it to the default recipient.
 

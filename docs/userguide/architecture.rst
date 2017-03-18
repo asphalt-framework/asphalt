@@ -43,7 +43,7 @@ set of responsibilities:
 
 In the :meth:`~asphalt.core.component.Component.start` method, the component receives a
 :class:`~asphalt.core.context.Context` as its only argument. The component can use the context to
-publish resources for other components and the application business logic to use. It can also
+add resources for other components and the application business logic to use. It can also
 request resources provided by other components to provide some complex service that builds on those
 resources.
 
@@ -53,10 +53,10 @@ If any of the components raises an exception, the application startup process fa
 is finished.
 
 In order to speed up the startup process and to prevent any deadlocks, components should try to
-publish any resources as soon as possible before requesting any. If two or more components end up
+add any resources as soon as possible before requesting any. If two or more components end up
 waiting on each others' resources, the application will fail to start due to timeout errors.
 Also, if a component needs to perform lengthy operations like connection validation on network
-clients, it should publish all its resources first to avoid said timeouts.
+clients, it should add all its resources first to avoid said timeouts.
 
 .. hint::
     It is a good idea to use `type hints`_ with typeguard_ checks
@@ -76,7 +76,7 @@ Container components can of course contain other container components and so on.
 When the container component starts its child components, each
 :meth:`~asphalt.core.component.Component.start` call is launched in its own task. Therefore all the
 child components start concurrently and cannot rely on the start order. This is by design.
-The only way components should be relying on each other is by the publishing and requesting of
+The only way components should be relying on each other is by the adding and requesting of
 resources in their shared context.
 
 Context hierarchies
@@ -109,38 +109,31 @@ Here are a few examples of services that will likely benefit from resource shari
 * Template renderers
 * SSL contexts
 
-When you publish a resource, you should make sure that the resource is discoverable using any
+When you add a resource, you should make sure that the resource is discoverable using any
 abstract interface or base class that it implements. This is so that consumers of the service don't
 have to care if you switch the implementation of another. For example, consider a mailer service,
 provided by asphalt-mailer_. The library has an abstract base class for all mailers,
-``asphalt.mailer.api.Mailer``. To facilitate this loose coupling of services, it publishes all
-mailers as Mailers.
+``asphalt.mailer.api.Mailer``. To facilitate this loose coupling of services, it adds all mailers
+as Mailers.
 
 .. _asphalt-mailer: https://github.com/asphalt-framework/asphalt-mailer
 
-Lazy resources
---------------
+Resource factories
+------------------
 
-Resources can also be published *lazily*. That means they're created *on demand*, that is, either
-when their context attribute is accessed or when the resource is being requested for the first
-time. Unlike with normal resources, the resource values are not inherited by subcontexts, but every
-time the resource is requested in a new context, a new value is created specifically for that
-context.
+There are certain types of resources that should always be local to the context that they are
+accessed from. To this end, it is possible to use *resource factories*. Instead of adding a
+concrete object to a context as a resource, you instead call
+:meth:`~asphalt.core.context.Context.add_resource_factory` and pass it a callable that takes a
+context object as the argument and returns the actual resource object. The callback is called
+whenever a resource matching the name and any of of the specified types of the resource factory is
+being requested (and is not already present in the context), or its designated context attribute is
+being accessed for the first time. Each context object always gets its very own resource object
+from the factory, even if a parent context already has one.
 
-There are at least a couple plausible reasons for publishing resources this way:
+There are at least a couple plausible reasons for using resource factories:
 
 * The resource needs access to the resources or data specific to the local context
   (example: template renderers)
 * The life cycle of the resource needs to be tied to the life cycle of the context
   (example: database transactions)
-
-Lazy resources are published using :meth:`~asphalt.core.context.Context.publish_lazy_resource`.
-Instead of passing a static value to it, you give it a callable that takes the local context
-object (whatever that may be) as the argument and returns the created resource object. The creator
-callable will only be called at most once per context.
-
-The creator callable can be a coroutine function or return an awaitable, in which case the
-coroutine or other awaitable is resolved before returning the resource object to the caller. This
-approach has the unfortunate limitation that the awaitable cannot be automatically resolved on
-attribute access so something like ``await ctx.resourcename`` is required when such resources are
-accessed through their context attributes.

@@ -6,7 +6,7 @@ import aiohttp
 from async_generator import yield_
 
 from asphalt.core import Component, Event, Signal
-from asphalt.core.context import context_finisher
+from asphalt.core.context import context_cleanup
 
 logger = logging.getLogger(__name__)
 
@@ -49,10 +49,10 @@ class ChangeDetectorComponent(Component):
         self.url = url
         self.delay = delay
 
-    @context_finisher
+    @context_cleanup
     async def start(self, ctx):
         detector = Detector(self.url, self.delay)
-        ctx.publish_resource(detector, context_attr='detector')
+        ctx.add_resource(detector, context_attr='detector')
         task = asyncio.get_event_loop().create_task(detector.run())
         logging.info('Started web page change detector for url "%s" with a delay of %d seconds',
                      self.url, self.delay)

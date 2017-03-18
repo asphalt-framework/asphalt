@@ -115,9 +115,7 @@ def run_application(component: Union[Component, Dict[str, Any]], *, event_loop_p
         for task in asyncio.Task.all_tasks(event_loop):
             task.cancel()
 
-        # Run all the finish callbacks
-        future = context.finished.dispatch(exception, return_future=True)
-        event_loop.run_until_complete(future)
-
+        # Close the context and the event loop itself
+        event_loop.run_until_complete(context.close(exception))
         event_loop.close()
         logger.info('Application stopped')
