@@ -7,8 +7,6 @@ This library adheres to `Semantic Versioning <http://semver.org/>`_.
 
 - **BACKWARD INCOMPATIBLE** Upped the minimum Python version to 3.5.2 from 3.5.0
 - **BACKWARD INCOMPATIBLE** Renamed the ``asphalt.core.util`` module to ``asphalt.core.utils``
-- **BACKWARD INCOMPATIBLE** Removed the ``monotime`` attribute from the
-  ``asphalt.core.event.Event`` class
 - **BACKWARD INCOMPATIBLE** Removed the ability to remove resources from a ``Context``
 - **BACKWARD INCOMPATIBLE** The ``asphalt.core.event`` module was overhauled:
 
@@ -22,6 +20,7 @@ This library adheres to `Semantic Versioning <http://semver.org/>`_.
   - ``Signal.stream_events()`` and ``stream_events()`` can now be given a callback that can
     restrict the events that are yielded by them
   - the ``Event`` class gained a new constructor argument, ``time``
+  - removed the ``monotime`` attribute from the ``Event`` class
 - Switched from ``asyncio_extras`` to ``async_generator`` as the async generator compatibility
   library
 - Made the current event loop accessible (from any thread) as the ``loop`` property from any
