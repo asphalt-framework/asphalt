@@ -103,8 +103,7 @@ class ContainerComponent(Component):
             if alias not in self.child_components:
                 self.add_component(alias)
 
-        loop = asyncio.get_event_loop()
-        tasks = [loop.create_task(component.start(ctx)) for component in
+        tasks = [ctx.loop.create_task(component.start(ctx)) for component in
                  self.child_components.values()]
         if tasks:
             await asyncio.gather(*tasks)
@@ -148,7 +147,7 @@ class CLIApplicationComponent(ContainerComponent):
                 sys.exit(0)
 
         await super().start(ctx)
-        task = asyncio.get_event_loop().create_task(self.run(ctx))
+        task = ctx.loop.create_task(self.run(ctx))
         task.add_done_callback(run_complete)
 
     @abstractmethod
