@@ -1,7 +1,9 @@
 import asyncio
+import signal
 import sys
+from asyncio.events import AbstractEventLoop
 from concurrent.futures import ThreadPoolExecutor
-from logging import basicConfig, getLogger, INFO
+from logging import basicConfig, getLogger, INFO, Logger
 from logging.config import dictConfig
 from typing import Union, Dict, Any
 
@@ -24,6 +26,12 @@ def uvloop_policy():
 def gevent_policy():
     import aiogevent
     return aiogevent.EventLoopPolicy()
+
+
+def sigterm_handler(logger: Logger, event_loop: AbstractEventLoop) -> None:
+    if event_loop.is_running():
+        logger.info('Received SIGTERM')
+        event_loop.stop()
 
 
 def run_application(component: Union[Component, Dict[str, Any]], *, event_loop_policy: str = None,
@@ -92,34 +100,38 @@ def run_application(component: Union[Component, Dict[str, Any]], *, event_loop_p
     logger.info('Starting application')
     context = Context()
     exception = None
+
+    # Start the root component
     try:
-        # Start the root component
-        try:
-            event_loop.run_until_complete(component.start(context))
-        except Exception as e:
-            exception = e
-            logger.exception('Error during application startup')
-            sys.exit(1)
-        else:
-            # Enable the component tree to be garbage collected
-            del component
+        event_loop.run_until_complete(component.start(context))
+    except Exception as e:
+        exception = e
+        logger.exception('Error during application startup')
+    else:
+        # Enable the component tree to be garbage collected
+        del component
 
-            # Finally, run the event loop until the process is terminated or Ctrl+C is pressed
-            logger.info('Application started')
-            try:
-                event_loop.run_forever()
-            except KeyboardInterrupt:
-                pass
-    finally:
-        # Close the root context
-        event_loop.run_until_complete(context.close(exception))
-
-        # Shut down leftover async generators (requires Python 3.6+)
+        # Finally, run the event loop until the process is terminated or Ctrl+C is pressed
+        logger.info('Application started')
+        event_loop.add_signal_handler(signal.SIGTERM, sigterm_handler, logger, event_loop)
         try:
-            event_loop.run_until_complete(event_loop.shutdown_asyncgens())
-        except (AttributeError, NotImplementedError):
+            event_loop.run_forever()
+        except (KeyboardInterrupt, SystemExit):
             pass
 
-        # Finally, close the event loop itself
-        event_loop.close()
-        logger.info('Application stopped')
+    # Close the root context
+    logger.info('Stopping application')
+    event_loop.run_until_complete(context.close(exception))
+
+    # Shut down leftover async generators (requires Python 3.6+)
+    try:
+        event_loop.run_until_complete(event_loop.shutdown_asyncgens())
+    except (AttributeError, NotImplementedError):
+        pass
+
+    # Finally, close the event loop itself
+    event_loop.close()
+    logger.info('Application stopped')
+
+    if exception:
+        sys.exit(1)

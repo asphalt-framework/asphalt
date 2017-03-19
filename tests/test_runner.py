@@ -6,7 +6,7 @@ import pytest
 
 from asphalt.core.component import Component
 from asphalt.core.context import Context
-from asphalt.core.runner import run_application
+from asphalt.core.runner import run_application, sigterm_handler
 
 
 class ShutdownComponent(Component):
@@ -31,6 +31,8 @@ class ShutdownComponent(Component):
             ctx.loop.call_later(0.1, sys.exit)
         elif self.method == 'keyboard':
             ctx.loop.call_later(0.1, self.press_ctrl_c)
+        elif self.method == 'sigterm':
+            ctx.loop.call_later(0.1, sigterm_handler, logging.getLogger(__name__), ctx.loop)
         elif self.method == 'exception':
             raise RuntimeError('this should crash the application')
 
@@ -76,12 +78,13 @@ def test_event_loop_policy(caplog, policy, policy_name):
     run_application(component, event_loop_policy=policy)
 
     records = [record for record in caplog.records if record.name == 'asphalt.core.runner']
-    assert len(records) == 5
+    assert len(records) == 6
     assert records[0].message == 'Running in development mode'
     assert records[1].message == 'Switched event loop policy to %s' % policy_name
     assert records[2].message == 'Starting application'
     assert records[3].message == 'Application started'
-    assert records[4].message == 'Application stopped'
+    assert records[4].message == 'Stopping application'
+    assert records[5].message == 'Application stopped'
 
 
 def test_run_callbacks(event_loop, caplog):
@@ -95,48 +98,37 @@ def test_run_callbacks(event_loop, caplog):
 
     assert component.cleanup_callback_called
     records = [record for record in caplog.records if record.name == 'asphalt.core.runner']
-    assert len(records) == 4
+    assert len(records) == 5
     assert records[0].message == 'Running in development mode'
     assert records[1].message == 'Starting application'
     assert records[2].message == 'Application started'
-    assert records[3].message == 'Application stopped'
+    assert records[3].message == 'Stopping application'
+    assert records[4].message == 'Application stopped'
 
 
-def test_run_sysexit(event_loop, caplog):
-    """Test that calling sys.exit() will gracefully shut down the application."""
-    component = ShutdownComponent(method='exit')
-    pytest.raises(SystemExit, run_application, component)
-
-    assert component.cleanup_callback_called
-    records = [record for record in caplog.records if record.name == 'asphalt.core.runner']
-    assert len(records) == 4
-    assert records[0].message == 'Running in development mode'
-    assert records[1].message == 'Starting application'
-    assert records[2].message == 'Application started'
-    assert records[3].message == 'Application stopped'
-
-
-def test_run_ctrl_c(event_loop, caplog):
+@pytest.mark.parametrize('method', ['exit', 'keyboard', 'sigterm'])
+def test_clean_exit(event_loop, caplog, method):
     """
     Test that when Ctrl+C is pressed during event_loop.run_forever(), run_application() exits
     cleanly.
 
     """
-    component = ShutdownComponent(method='keyboard')
+    component = ShutdownComponent(method=method)
     run_application(component)
 
     records = [record for record in caplog.records if record.name == 'asphalt.core.runner']
-    assert len(records) == 4
+    assert len(records) == 5
     assert records[0].message == 'Running in development mode'
     assert records[1].message == 'Starting application'
     assert records[2].message == 'Application started'
-    assert records[3].message == 'Application stopped'
+    assert records[3].message == 'Stopping application'
+    assert records[4].message == 'Application stopped'
 
 
 def test_run_start_exception(event_loop, caplog):
     """
     Test that an exception caught during the application initialization is put into the
-    application context and made available to finish callbacks.
+    application context and made available to cleanup callbacks.
 
     """
     component = ShutdownComponent(method='exception')
@@ -144,11 +136,12 @@ def test_run_start_exception(event_loop, caplog):
 
     assert str(component.exception) == 'this should crash the application'
     records = [record for record in caplog.records if record.name == 'asphalt.core.runner']
-    assert len(records) == 4
+    assert len(records) == 5
     assert records[0].message == 'Running in development mode'
     assert records[1].message == 'Starting application'
     assert records[2].message == 'Error during application startup'
-    assert records[3].message == 'Application stopped'
+    assert records[3].message == 'Stopping application'
+    assert records[4].message == 'Application stopped'
 
 
 def test_dict_config(event_loop, caplog):
@@ -157,8 +150,9 @@ def test_dict_config(event_loop, caplog):
     run_application(component={'type': component_class})
 
     records = [record for record in caplog.records if record.name == 'asphalt.core.runner']
-    assert len(records) == 4
+    assert len(records) == 5
     assert records[0].message == 'Running in development mode'
     assert records[1].message == 'Starting application'
     assert records[2].message == 'Application started'
-    assert records[3].message == 'Application stopped'
+    assert records[3].message == 'Stopping application'
+    assert records[4].message == 'Application stopped'

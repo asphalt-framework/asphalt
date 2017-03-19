@@ -37,6 +37,7 @@ This library adheres to `Semantic Versioning <http://semver.org/>`_.
   - **BACKWARD INCOMPATIBLE** ``Context.publish_lazy_resource()`` was renamed to
     ``Context.add_resource_factory()``
 - The application runner now shuts down asynchronous generators on exit
+- The application runner now handles SIGTERM and cleanly shuts down the application
 - Switched from ``asyncio_extras`` to ``async_generator`` as the async generator compatibility
   library
 - Made the current event loop accessible (from any thread) as the ``loop`` property from any
