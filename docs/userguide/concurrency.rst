@@ -31,6 +31,10 @@ otherwise block the event loop for long periods of time.
 To help with this, the `asyncio_extras`_ library was created as a byproduct of Asphalt.
 It provides several conveniences you can use to easily use threads when the need arises.
 
+.. note:: Starting from Asphalt 3.0, the ``asyncio_extras`` library is no longer installed as a
+   dependency of Asphalt core. You will need to add it to your application's dependencies yourself
+   if you intend to use it.
+
 Examples
 --------
 
@@ -44,7 +48,7 @@ The easiest way is probably to use :func:`~asyncio_extras.file.open_async`::
 
     from asyncio_extras import open_async
 
-    async def read_and_send_file(connection):
+    async def read_and_send_file(ctx, connection):
         async with open_async('file.txt', 'rb') as f:
             contents = await f.read()
 
@@ -54,7 +58,7 @@ The following snippet achieves the same goal::
 
     from asyncio_extras import threadpool
 
-    async def read_and_send_file(connection):
+    async def read_and_send_file(ctx, connection):
         async with threadpool():
             with open('file.txt', 'rb') as f:
                 contents = f.read()
@@ -65,7 +69,7 @@ As does the next one::
 
     from asyncio_extras import call_in_executor
 
-    async def read_and_send_file(connection):
+    async def read_and_send_file(ctx, connection):
         f = await call_in_executor(open, 'file.txt', 'rb')
         with f:
             contents = await call_in_executor(f.read)
@@ -73,17 +77,16 @@ As does the next one::
         await connection.send(contents)
 
 Alternatively, you can run the whole function in the thread pool.
-You will need to make it a regular function instead of a coroutine function and you must
-explicitly pass in the event loop object::
+You will then need to make it a regular function instead of a coroutine function::
 
     from asyncio_extras import threadpool, call_async
 
     @threadpool
-    def read_and_send_file(connection, loop):
+    def read_and_send_file(ctx, connection):
         with open('file.txt', 'rb') as f:
             contents = f.read()
 
-        call_async(loop, connection.send, contents)
+        call_async(ctx.loop, connection.send, contents)
 
 Using alternate thread pools
 ----------------------------
