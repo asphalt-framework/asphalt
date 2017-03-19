@@ -81,6 +81,14 @@ You can even wait for the next event dispatched from any of several signals usin
         event = await wait_event(source1.some_signal, source2.another_signal, source3.some_signal)
         print(event)
 
+As a convenience, you can provide a filter callback that will cause the call to only return when
+the callback returns ``True``::
+
+    async def print_next_matching_event(source1, source2, source3):
+        event = await wait_event(source1.some_signal, source2.another_signal, source3.some_signal,
+                                 lambda event: event.myrandomproperty == 'foo')
+        print(event)
+
 Receiving events iteratively
 ----------------------------
 
@@ -106,3 +114,11 @@ Using :func:`~asphalt.core.event.stream_events`, you can stream events from mult
             async for event in stream):
                 print(event)
 
+The filtering capability of :func:`~asphalt.core.event.wait_event` works here too::
+
+    async def listen_to_events(source1, source2, source3):
+        stream = stream_events(source1.some_signal, source2.another_signal, source3.some_signal,
+                               lambda event: event.randomproperty == 'foo')
+        async with aclosing(stream):
+            async for event in stream):
+                print(event)
