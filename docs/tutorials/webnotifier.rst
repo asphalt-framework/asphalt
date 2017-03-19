@@ -255,7 +255,7 @@ Asphalt application::
         async def start(self, ctx):
             detector = Detector(self.url, self.delay)
             ctx.add_resource(detector, context_attr='detector')
-            task = asyncio.get_event_loop().create_task(detector.run())
+            task = ctx.loop.create_task(detector.run())
             logging.info('Started web page change detector for url "%s" with a delay of %d seconds',
                          self.url, self.delay)
 
