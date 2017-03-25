@@ -7,8 +7,6 @@ This library adheres to `Semantic Versioning <http://semver.org/>`_.
 
 - **BACKWARD INCOMPATIBLE** Upped the minimum Python version to 3.5.2 from 3.5.0
 - **BACKWARD INCOMPATIBLE** Renamed the ``asphalt.core.util`` module to ``asphalt.core.utils``
-- **BACKWARD INCOMPATIBLE** The application runner no longer cancels all active tasks on exit –
-  make sure you add the proper cleanup callbacks for that!
 - The ``asphalt.core.event`` module was overhauled:
 
   - **BACKWARD INCOMPATIBLE** Removed the ``monotime`` attribute from the ``Event`` class
@@ -26,6 +24,12 @@ This library adheres to `Semantic Versioning <http://semver.org/>`_.
 
   - "lazy resources" are now called "resource factories"
   - ``Context.get_resources()`` now returns a set of ``ResourceContainer``s (instead of a list)
+  - **BACKWARD INCOMPATIBLE** The ``default_timeout`` parameter was removed from the ``Context``
+    constructor
+  - **BACKWARD INCOMPATIBLE** The ``timeout`` parameter of ``Context.request_resource()`` was
+    removed
+  - **BACKWARD INCOMPATIBLE** The ``alias`` parameter of ``Context.request_resource()`` was
+    renamed to ``name``
   - **BACKWARD INCOMPATIBLE** Removed the ``Context.finished`` signal in favor of the new
     ``add_cleanup_callback()`` method which has different semantics (callbacks are called in LIFO
     order and awaited for one at a time)
@@ -36,8 +40,12 @@ This library adheres to `Semantic Versioning <http://semver.org/>`_.
     ``Context.add_resource()``
   - **BACKWARD INCOMPATIBLE** ``Context.publish_lazy_resource()`` was renamed to
     ``Context.add_resource_factory()``
-- The application runner now shuts down asynchronous generators on exit
-- The application runner now handles SIGTERM and cleanly shuts down the application
+- The application runner (``asphalt.core.runner``) got some changes too:
+  - **BACKWARD INCOMPATIBLE** The runner no longer cancels all active tasks on exit
+  - **BACKWARD INCOMPATIBLE** There is now a (configurable, defaults to 5 seconds) timeout for
+    waiting for the root component to start
+  - Asynchronous generators are now closed after the context has been closed (on Python 3.6+)
+  - The SIGTERM signal now cleanly shuts down the application
 - Switched from ``asyncio_extras`` to ``async_generator`` as the async generator compatibility
   library
 - Made the current event loop accessible (from any thread) as the ``loop`` property from any

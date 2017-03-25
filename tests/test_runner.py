@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import sys
 from unittest.mock import patch
@@ -26,7 +27,7 @@ class ShutdownComponent(Component):
         ctx.add_teardown_callback(self.teardown_callback, pass_exception=True)
 
         if self.method == 'stop':
-            ctx.loop.stop()
+            ctx.loop.call_later(0.1, ctx.loop.stop)
         elif self.method == 'exit':
             ctx.loop.call_later(0.1, sys.exit)
         elif self.method == 'keyboard':
@@ -35,6 +36,8 @@ class ShutdownComponent(Component):
             ctx.loop.call_later(0.1, sigterm_handler, logging.getLogger(__name__), ctx.loop)
         elif self.method == 'exception':
             raise RuntimeError('this should crash the application')
+        elif self.method == 'timeout':
+            await asyncio.sleep(1)
 
 
 @pytest.mark.parametrize('logging_config', [
@@ -140,6 +143,24 @@ def test_run_start_exception(event_loop, caplog):
     assert records[0].message == 'Running in development mode'
     assert records[1].message == 'Starting application'
     assert records[2].message == 'Error during application startup'
+    assert records[3].message == 'Stopping application'
+    assert records[4].message == 'Application stopped'
+
+
+def test_run_start_timeout(event_loop, caplog):
+    """
+    Test that when the root component takes too long to start up, the runner exits and logs the
+    appropriate error message.
+
+    """
+    component = ShutdownComponent(method='timeout')
+    pytest.raises(SystemExit, run_application, component, start_timeout=1)
+
+    records = [record for record in caplog.records if record.name == 'asphalt.core.runner']
+    assert len(records) == 5
+    assert records[0].message == 'Running in development mode'
+    assert records[1].message == 'Starting application'
+    assert records[2].message == 'Timeout waiting for the root component to start'
     assert records[3].message == 'Stopping application'
     assert records[4].message == 'Application stopped'
 

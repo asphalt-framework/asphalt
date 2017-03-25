@@ -35,7 +35,8 @@ def sigterm_handler(logger: Logger, event_loop: AbstractEventLoop) -> None:
 
 
 def run_application(component: Union[Component, Dict[str, Any]], *, event_loop_policy: str = None,
-                    max_threads: int = None, logging: Union[Dict[str, Any], int, None] = INFO):
+                    max_threads: int = None, logging: Union[Dict[str, Any], int, None] = INFO,
+                    start_timeout: Union[int, float, None] = 5):
     """
     Configure logging and start the given root component in the default asyncio event loop.
 
@@ -66,6 +67,8 @@ def run_application(component: Union[Component, Dict[str, Any]], *, event_loop_p
         (the default value depends on the event loop implementation)
     :param logging: a logging configuration dictionary, :ref:`logging level <python:levels>` or
         ``None``
+    :param start_timeout: seconds to wait for the root component (and its subcomponents) to start
+        up before giving up (``None`` = wait forever)
 
     """
     assert check_argument_types()
@@ -103,7 +106,11 @@ def run_application(component: Union[Component, Dict[str, Any]], *, event_loop_p
 
     # Start the root component
     try:
-        event_loop.run_until_complete(component.start(context))
+        coro = asyncio.wait_for(component.start(context), start_timeout, loop=event_loop)
+        event_loop.run_until_complete(coro)
+    except asyncio.TimeoutError as e:
+        exception = e
+        logger.error('Timeout waiting for the root component to start')
     except Exception as e:
         exception = e
         logger.exception('Error during application startup')
