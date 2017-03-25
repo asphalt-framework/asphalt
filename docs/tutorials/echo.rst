@@ -62,8 +62,6 @@ On Windows, the last line should be:
 Creating the first component
 ----------------------------
 
-.. highlight:: python3
-
 Now, let's write some code! Create a file named ``server.py`` in the ``echo`` package directory::
 
     from asphalt.core import Component, run_application

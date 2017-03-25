@@ -66,7 +66,7 @@ respond with a ``304 Not Modified`` if the contents have not changed since that 
 So, modify the code as follows::
 
     class ApplicationComponent(CLIApplicationComponent):
-        async def start(self, ctx):
+        async def run(self, ctx):
             last_modified = None
             with aiohttp.ClientSession() as session:
                 while True:
@@ -99,7 +99,7 @@ to the logger::
 
 
     class ApplicationComponent(CLIApplicationComponent):
-        async def start(self, ctx):
+        async def run(self, ctx):
             with aiohttp.ClientSession() as session:
                 last_modified, old_lines = None, None
                 while True:
