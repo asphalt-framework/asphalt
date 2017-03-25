@@ -1,6 +1,6 @@
 import pytest
 
-from asphalt.core.context import Context, context_cleanup
+from asphalt.core.context import Context, context_teardown
 
 
 class TestContextFinisher:
@@ -8,8 +8,8 @@ class TestContextFinisher:
         None, Exception('foo')
     ], ids=['no_exception', 'exception'])
     @pytest.mark.asyncio
-    async def test_context_cleanup(self, expected_exc):
-        @context_cleanup
+    async def test_context_teardown(self, expected_exc):
+        @context_teardown
         async def start(ctx: Context):
             nonlocal phase, received_exception
             phase = 'started'

@@ -12,7 +12,7 @@ from asphalt.core.event import Signal, Event, wait_event
 from asphalt.core.utils import qualified_name, callable_name
 
 __all__ = ('ResourceContainer', 'ResourceEvent', 'ResourceConflict', 'ResourceNotFound', 'Context',
-           'context_cleanup')
+           'context_teardown')
 
 logger = logging.getLogger(__name__)
 factory_callback_type = Callable[['Context'], Any]
@@ -117,7 +117,7 @@ class Context:
         self._resources = {}  # type: Dict[Tuple[type, str], ResourceContainer]
         self._resource_factories = {}  # type: Dict[Tuple[type, str], ResourceContainer]
         self._resource_factories_by_context_attr = {}  # type: Dict[str, ResourceContainer]
-        self._cleanup_callbacks = []  # type: List[Tuple[Callable, bool]]
+        self._teardown_callbacks = []  # type: List[Tuple[Callable, bool]]
         self._closed = False
         self.default_timeout = default_timeout
         self.loop = parent.loop if parent is not None else get_event_loop()
@@ -157,7 +157,7 @@ class Context:
         if self._closed:
             raise RuntimeError('this context has already been closed')
 
-    def add_cleanup_callback(self, callback: Callable, pass_exception: bool = False) -> None:
+    def add_teardown_callback(self, callback: Callable, pass_exception: bool = False) -> None:
         """
         Add a callback to be called when this context closes.
 
@@ -174,14 +174,14 @@ class Context:
 
         """
         assert check_argument_types()
-        self._cleanup_callbacks.append((callback, pass_exception))
+        self._teardown_callbacks.append((callback, pass_exception))
 
     async def close(self, exception: BaseException = None) -> None:
         """
-        Close this context and call any necessary resource cleanup callbacks.
+        Close this context and call any necessary resource teardown callbacks.
 
-        If a cleanup callback returns an awaitable, the return value is awaited on before calling
-        any further cleanup callbacks.
+        If a teardown callback returns an awaitable, the return value is awaited on before calling
+        any further teardown callbacks.
 
         After this method has been called, resources can no longer be requested or published on
         this context.
@@ -192,15 +192,15 @@ class Context:
         self._check_closed()
         self._closed = True
 
-        callbacks = reversed(self._cleanup_callbacks)
-        del self._cleanup_callbacks
+        callbacks = reversed(self._teardown_callbacks)
+        del self._teardown_callbacks
         for callback, pass_exception in callbacks:
             try:
                 retval = callback(exception) if pass_exception else callback()
                 if isawaitable(retval):
                     await retval
             except Exception:
-                logger.exception('Error calling cleanup callback %s', callable_name(callback))
+                logger.exception('Error calling teardown callback %s', callable_name(callback))
 
     def __enter__(self):
         self._check_closed()
@@ -279,7 +279,7 @@ class Context:
         it was requested, regardless of where in the chain the factory itself was added to.
 
         :param factory_callback: a (non-coroutine) callable that takes a context instance as
-            argument and returns a tuple of (resource object, cleanup callback)
+            argument and returns a tuple of (resource object, teardown callback)
         :param types: one or more types to register the generated resource as on the target context
         :param name: name of the resource that will be created in the target context
         :param context_attr: name of the context attribute the created resource will be accessible
@@ -409,19 +409,19 @@ class Context:
         return self.get_resource(type, name)
 
 
-def context_cleanup(func: Callable):
+def context_teardown(func: Callable):
     """
-    Wrap an async generator function to handle the context cleanup.
+    Wrap an async generator function to execute the rest of the function at context teardown.
 
     This function returns an async function, which, when called, starts the wrapped async
     generator. The wrapped async function is run until the first ``yield`` statement
-    (``await async_generator.yield_()`` on Python 3.5). When the context is closed, the generator
-    is sent the exception, if any, that ended the context.
+    (``await async_generator.yield_()`` on Python 3.5). When the context is being torn down, the
+    exception that ended the context, if any, is sent to the generator.
 
     For example::
 
         class SomeComponent(Component):
-            @context_cleanup
+            @context_teardown
             async def start(self, ctx: Context):
                 service = SomeService()
                 ctx.add_resource(service)
@@ -434,7 +434,7 @@ def context_cleanup(func: Callable):
     """
     @wraps(func)
     async def wrapper(*args, **kwargs) -> None:
-        async def cleanup_callback(exception: Optional[Exception]):
+        async def teardown_callback(exception: Optional[Exception]):
             try:
                 await generator.asend(exception)
             except StopAsyncIteration:
@@ -459,7 +459,7 @@ def context_cleanup(func: Callable):
             await generator.aclose()
             raise
         else:
-            ctx.add_cleanup_callback(cleanup_callback, True)
+            ctx.add_teardown_callback(teardown_callback, True)
 
     if iscoroutinefunction(func):
         func = async_generator(func)

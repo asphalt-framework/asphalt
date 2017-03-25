@@ -12,18 +12,18 @@ from asphalt.core.runner import run_application, sigterm_handler
 class ShutdownComponent(Component):
     def __init__(self, method: str = 'stop'):
         self.method = method
-        self.cleanup_callback_called = False
+        self.teardown_callback_called = False
         self.exception = None
 
-    def cleanup_callback(self, exception):
-        self.cleanup_callback_called = True
+    def teardown_callback(self, exception):
+        self.teardown_callback_called = True
         self.exception = exception
 
     def press_ctrl_c(self):
         raise KeyboardInterrupt
 
     async def start(self, ctx: Context):
-        ctx.add_cleanup_callback(self.cleanup_callback, pass_exception=True)
+        ctx.add_teardown_callback(self.teardown_callback, pass_exception=True)
 
         if self.method == 'stop':
             ctx.loop.stop()
@@ -89,14 +89,14 @@ def test_event_loop_policy(caplog, policy, policy_name):
 
 def test_run_callbacks(event_loop, caplog):
     """
-    Test that the "finished" callbacks are run when the application is started and shut down
-    properly and that the proper logging messages are emitted.
+    Test that the teardown callbacks are run when the application is started and shut down properly
+    and that the proper logging messages are emitted.
 
     """
     component = ShutdownComponent()
     run_application(component)
 
-    assert component.cleanup_callback_called
+    assert component.teardown_callback_called
     records = [record for record in caplog.records if record.name == 'asphalt.core.runner']
     assert len(records) == 5
     assert records[0].message == 'Running in development mode'
@@ -128,7 +128,7 @@ def test_clean_exit(event_loop, caplog, method):
 def test_run_start_exception(event_loop, caplog):
     """
     Test that an exception caught during the application initialization is put into the
-    application context and made available to cleanup callbacks.
+    application context and made available to teardown callbacks.
 
     """
     component = ShutdownComponent(method='exception')

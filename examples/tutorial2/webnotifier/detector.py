@@ -6,7 +6,7 @@ import aiohttp
 from async_generator import yield_
 
 from asphalt.core import Component, Event, Signal
-from asphalt.core.context import context_cleanup
+from asphalt.core.context import context_teardown
 
 logger = logging.getLogger(__name__)
 
@@ -49,7 +49,7 @@ class ChangeDetectorComponent(Component):
         self.url = url
         self.delay = delay
 
-    @context_cleanup
+    @context_teardown
     async def start(self, ctx):
         detector = Detector(self.url, self.delay)
         ctx.add_resource(detector, context_attr='detector')

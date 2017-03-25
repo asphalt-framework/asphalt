@@ -7,7 +7,7 @@ Testing Asphalt components and component hierarchies is a relatively simple proc
 #. Create a :class:`~asphalt.core.context.Context` instance
 #. Run the component's ``start()`` method with the context as the argument
 #. Run the tests
-#. Dispatch the ``finished`` event on the context to release any resources
+#. Close the context to release any resources
 
 With Asphalt projects, it is recommended to use the `py.test`_ testing framework because it is
 already being used with Asphalt core and it provides easy testing of asynchronous code
@@ -45,9 +45,8 @@ Create a ``tests`` directory at the root of the project directory and create a m
 
     @pytest.fixture
     def context(event_loop):
-        ctx = Context()
-        yield ctx
-        event_loop.run_until_complete(ctx.finished.dispatch(None, return_future=True))
+        with Context() as ctx:
+            yield ctx
 
 
     @pytest.fixture
@@ -69,7 +68,7 @@ Create a ``tests`` directory at the root of the project directory and create a m
 The test module above contains one test function (``test_client``) and three fixtures:
 
 * ``event_loop``: provides an asyncio event loop and closes it after the test
-* ``context`` provides the root context and runs finish callbacks after the test
+* ``context`` provides the root context and runs teardown callbacks after the test
 * ``server_component``: creates and starts the server component
 
 The client component is not provided as a fixture because, as always with

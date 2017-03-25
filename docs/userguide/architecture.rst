@@ -38,25 +38,26 @@ set of responsibilities:
 #. Take in configuration through the constructor
 #. Validate the configuration
 #. Publish resources (in :meth:`~asphalt.core.component.Component.start`)
-#. Close/shut down/cleanup resources when the context is finished (by adding a callback on the
-   ``finished`` signal of the context, or by using :func:`~asphalt.core.context.context_finisher`)
+#. Close/shut down/clean up resources when the context is torn down (by directly adding a callback
+   on the context with :meth:`~asphalt.core.context.Context.add_teardown_callback`, or by using
+   :func:`~asphalt.core.context.context_teardown`)
 
-In the :meth:`~asphalt.core.component.Component.start` method, the component receives a
-:class:`~asphalt.core.context.Context` as its only argument. The component can use the context to
-add resources for other components and the application business logic to use. It can also
-request resources provided by other components to provide some complex service that builds on those
-resources.
+The :meth:`~asphalt.core.component.Component.start` method is called either by the parent component
+or the application runner with a :class:`~asphalt.core.context.Context` as its only argument.
+The component can use the context to add resources for other components and the application
+business logic to use. It can also request resources provided by other components to provide some
+complex service that builds on those resources.
 
 The :meth:`~asphalt.core.component.Component.start` method of a component is only called once,
 during application startup. When all components have been started, they are disposed of.
-If any of the components raises an exception, the application startup process fails and the context
-is finished.
+If any of the components raises an exception, the application startup process fails and any context
+cleanup callbacks scheduled so far are called before the process is exited.
 
 In order to speed up the startup process and to prevent any deadlocks, components should try to
 add any resources as soon as possible before requesting any. If two or more components end up
-waiting on each others' resources, the application will fail to start due to timeout errors.
+waiting on each others' resources, the application will fail to start.
 Also, if a component needs to perform lengthy operations like connection validation on network
-clients, it should add all its resources first to avoid said timeouts.
+clients, it should add all its resources first to avoid the application start timing out.
 
 .. hint::
     It is a good idea to use `type hints`_ with typeguard_ checks

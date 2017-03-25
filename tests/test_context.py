@@ -6,7 +6,7 @@ import pytest
 from async_generator import yield_
 
 from asphalt.core import (
-    ResourceConflict, ResourceNotFound, Context, context_cleanup, ResourceContainer)
+    ResourceConflict, ResourceNotFound, Context, context_teardown, ResourceContainer)
 from asphalt.core.utils import callable_name
 
 
@@ -51,7 +51,7 @@ class TestContext:
     @pytest.mark.asyncio
     async def test_close(self, context, exception):
         """
-        Test that resource cleanup callbacks are called in reverse order when a context is closed.
+        Test that teardown callbacks are called in reverse order when a context is closed.
 
         """
         def callback(exception=None):
@@ -61,25 +61,25 @@ class TestContext:
             called_functions.append((async_callback, exception))
 
         called_functions = []
-        context.add_cleanup_callback(callback, pass_exception=True)
-        context.add_cleanup_callback(async_callback, pass_exception=True)
+        context.add_teardown_callback(callback, pass_exception=True)
+        context.add_teardown_callback(async_callback, pass_exception=True)
         await context.close(exception)
 
         assert called_functions == [(async_callback, exception), (callback, exception)]
 
     @pytest.mark.asyncio
-    async def test_close_callback_exception(self, context, caplog):
-        """Test that exceptions raised by cleanup callbacks are logged."""
+    async def test_teardown_callback_exception(self, context, caplog):
+        """Test that exceptions raised by teardown callbacks are logged."""
         def callback():
             raise Exception('foo')
 
-        context.add_cleanup_callback(callback)
+        context.add_teardown_callback(callback)
         await context.close()
 
         callback_name = callable_name(callback)
         records = [record for record in caplog.records if record.name == 'asphalt.core.context']
         assert len(records) == 1
-        assert records[0].message == 'Error calling cleanup callback ' + callback_name
+        assert records[0].message == 'Error calling teardown callback ' + callback_name
 
     @pytest.mark.asyncio
     async def test_close_closed(self, context):
@@ -322,7 +322,7 @@ class TestContextCleanup:
     ], ids=['no_exception', 'exception'])
     @pytest.mark.asyncio
     async def test_function(self, expected_exc):
-        @context_cleanup
+        @context_teardown
         async def start(ctx: Context):
             nonlocal phase, received_exception
             phase = 'started'
@@ -345,7 +345,7 @@ class TestContextCleanup:
     @pytest.mark.asyncio
     async def test_method(self, expected_exc):
         class SomeComponent:
-            @context_cleanup
+            @context_teardown
             async def start(self, ctx: Context):
                 nonlocal phase, received_exception
                 phase = 'started'
@@ -366,12 +366,12 @@ class TestContextCleanup:
         def start(ctx):
             pass
 
-        pytest.raises(TypeError, context_cleanup, start).\
+        pytest.raises(TypeError, context_teardown, start).\
             match(' must be an async generator function')
 
     @pytest.mark.asyncio
     async def test_bad_args(self):
-        @context_cleanup
+        @context_teardown
         async def start(ctx):
             pass
 
@@ -383,7 +383,7 @@ class TestContextCleanup:
 
     @pytest.mark.asyncio
     async def test_exception(self):
-        @context_cleanup
+        @context_teardown
         async def start(ctx):
             raise Exception('dummy error')
 
@@ -395,7 +395,7 @@ class TestContextCleanup:
 
     @pytest.mark.asyncio
     async def test_missing_yield(self):
-        @context_cleanup
+        @context_teardown
         async def start(ctx: Context):
             pass
 

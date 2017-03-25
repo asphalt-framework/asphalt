@@ -196,7 +196,7 @@ class to it::
     import aiohttp
     from async_generator import yield_
 
-    from asphalt.core import Component, Event, Signal, context_finisher
+    from asphalt.core import Component, Event, Signal, context_teardown
 
     logger = logging.getLogger(__name__)
 
@@ -251,7 +251,7 @@ Asphalt application::
             self.url = url
             self.delay = delay
 
-        @context_finisher
+        @context_teardown
         async def start(self, ctx):
             detector = Detector(self.url, self.delay)
             ctx.add_resource(detector, context_attr='detector')
@@ -262,13 +262,13 @@ Asphalt application::
             # Can be replaced with plain "yield" on Python 3.6+
             await yield_()
 
-            # This part is run when the context is finished
+            # This part is run when the context is being torn down
             task.cancel()
             logging.info('Shut down web page change detector')
 
 The component's ``start()`` method starts the detector's ``run()`` method as a new task, adds
 the detector object as resource and installs an event listener that will shut down the detector
-when the context finishes.
+when the context is torn down.
 
 Now that you've moved the change detection code to its own module, ``ApplicationComponent`` will
 become somewhat lighter::
