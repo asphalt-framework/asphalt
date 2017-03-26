@@ -23,7 +23,7 @@ This library adheres to `Semantic Versioning <http://semver.org/>`_.
 - The ``asphalt.core.context`` module was overhauled:
 
   - "lazy resources" are now called "resource factories"
-  - ``Context.get_resources()`` now returns a set of ``ResourceContainer``s (instead of a list)
+  - ``Context.get_resources()`` now returns a set of ``ResourceContainer`` (instead of a list)
   - **BACKWARD INCOMPATIBLE** The ``default_timeout`` parameter was removed from the ``Context``
     constructor
   - **BACKWARD INCOMPATIBLE** The ``timeout`` parameter of ``Context.request_resource()`` was
@@ -41,6 +41,7 @@ This library adheres to `Semantic Versioning <http://semver.org/>`_.
   - **BACKWARD INCOMPATIBLE** ``Context.publish_lazy_resource()`` was renamed to
     ``Context.add_resource_factory()``
 - The application runner (``asphalt.core.runner``) got some changes too:
+
   - **BACKWARD INCOMPATIBLE** The runner no longer cancels all active tasks on exit
   - **BACKWARD INCOMPATIBLE** There is now a (configurable, defaults to 5 seconds) timeout for
     waiting for the root component to start
