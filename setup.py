@@ -42,6 +42,7 @@ setup(
         'ruamel.yaml >= 0.12',
         'typeguard >= 1.1.3',
         'async-generator ~= 1.4',
+        'asyncio_extras ~= 1.3',
         'click >= 6.6'
     ],
     extras_require={

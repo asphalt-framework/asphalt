@@ -40,6 +40,9 @@ This library adheres to `Semantic Versioning <http://semver.org/>`_.
     ``Context.add_resource()``
   - **BACKWARD INCOMPATIBLE** ``Context.publish_lazy_resource()`` was renamed to
     ``Context.add_resource_factory()``
+  - Three new methods were added to the ``Context`` class to bridge ``asyncio_extras`` and
+    ``Executor`` resources: ``call_async()``, ``call_in_executor()`` and ``threadpool()``
+  - Added a new decorator, ``@executor`` to help run code in specific ``Executor`` resources
 - The application runner (``asphalt.core.runner``) got some changes too:
 
   - **BACKWARD INCOMPATIBLE** The runner no longer cancels all active tasks on exit

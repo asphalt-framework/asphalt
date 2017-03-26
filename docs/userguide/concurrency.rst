@@ -28,12 +28,8 @@ Also, file operations cannot, at this time, be executed asynchronously and need 
 threads. Finally, your application might just need to do some CPU heavy processing that would
 otherwise block the event loop for long periods of time.
 
-To help with this, the `asyncio_extras`_ library was created as a byproduct of Asphalt.
-It provides several conveniences you can use to easily use threads when the need arises.
-
-.. note:: Starting from Asphalt 3.0, the ``asyncio_extras`` library is no longer installed as a
-   dependency of Asphalt core. You will need to add it to your application's dependencies yourself
-   if you intend to use it.
+To help with this, Asphalt contains functionality with which you can easily run code in thread
+pools or call asynchronous code from worker threads.
 
 Examples
 --------
@@ -44,78 +40,79 @@ consider what happens if the disk has to spin up from idle state or the file is 
 (or temporarily inaccessible) network drive. The whole event loop will then be blocked for who
 knows how long.
 
-The easiest way is probably to use :func:`~asyncio_extras.file.open_async`::
+The easiest way is probably to use :func:`~asphalt.core.context.call_in_executor`::
 
-    from asyncio_extras import open_async
-
-    async def read_and_send_file(ctx, connection):
-        async with open_async('file.txt', 'rb') as f:
-            contents = await f.read()
-
-        await connection.send(contents)
-
-The following snippet achieves the same goal::
-
-    from asyncio_extras import threadpool
+    from pathlib import Path
 
     async def read_and_send_file(ctx, connection):
-        async with threadpool():
-            with open('file.txt', 'rb') as f:
-                contents = f.read()
-
+        contents = await ctx.call_in_executor(Path('file.txt').read_bytes)
         await connection.send(contents)
 
-As does the next one::
-
-    from asyncio_extras import call_in_executor
+You can also opt to execute entire blocks with a thread pool executor by using
+:func:`~asphalt.core.context.threadpool`::
 
     async def read_and_send_file(ctx, connection):
-        f = await call_in_executor(open, 'file.txt', 'rb')
-        with f:
-            contents = await call_in_executor(f.read)
+        async with ctx.threadpool():
+            # Anything inside this block runs in a worker thread!
+            contents = Path('file.txt').read_bytes()
 
+        # Don't try to "await" inside the ctx.threadpool() block!
         await connection.send(contents)
 
-Alternatively, you can run the whole function in the thread pool.
-You will then need to make it a regular function instead of a coroutine function::
+Alternatively, you can run the whole function in an executor.
+You will then need to make it a regular function instead of a coroutine function.
+If the name of an executor resource is given, the first argument (second for instance/class
+methods) needs to be a :class:`Context` instance for the resource lookup to work::
 
-    from asyncio_extras import threadpool, call_async
+    from asphalt.core import executor
 
-    @threadpool
+    @executor
     def read_and_send_file(ctx, connection):
-        with open('file.txt', 'rb') as f:
-            contents = f.read()
+        contents = Path('file.txt').read_bytes()
+        ctx.call_async(connection.send, contents)
 
-        call_async(ctx.loop, connection.send, contents)
+Using alternate executors
+-------------------------
 
-Using alternate thread pools
-----------------------------
+By default, all these methods use the default executor of the event loop, which in turn defaults to
+a :class:`~concurrent.futures.ThreadPoolExecutor` with the default number of workers.
+Sometimes you may encounter situations where you need to use multiple executors, each earmarked
+for a particular task or group of tasks so as to prevent other tasks from getting stuck due to the
+lack of available workers. To this end, the mechanisms described above can be made to target a
+specific executor, either given directly or acquired as a resource from a context.
 
-In more advanced applications, you may find it useful to set up specialized thread pools for
-certain tasks in order to avoid the default thread pool from being overburdened::
+Suppose you add an ``Executor`` resource named ``file_ops`` to a context::
 
-    from concurrent.futures import ThreadPoolExecutor
+    from concurrent.futures import ThreadPoolExecutor, Executor
 
-    from asyncio_extras import threadpool
+    file_ops = ThreadPoolExecutor(5)  # max 5 worker threads for file operations
+    ctx.add_resource(file_ops, 'file_ops', types=[Executor])
 
-    file_ops = ThreadPoolExecutor(5)  # max 5 threads for file operations
+You can then use this executor resource by its name::
 
+    async def read_and_send_file(ctx, connection):
+        contents = await ctx.call_in_executor(Path('file.txt').read_bytes, executor='file_ops')
+        await connection.send(contents)
 
-    async def read_and_send_file(connection):
-        async with threadpool(file_ops):
-            with open('file.txt', 'rb') as f:
-                contents = f.read()
+Also works with the async context manager::
+
+    async def read_and_send_file(ctx, connection):
+        async with ctx.threadpool('file_ops'):
+            contents = Path('file.txt').read_bytes()
 
         await connection.send(contents)
 
+And of course as a decorator too, as long as the context is provided::
 
-All the thread related utilities in `asyncio_extras`_ have a way to specify the executor to use.
-Refer to its documentation for the specifics.
+    from asphalt.core import executor
 
+    @executor('file_ops')
+    def read_and_send_file(ctx, connection):
+        contents = Path('file.txt').read_bytes()
+        ctx.call_async(connection.send, contents)
 
 .. _co-operative multitasking: https://en.wikipedia.org/wiki/Cooperative_multitasking
 .. _preemptive multitasking: https://en.wikipedia.org/wiki/Preemption_%28computing%29
 .. _race conditions: https://en.wikipedia.org/wiki/Race_condition
 .. _locks: https://en.wikipedia.org/wiki/Lock_%28computer_science%29
 .. _context switching: https://en.wikipedia.org/wiki/Context_switch
-.. _asyncio_extras: https://pypi.python.org/pypi/asyncio_extras

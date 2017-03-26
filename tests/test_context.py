@@ -1,13 +1,29 @@
+import asyncio
 from collections import Iterable
+from concurrent.futures import ThreadPoolExecutor, Executor
 from itertools import count
+from threading import current_thread
 from unittest.mock import patch
 
 import pytest
 from async_generator import yield_
 
 from asphalt.core import (
-    ResourceConflict, ResourceNotFound, Context, context_teardown, ResourceContainer)
-from asphalt.core.utils import callable_name
+    ResourceConflict, ResourceNotFound, Context, context_teardown, ResourceContainer,
+    callable_name, executor)
+
+
+@pytest.fixture
+def context(event_loop):
+    return Context()
+
+
+@pytest.fixture
+def special_executor(context):
+    executor = ThreadPoolExecutor(1)
+    context.add_resource(executor, 'special', types=[Executor])
+    yield executor
+    executor.shutdown()
 
 
 class TestResourceContainer:
@@ -35,10 +51,6 @@ class TestResourceContainer:
 
 
 class TestContext:
-    @pytest.fixture
-    def context(self, event_loop):
-        return Context(default_timeout=2)
-
     def test_parent(self):
         """Test that the parent property points to the parent context instance, if any."""
         parent = Context()
@@ -314,6 +326,101 @@ class TestContext:
         context.add_resource_factory(lambda ctx: 6, int, context_attr='foo')
         await context.request_resource(int)
         assert context.__dict__['foo'] == 6
+
+    @pytest.mark.asyncio
+    async def test_call_async_plain(self, context):
+        def runs_in_event_loop(worker_thread, x, y):
+            assert current_thread() is not worker_thread
+            return x + y
+
+        def runs_in_worker_thread():
+            worker_thread = current_thread()
+            return context.call_async(runs_in_event_loop, worker_thread, 1, y=2)
+
+        assert await context.call_in_executor(runs_in_worker_thread) == 3
+
+    @pytest.mark.asyncio
+    async def test_call_async_coroutine(self, context):
+        async def runs_in_event_loop(worker_thread, x, y):
+            assert current_thread() is not worker_thread
+            await asyncio.sleep(0.1)
+            return x + y
+
+        def runs_in_worker_thread():
+            worker_thread = current_thread()
+            return context.call_async(runs_in_event_loop, worker_thread, 1, y=2)
+
+        assert await context.call_in_executor(runs_in_worker_thread) == 3
+
+    @pytest.mark.asyncio
+    async def test_call_async_exception(self, context):
+        def runs_in_event_loop():
+            raise ValueError('foo')
+
+        with pytest.raises(ValueError) as exc:
+            await context.call_in_executor(context.call_async, runs_in_event_loop)
+
+        assert exc.match('foo')
+
+    @pytest.mark.asyncio
+    async def test_call_in_executor(self, context):
+        """Test that call_in_executor actually runs the target in a worker thread."""
+        worker_thread = await context.call_in_executor(current_thread)
+        assert worker_thread is not current_thread()
+
+    @pytest.mark.parametrize('use_resource_name', [True, False], ids=['direct', 'resource'])
+    @pytest.mark.asyncio
+    async def test_call_in_executor_explicit(self, context, use_resource_name):
+        executor = ThreadPoolExecutor(1)
+        context.add_resource(executor, types=[Executor])
+        context.add_teardown_callback(executor.shutdown)
+        executor_arg = 'default' if use_resource_name else executor
+        worker_thread = await context.call_in_executor(current_thread, executor=executor_arg)
+        assert worker_thread is not current_thread()
+
+    @pytest.mark.asyncio
+    async def test_threadpool(self, context):
+        event_loop_thread = current_thread()
+        async with context.threadpool():
+            assert current_thread() is not event_loop_thread
+
+    @pytest.mark.asyncio
+    async def test_threadpool_named_executor(self, context, special_executor):
+        special_executor_thread = special_executor.submit(current_thread).result()
+        async with context.threadpool('special'):
+            assert current_thread() is special_executor_thread
+
+
+class TestExecutor:
+    @pytest.mark.asyncio
+    async def test_no_arguments(self, context):
+        @executor
+        def runs_in_default_worker():
+            assert current_thread() is not event_loop_thread
+
+        event_loop_thread = current_thread()
+        await runs_in_default_worker()
+
+    @pytest.mark.asyncio
+    async def test_named_executor(self, context, special_executor):
+        @executor('special')
+        def runs_in_default_worker(ctx):
+            assert current_thread() is special_executor_thread
+
+        special_executor_thread = special_executor.submit(current_thread).result()
+        await runs_in_default_worker(context)
+
+    @pytest.mark.asyncio
+    async def test_executor_missing_context(self, event_loop, context):
+        @executor('special')
+        def runs_in_default_worker():
+            pass
+
+        with pytest.raises(RuntimeError) as exc:
+            await runs_in_default_worker()
+
+        exc.match('the first argument to %s\(\) has to be a Context instance' %
+                  callable_name(runs_in_default_worker))
 
 
 class TestContextCleanup:

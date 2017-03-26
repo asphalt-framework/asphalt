@@ -1,9 +1,15 @@
 import logging
 import re
 from asyncio import get_event_loop, iscoroutinefunction
-from functools import wraps
+from concurrent.futures import Executor, Future
+from functools import wraps, partial
 from inspect import isawaitable, getattr_static
-from typing import Optional, Callable, Any, Sequence, Dict, Tuple, Type, List, Set, Union  # noqa
+
+import asyncio_extras
+from typing import (
+    Optional, Callable, Any, Sequence, Dict, Tuple, Type, List, Set, Union,
+    Awaitable
+)
 
 from async_generator import async_generator, isasyncgenfunction
 from typeguard import check_argument_types
@@ -12,7 +18,7 @@ from asphalt.core.event import Signal, Event, wait_event
 from asphalt.core.utils import qualified_name, callable_name
 
 __all__ = ('ResourceContainer', 'ResourceEvent', 'ResourceConflict', 'ResourceNotFound', 'Context',
-           'context_teardown')
+           'executor', 'context_teardown')
 
 logger = logging.getLogger(__name__)
 factory_callback_type = Callable[['Context'], Any]
@@ -99,9 +105,8 @@ class Context:
     attribute is found (or :class:`AttributeError` is raised).
 
     :param parent: the parent context, if any
-    :param default_timeout: default timeout for :meth:`request_resource` if omitted from the call
-        arguments
 
+    :ivar Context parent: the parent context, if any
     :ivar loop: the event loop associated with the context (comes from the parent context, or
         :func:`~asyncio.get_event_loop()` when no parent context is given)
     :vartype loop: asyncio.AbstractEventLoop
@@ -111,16 +116,15 @@ class Context:
 
     resource_added = Signal(ResourceEvent)
 
-    def __init__(self, parent: 'Context' = None, *, default_timeout: int = 5):
+    def __init__(self, parent: 'Context' = None):
         assert check_argument_types()
-        self._parent = parent
+        self.parent = parent
+        self.loop = parent.loop if parent is not None else get_event_loop()
         self._resources = {}  # type: Dict[Tuple[type, str], ResourceContainer]
         self._resource_factories = {}  # type: Dict[Tuple[type, str], ResourceContainer]
         self._resource_factories_by_context_attr = {}  # type: Dict[str, ResourceContainer]
         self._teardown_callbacks = []  # type: List[Tuple[Callable, bool]]
         self._closed = False
-        self.default_timeout = default_timeout
-        self.loop = parent.loop if parent is not None else get_event_loop()
 
     def __getattr__(self, name):
         # First look for a resource factory in the whole context chain
@@ -136,11 +140,6 @@ class Context:
                 return getattr(ctx, name)
 
         raise AttributeError('no such context variable: {}'.format(name))
-
-    @property
-    def parent(self) -> Optional['Context']:
-        """Return the parent of this context or ``None`` if there is no parent context."""
-        return self._parent
 
     @property
     def context_chain(self) -> List['Context']:
@@ -334,8 +333,8 @@ class Context:
         """
         resources = set(resource for resource in self._resources.values()
                         if type is None or type in resource.types)
-        if include_parents and self._parent:
-            resources.update(self._parent.get_resources(type))
+        if include_parents and self.parent:
+            resources.update(self.parent.get_resources(type))
 
         return resources
 
@@ -407,6 +406,102 @@ class Context:
         await wait_event(
             signals, lambda event: event.resource.name == name and type in event.resource.types)
         return self.get_resource(type, name)
+
+    def call_async(self, func: Callable, *args, **kwargs):
+        """
+        Call the given callable in the event loop thread.
+
+        This method lets you call asynchronous code from a worker thread.
+        Do not use it from within the event loop thread.
+
+        If the callable returns an awaitable, it is resolved before returning to the caller.
+
+        :param func: a regular function or a coroutine function
+        :param args: positional arguments to call the callable with
+        :param kwargs: keyword arguments to call the callable with
+        :return: the return value of the call
+
+        """
+        return asyncio_extras.call_async(self.loop, func, *args, **kwargs)
+
+    def call_in_executor(self, func: Callable, *args, executor: Union[Executor, str] = None,
+                         **kwargs) -> Awaitable:
+        """
+        Call the given callable in an executor.
+
+        :param func: the callable to call
+        :param args: positional arguments to call the callable with
+        :param executor: either an :class:`~concurrent.futures.Executor` instance, the resource
+            name of one or ``None`` to use the event loop's default executor
+        :param kwargs: keyword arguments to call the callable with
+        :return: an awaitable that resolves to the return value of the call
+
+        """
+        assert check_argument_types()
+        if isinstance(executor, str):
+            executor = self.require_resource(Executor, executor)
+
+        return asyncio_extras.call_in_executor(func, *args, executor=executor, **kwargs)
+
+    def threadpool(self, executor: Union[Executor, str] = None):
+        """
+        Return an asynchronous context manager that runs the block in a (thread pool) executor.
+
+        :param executor: either an :class:`~concurrent.futures.Executor` instance, the resource
+            name of one or ``None`` to use the event loop's default executor
+        :return: an asynchronous context manager
+
+        """
+        assert check_argument_types()
+        if isinstance(executor, str):
+            executor = self.require_resource(Executor, executor)
+
+        return asyncio_extras.threadpool(executor)
+
+
+def executor(arg: Union[Executor, str, Callable] = None):
+    """
+    Decorate a function so that it runs in an :class:`~concurrent.futures.Executor`.
+
+    If a resource name is given, the first argument must be a :class:`~.Context`.
+
+    Usage::
+    
+        @executor
+        def should_run_in_executor():
+            ...
+
+    With a resource name::
+
+        @executor('resourcename')
+        def should_run_in_executor(ctx):
+            ...
+
+    :param arg: a callable to decorate, an :class:`~concurrent.futures.Executor` instance, the
+        resource name of one or ``None`` to use the event loop's default executor
+    :return: the wrapped function
+
+    """
+    def outer_wrapper(func: Callable):
+        @wraps(func)
+        def inner_wrapper(*args, **kwargs):
+            try:
+                ctx = next(arg for arg in args if isinstance(arg, Context))
+            except StopIteration:
+                raise RuntimeError('the first argument to %s() has to be a Context '
+                                   'instance' % func_name) from None
+
+            executor = ctx.require_resource(Executor, resource_name)
+            return asyncio_extras.call_in_executor(func, *args, executor=executor, **kwargs)
+
+        func_name = callable_name(func)
+        return inner_wrapper
+
+    if isinstance(arg, str):
+        resource_name = arg
+        return outer_wrapper
+
+    return asyncio_extras.threadpool(arg)
 
 
 def context_teardown(func: Callable):
