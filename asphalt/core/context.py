@@ -143,7 +143,7 @@ class Context:
 
     @property
     def context_chain(self) -> List['Context']:
-        """Return the parent of this context or ``None`` if there is no parent context."""
+        """Return a list of contexts starting from this one, its parent and so on."""
         contexts = []
         ctx = self
         while ctx is not None:
