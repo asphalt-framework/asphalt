@@ -1,16 +1,14 @@
 import logging
 import re
 from asyncio import get_event_loop, iscoroutinefunction
-from concurrent.futures import Executor, Future
-from functools import wraps, partial
+from concurrent.futures import Executor
+from functools import wraps
 from inspect import isawaitable, getattr_static
-
-import asyncio_extras
 from typing import (
     Optional, Callable, Any, Sequence, Dict, Tuple, Type, List, Set, Union,
-    Awaitable
-)
+    Awaitable)
 
+import asyncio_extras
 from async_generator import async_generator, isasyncgenfunction
 from typeguard import check_argument_types
 
@@ -173,6 +171,7 @@ class Context:
 
         """
         assert check_argument_types()
+        self._check_closed()
         self._teardown_callbacks.append((callback, pass_exception))
 
     async def close(self, exception: BaseException = None) -> None:
@@ -191,15 +190,15 @@ class Context:
         self._check_closed()
         self._closed = True
 
-        callbacks = reversed(self._teardown_callbacks)
-        del self._teardown_callbacks
-        for callback, pass_exception in callbacks:
+        for callback, pass_exception in reversed(self._teardown_callbacks):
             try:
                 retval = callback(exception) if pass_exception else callback()
                 if isawaitable(retval):
                     await retval
             except Exception:
                 logger.exception('Error calling teardown callback %s', callable_name(callback))
+
+        del self._teardown_callbacks
 
     def __enter__(self):
         self._check_closed()
