@@ -1,6 +1,6 @@
 from importlib import import_module
 from inspect import isclass
-from typing import Any, Union, List, Dict, Callable
+from typing import Any, Union, List, Dict, Callable, Optional
 
 from pkg_resources import EntryPoint, iter_entry_points
 from typeguard import check_argument_types
@@ -67,7 +67,8 @@ def callable_name(func: Callable) -> str:
         return '{}.{}'.format(func.__module__, func.__qualname__)
 
 
-def merge_config(original: Dict[str, Any], overrides: Dict[str, Any]) -> Dict[str, Any]:
+def merge_config(original: Optional[Dict[str, Any]],
+                 overrides: Optional[Dict[str, Any]]) -> Dict[str, Any]:
     """
     Return a copy of the ``original`` configuration dictionary, with overrides from ``overrides``
     applied.
@@ -78,23 +79,24 @@ def merge_config(original: Dict[str, Any], overrides: Dict[str, Any]) -> Dict[st
     If a key in ``overrides`` is a dotted path (ie. ``foo.bar.baz: value``), it is assumed to be a
     shorthand for ``foo: {bar: {baz: value}}``.
 
-    :param original: a configuration dictionary
-    :param overrides: a dictionary containing overriding values to the configuration
+    :param original: a configuration dictionary (or ``None``)
+    :param overrides: a dictionary containing overriding values to the configuration (or ``None``)
     :return: the merge result
 
     """
     assert check_argument_types()
-    copied = original.copy()
-    for key, value in overrides.items():
-        if '.' in key:
-            key, rest = key.split('.', 1)
-            value = {rest: value}
+    copied = original.copy() if original else {}
+    if overrides:
+        for key, value in overrides.items():
+            if '.' in key:
+                key, rest = key.split('.', 1)
+                value = {rest: value}
 
-        orig_value = copied.get(key)
-        if isinstance(orig_value, dict) and isinstance(value, dict):
-            copied[key] = merge_config(orig_value, value)
-        else:
-            copied[key] = value
+            orig_value = copied.get(key)
+            if isinstance(orig_value, dict) and isinstance(value, dict):
+                copied[key] = merge_config(orig_value, value)
+            else:
+                copied[key] = value
 
     return copied
 

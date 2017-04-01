@@ -46,6 +46,14 @@ def test_merge_config(overrides):
     assert merge_config(original, overrides) == expected
 
 
+@pytest.mark.parametrize('original, overrides', [
+    (None, {'a': 1}),
+    ({'a': 1}, None),
+], ids=['original_none', 'override_none'])
+def test_merge_config_none_args(original, overrides):
+    assert merge_config(original, overrides) == {'a': 1}
+
+
 @pytest.mark.parametrize('inputval, expected', [
     (qualified_name, 'function'),
     (asyncio.Event(), 'asyncio.locks.Event'),
