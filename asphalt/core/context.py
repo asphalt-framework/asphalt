@@ -345,6 +345,7 @@ class Context:
         :param include_parents: include the resources from parent contexts
 
         """
+        assert check_argument_types()
         resources = set(resource for resource in self._resources.values()
                         if type is None or type in resource.types)
         if include_parents and self.parent:
@@ -361,6 +362,7 @@ class Context:
         :return: the requested resource, or ``None`` if none was available
 
         """
+        assert check_argument_types()
         key = (type, name)
 
         # First check if there's already a matching resource in this context
