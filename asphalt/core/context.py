@@ -1,6 +1,6 @@
 import logging
 import re
-from asyncio import get_event_loop, iscoroutinefunction
+from asyncio import get_event_loop, iscoroutinefunction, AbstractEventLoop
 from concurrent.futures import Executor
 from functools import wraps
 from inspect import isawaitable, getattr_static
@@ -116,13 +116,13 @@ class Context:
 
     def __init__(self, parent: 'Context' = None):
         assert check_argument_types()
-        self.parent = parent
-        self.loop = parent.loop if parent is not None else get_event_loop()
+        self._parent = parent
+        self._loop = getattr(parent, 'loop', None) or get_event_loop()
+        self._closed = False
         self._resources = {}  # type: Dict[Tuple[type, str], ResourceContainer]
         self._resource_factories = {}  # type: Dict[Tuple[type, str], ResourceContainer]
         self._resource_factories_by_context_attr = {}  # type: Dict[str, ResourceContainer]
         self._teardown_callbacks = []  # type: List[Tuple[Callable, bool]]
-        self._closed = False
 
     def __getattr__(self, name):
         # First look for a resource factory in the whole context chain
@@ -149,6 +149,21 @@ class Context:
             ctx = ctx.parent
 
         return contexts
+
+    @property
+    def loop(self) -> AbstractEventLoop:
+        """Return the event loop associated with this context."""
+        return self._loop
+
+    @property
+    def parent(self) -> Optional['Context']:
+        """Return the parent context, or ``None`` if there is no parent."""
+        return self._parent
+
+    @property
+    def closed(self) -> bool:
+        """Return ``True`` if the context has been closed, ``False`` otherwise."""
+        return self._closed
 
     def _check_closed(self):
         if self._closed:
