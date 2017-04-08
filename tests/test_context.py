@@ -27,11 +27,16 @@ def special_executor(context):
 
 
 class TestResourceContainer:
+    @pytest.mark.parametrize('thread', [False, True], ids=['eventloop', 'worker'])
     @pytest.mark.parametrize('context_attr', [None, 'attrname'], ids=['no_attr', 'has_attr'])
-    def test_generate_value(self, context_attr):
+    @pytest.mark.asyncio
+    async def test_generate_value(self, thread, context_attr):
         container = ResourceContainer(lambda ctx: 'foo', (str,), 'default', context_attr, True)
         context = Context()
-        value = container.generate_value(context)
+        if thread:
+            value = await context.call_in_executor(container.generate_value, context)
+        else:
+            value = container.generate_value(context)
 
         assert value == 'foo'
         assert context.get_resource(str) == 'foo'

@@ -48,7 +48,14 @@ class ResourceContainer:
     def generate_value(self, ctx: 'Context'):
         assert self.is_factory, 'generate_value() only works for resource factories'
         value = self.value_or_factory(ctx)
-        ctx.add_resource(value, self.name, self.context_attr, self.types)
+
+        container = ResourceContainer(value, self.types, self.name, self.context_attr, False)
+        for type_ in self.types:
+            ctx._resources[(type_, self.name)] = container
+
+        if self.context_attr:
+            setattr(ctx, self.context_attr, value)
+
         return value
 
     def __repr__(self):
