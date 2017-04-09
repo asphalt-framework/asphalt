@@ -1,5 +1,5 @@
-Events
-======
+Working with signals and events
+===============================
 
 Events are a handy way to make your code react to changes in another part of the application.
 To dispatch and listen to events, you first need to have one or more
@@ -53,13 +53,11 @@ Here's how it works::
 Exception handling
 ------------------
 
-By default, all exceptions raised by listener callbacks are just sent to the logger
-(``asphalt.core.event``). If the dispatcher needs to know about any exceptions raised by listeners,
-it can call :meth:`~asphalt.core.event.Signal.dispatch` with ``return_future=True``. This will
-cause a :class:`~asyncio.Future` to be returned and, when awaited, will raise a
-:class:`~asphalt.core.event.EventDispatchError` if any listener raised an exception. This exception
-will contain every exception that was raised, along with the information regarding which callback
-raised which exception.
+Any exceptions raised by the listener callbacks are logged to the ``asphalt.core.event`` logger.
+Additionally, the future returned by :meth:`~asphalt.core.event.Signal.dispatch` resolves to
+``True`` if no exceptions were raised during the processing of listeners. This was meant as a
+convenience for use with tests where you can just do
+``assert await thing.some_signal.dispatch('foo')``.
 
 Waiting for a single event
 --------------------------

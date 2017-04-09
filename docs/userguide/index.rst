@@ -8,6 +8,8 @@ take a look at the :doc:`../tutorials/index` first.
    :maxdepth: 2
 
    architecture
+   components
+   contexts
    concurrency
    events
    testing
