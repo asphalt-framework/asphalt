@@ -12,7 +12,7 @@ from typeguard import check_argument_types
 
 from asphalt.core.utils import qualified_name
 
-__all__ = ('Event', 'BoundSignal', 'Signal', 'wait_event', 'stream_events')
+__all__ = ('Event', 'Signal', 'wait_event', 'stream_events')
 
 logger = logging.getLogger(__name__)
 
