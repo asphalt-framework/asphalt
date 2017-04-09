@@ -4,9 +4,7 @@ from asyncio import get_event_loop, iscoroutinefunction, AbstractEventLoop
 from concurrent.futures import Executor
 from functools import wraps
 from inspect import isawaitable, getattr_static
-from typing import (
-    Optional, Callable, Any, Sequence, Dict, Tuple, Type, List, Set, Union,
-    Awaitable)
+from typing import Optional, Callable, Any, Sequence, Dict, Tuple, Type, List, Union, Awaitable
 
 import asyncio_extras
 from async_generator import async_generator, isasyncgenfunction
@@ -15,8 +13,8 @@ from typeguard import check_argument_types
 from asphalt.core.event import Signal, Event, wait_event
 from asphalt.core.utils import qualified_name, callable_name
 
-__all__ = ('ResourceContainer', 'ResourceEvent', 'ResourceConflict', 'ResourceNotFound', 'Context',
-           'executor', 'context_teardown')
+__all__ = ('ResourceEvent', 'ResourceConflict', 'ResourceNotFound', 'Context', 'executor',
+           'context_teardown')
 
 logger = logging.getLogger(__name__)
 factory_callback_type = Callable[['Context'], Any]
@@ -71,14 +69,21 @@ class ResourceEvent(Event):
     """
     Dispatched when a resource or resource factory has been added to a context.
 
-    :ivar ResourceContainer resource: container for the resource or resource factory
+    :ivar resource_types: types the resource was registered under
+    :vartype resource_types: Tuple[type, ...]
+    :ivar str name: name of the resource
+    :ivar bool is_factory: ``True`` if a resource factory was added, ``False`` if a regular
+        resource was added
     """
 
-    __slots__ = 'resource'
+    __slots__ = 'resource_types', 'resource_name', 'is_factory'
 
-    def __init__(self, source: 'Context', topic: str, resource: ResourceContainer):
+    def __init__(self, source: 'Context', topic: str, types: Tuple[type, ...], name: str,
+                 is_factory: bool):
         super().__init__(source, topic)
-        self.resource = resource
+        self.resource_types = types
+        self.resource_name = name
+        self.is_factory = is_factory
 
 
 class ResourceConflict(Exception):
@@ -281,7 +286,7 @@ class Context:
             setattr(self, context_attr, value)
 
         # Notify listeners that a new resource has been made available
-        self.resource_added.dispatch(resource)
+        self.resource_added.dispatch(types, name, False)
 
     def add_resource_factory(self, factory_callback: factory_callback_type,
                              types: Union[type, Sequence[Type]], name: str = 'default',
@@ -341,25 +346,7 @@ class Context:
             self._resource_factories_by_context_attr[context_attr] = resource
 
         # Notify listeners that a new resource has been made available
-        self.resource_added.dispatch(resource)
-
-    def get_resources(self, type: type = None, *,
-                      include_parents: bool = True) -> Set[ResourceContainer]:
-        """
-        Return containers for resources and resource factories specific to one type or all types.
-
-        :param type: type of the resources to return, or ``None`` to return all resources
-        :param include_parents: include the resources from parent contexts
-
-        """
-        assert check_argument_types()
-        self._check_closed()
-        resources = set(resource for resource in self._resources.values()
-                        if type is None or type in resource.types)
-        if include_parents and self.parent:
-            resources.update(self.parent.get_resources(type))
-
-        return resources
+        self.resource_added.dispatch(types, name, True)
 
     def get_resource(self, type: type, name: str = 'default'):
         """
@@ -429,7 +416,7 @@ class Context:
         # Wait until a matching resource or resource factory is available
         signals = [ctx.resource_added for ctx in self.context_chain]
         await wait_event(
-            signals, lambda event: event.resource.name == name and type in event.resource.types)
+            signals, lambda event: event.resource_name == name and type in event.resource_types)
         return self.get_resource(type, name)
 
     def call_async(self, func: Callable, *args, **kwargs):

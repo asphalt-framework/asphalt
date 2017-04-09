@@ -1,5 +1,4 @@
 import asyncio
-from collections import Iterable
 from concurrent.futures import ThreadPoolExecutor, Executor
 from itertools import count
 from threading import current_thread
@@ -9,8 +8,8 @@ import pytest
 from async_generator import yield_
 
 from asphalt.core import (
-    ResourceConflict, ResourceNotFound, Context, context_teardown, ResourceContainer,
-    callable_name, executor)
+    ResourceConflict, ResourceNotFound, Context, context_teardown, callable_name, executor)
+from asphalt.core.context import ResourceContainer
 
 
 @pytest.fixture
@@ -143,11 +142,10 @@ class TestContext:
         event_loop.call_soon(context.add_resource, 6, 'foo', 'foo.bar', types)
         event = await context.resource_added.wait_event()
 
-        assert event.resource.value_or_factory == 6
-        assert event.resource.types == (int,)
-        assert event.resource.name == 'foo'
-        assert event.resource.context_attr == 'foo.bar'
-        assert not event.resource.is_factory
+        assert event.resource_types == (int,)
+        assert event.resource_name == 'foo'
+        assert not event.is_factory
+        assert context.get_resource(int, 'foo') == 6
 
     @pytest.mark.asyncio
     async def test_add_resource_name_conflict(self, context):
@@ -281,28 +279,6 @@ class TestContext:
         child_context = Context(context)
         context.a = 2
         assert child_context.a == 2
-
-    @pytest.mark.asyncio
-    async def test_get_resources(self, context):
-        resource1 = context.add_resource(6, 'int1')
-        resource2 = context.add_resource(8, 'int2')
-        resource3 = context.add_resource('foo', types=[str, Iterable])
-        resource4 = context.add_resource((5, 4), 'sometuple', types=(tuple, Iterable))
-
-        assert context.get_resources() == {resource1, resource2, resource3, resource4}
-        assert context.get_resources(int) == {resource1, resource2}
-        assert context.get_resources(str) == {resource3}
-        assert context.get_resources(Iterable) == {resource3, resource4}
-
-    @pytest.mark.asyncio
-    async def test_get_resources_include_parents(self, context):
-        subcontext = Context(context)
-        resource1 = context.add_resource(6, 'int1')
-        resource2 = subcontext.add_resource(8, 'int2')
-        resource3 = context.add_resource('foo', 'str')
-
-        assert subcontext.get_resources() == {resource1, resource2, resource3}
-        assert subcontext.get_resources(include_parents=False) == {resource2}
 
     def test_require_resource(self, context):
         context.add_resource(1)

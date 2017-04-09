@@ -30,7 +30,7 @@ This library adheres to `Semantic Versioning <http://semver.org/>`_.
   - **BACKWARD INCOMPATIBLE** The ``alias`` parameter of ``Context.request_resource()`` was
     renamed to ``name``
   - **BACKWARD INCOMPATIBLE** Removed the ``Context.finished`` signal in favor of the new
-    ``add_cleanup_callback()`` method which has different semantics (callbacks are called in LIFO
+    ``add_teardown_callback()`` method which has different semantics (callbacks are called in LIFO
     order and awaited for one at a time)
   - **BACKWARD INCOMPATIBLE** Removed the ability to remove resources from a ``Context``
   - Added several new methods to the ``Context`` class: ``close()``, ``get_resource()``,
@@ -39,6 +39,9 @@ This library adheres to `Semantic Versioning <http://semver.org/>`_.
     ``Context.add_resource()``
   - **BACKWARD INCOMPATIBLE** ``Context.publish_lazy_resource()`` was renamed to
     ``Context.add_resource_factory()``
+  - **BACKWARD INCOMPATIBLE** The ``Context.get_resources()`` method was removed until
+    it can be replaced with a better thought out API
+  - **BACKWARD INCOMPATIBLE** The ``Resource`` class was removed from the public API
   - Three new methods were added to the ``Context`` class to bridge ``asyncio_extras`` and
     ``Executor`` resources: ``call_async()``, ``call_in_executor()`` and ``threadpool()``
   - Added a new decorator, ``@executor`` to help run code in specific ``Executor`` resources
