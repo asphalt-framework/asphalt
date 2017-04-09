@@ -478,7 +478,7 @@ def executor(arg: Union[Executor, str, Callable] = None):
     If a resource name is given, the first argument must be a :class:`~.Context`.
 
     Usage::
-    
+
         @executor
         def should_run_in_executor():
             ...

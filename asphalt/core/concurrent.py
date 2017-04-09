@@ -23,7 +23,7 @@ def executor(func_or_executor: Union[Executor, str, Callable[..., T_Retval]], *,
     :class:`~concurrent.futures.Executor` instance.
 
     If a decorated callable is called in a worker thread, the executor argument is ignored and the
-    wrapped function is called directly. 
+    wrapped function is called directly.
 
     Callables wrapped with this decorator must be used with ``await`` when called in the event loop
     thread.
