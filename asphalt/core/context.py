@@ -237,7 +237,7 @@ class Context:
         await self.close(exc_val)
 
     def add_resource(self, value, name: str = 'default', context_attr: str = None,
-                     types: Union[type, Sequence[Type]] = ()) -> ResourceContainer:
+                     types: Union[type, Sequence[Type]] = ()) -> None:
         """
         Add a resource to this context.
 
@@ -282,11 +282,10 @@ class Context:
 
         # Notify listeners that a new resource has been made available
         self.resource_added.dispatch(resource)
-        return resource
 
     def add_resource_factory(self, factory_callback: factory_callback_type,
                              types: Union[type, Sequence[Type]], name: str = 'default',
-                             context_attr: str = None) -> ResourceContainer:
+                             context_attr: str = None) -> None:
         """
         Add a resource factory to this context.
 
@@ -343,7 +342,6 @@ class Context:
 
         # Notify listeners that a new resource has been made available
         self.resource_added.dispatch(resource)
-        return resource
 
     def get_resources(self, type: type = None, *,
                       include_parents: bool = True) -> Set[ResourceContainer]:
