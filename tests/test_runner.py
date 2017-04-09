@@ -40,6 +40,11 @@ class ShutdownComponent(Component):
             await asyncio.sleep(1)
 
 
+def test_sigterm_handler_loop_not_running(event_loop):
+    """Test that the SIGTERM handler does nothing if the event loop is not running."""
+    sigterm_handler(logging.getLogger(__name__), event_loop)
+
+
 @pytest.mark.parametrize('logging_config', [
     None,
     logging.INFO,

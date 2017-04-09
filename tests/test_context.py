@@ -101,7 +101,10 @@ class TestContext:
     @pytest.mark.asyncio
     async def test_close_closed(self, context):
         """Test that closing an already closed context raises a RuntimeError."""
+        assert not context.closed
         await context.close()
+        assert context.closed
+
         with pytest.raises(RuntimeError) as exc:
             await context.close()
 
