@@ -4,16 +4,15 @@ from asyncio import get_event_loop, Queue, wait
 from datetime import datetime, timezone
 from inspect import isawaitable, getmembers
 from time import time as stdlib_time
+from typing import Callable, Any, Sequence, Awaitable, AsyncIterator, TypeVar, Generic, Type, Dict
 from weakref import WeakKeyDictionary
-from typing import (
-    Callable, Any, Sequence, Awaitable, AsyncIterator, TypeVar, Generic, Type, Union, Dict)
 
 from async_generator import async_generator, aclosing, yield_
 from typeguard import check_argument_types
 
 from asphalt.core.utils import qualified_name
 
-__all__ = ('Event', 'BoundSignal', 'Signal', 'wait_event', 'stream_events')
+__all__ = ('Event', 'Signal', 'wait_event', 'stream_events')
 
 logger = logging.getLogger(__name__)
 
@@ -55,14 +54,51 @@ class Event:
 T_Event = TypeVar('T_Event', bound=Event)
 
 
-class BoundSignal(Generic[T_Event]):
-    __slots__ = 'event_class', 'source', 'topic', 'listeners'
+class Signal(Generic[T_Event]):
+    """
+    Declaration of a signal that can be used to dispatch events.
 
-    def __init__(self, event_class: Type[T_Event], source, topic: str):
+    This is a descriptor that returns itself on class level attribute access and a bound version of
+    itself on instance level access. Connecting listeners and dispatching events only works with
+    these bound instances.
+
+    Each signal must be assigned to a class attribute, but only once. The Signal will not function
+    correctly if the same Signal instance is assigned to multiple attributes.
+
+    :param event_class: an event class
+    """
+
+    __slots__ = 'event_class', 'topic', 'source', 'listeners', 'bound_signals'
+
+    def __init__(self, event_class: Type[T_Event], *, source = None, topic: str = None):
+        assert check_argument_types()
         self.event_class = event_class
-        self.source = weakref.ref(source)
         self.topic = topic
-        self.listeners = None
+        if source is not None:
+            self.source = weakref.ref(source)
+            self.listeners = None
+        else:
+            assert issubclass(event_class, Event), 'event_class must be a subclass of Event'
+            self.bound_signals = WeakKeyDictionary()  # type: Dict[Any, 'Signal']
+
+    def __get__(self, instance, owner) -> 'Signal':
+        if instance is None:
+            return self
+
+        # Find the attribute this Signal was assigned to (needed only on Python 3.5)
+        if self.topic is None:
+            self.topic = next(
+                attr for attr, value in getmembers(owner, lambda value: value is self))
+
+        try:
+            return self.bound_signals[instance]
+        except KeyError:
+            bound_signal = Signal(self.event_class, source=instance, topic=self.topic)
+            self.bound_signals[instance] = bound_signal
+            return bound_signal
+
+    def __set_name__(self, owner, name: str) -> None:
+        self.topic = name
 
     def connect(self, callback: Callable[[T_Event], Any]) -> Callable[[T_Event], Any]:
         """
@@ -186,51 +222,8 @@ class BoundSignal(Generic[T_Event]):
         return stream_events([self], filter, max_queue_size=max_queue_size)
 
 
-class Signal(Generic[T_Event]):
-    """
-    Declaration of a signal that can be used to dispatch events.
-
-    This is a descriptor that returns itself on class level attribute access and a bound version of
-    itself on instance level access. Connecting listeners and dispatching events only works with
-    these bound instances.
-
-    Each signal must be assigned to a class attribute, but only once. The Signal will not function
-    correctly if the same Signal instance is assigned to multiple attributes.
-
-    :param event_class: an event class
-    """
-
-    __slots__ = 'event_class', 'topic', 'bound_signals'
-
-    def __init__(self, event_class: Type[T_Event]):
-        assert check_argument_types()
-        assert issubclass(event_class, Event), 'event_class must be a subclass of Event'
-        self.event_class = event_class
-        self.bound_signals = WeakKeyDictionary()  # type: Dict[Any, BoundSignal]
-        self.topic = None
-
-    def __get__(self, instance, owner) -> Union['Signal', BoundSignal]:
-        if instance is None:
-            return self
-
-        # Find the attribute this Signal was assigned to (needed only on Python 3.5)
-        if self.topic is None:
-            self.topic = next(
-                attr for attr, value in getmembers(owner, lambda value: value is self))
-
-        try:
-            return self.bound_signals[instance]
-        except KeyError:
-            bound_signal = BoundSignal(self.event_class, instance, self.topic)
-            self.bound_signals[instance] = bound_signal
-            return bound_signal
-
-    def __set_name__(self, owner, name: str) -> None:
-        self.topic = name
-
-
 @async_generator
-async def stream_events(signals: Sequence[BoundSignal], filter: Callable[[Event], bool] = None, *,
+async def stream_events(signals: Sequence[Signal], filter: Callable[[Event], bool] = None, *,
                         max_queue_size: int = 0) -> AsyncIterator[Event]:
     """
     Return an async generator that yields events from the given signals.
@@ -259,8 +252,7 @@ async def stream_events(signals: Sequence[BoundSignal], filter: Callable[[Event]
             signal.disconnect(queue.put_nowait)
 
 
-async def wait_event(signals: Sequence[BoundSignal],
-                     filter: Callable[[Event], bool] = None) -> Event:
+async def wait_event(signals: Sequence[Signal], filter: Callable[[Event], bool] = None) -> Event:
     """
     Wait until any of the given signals dispatches an event that satisfies the filter (if any).
 

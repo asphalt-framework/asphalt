@@ -10,13 +10,12 @@ This library adheres to `Semantic Versioning <http://semver.org/>`_.
 - The ``asphalt.core.event`` module was overhauled:
 
   - **BACKWARD INCOMPATIBLE** Removed the ``monotime`` attribute from the ``Event`` class
-  - Split off most methods in the ``Signal`` class into the ``BoundSignal`` class
-    (this does not affect how signals are used)
   - **BACKWARD INCOMPATIBLE** Dropped the ``return_future`` argument from ``Signal.dispatch()``
     and ``Signal.dispatch_event()`` – they now always return an awaitable that resolves to a
     boolean, indicating whether all callbacks were successful or not
   - **BACKWARD INCOMPATIBLE** Made the ``max_queue_size`` argument in ``Signal.stream_events`` and
     ``stream_events()`` into a keyword-only argument
+  - **BACKWARD INCOMPATIBLE** ``Signal.dispatch_event()`` was renamed to ``Signal.dispatch_raw()``
   - Added the ``filter`` argument to ``Signal.stream_events()`` and ``stream_events()`` which can
     restrict the events that are yielded by them
   - Added the ``time`` constructor argument to the ``Event`` class
@@ -50,7 +49,6 @@ This library adheres to `Semantic Versioning <http://semver.org/>`_.
     waiting for the root component to start
   - Asynchronous generators are now closed after the context has been closed (on Python 3.6+)
   - The SIGTERM signal now cleanly shuts down the application
-- **BACKWARD INCOMPATIBLE** ``Signal.dispatch_event()`` was renamed to ``Signal.dispatch_raw()``
 - Switched from ``asyncio_extras`` to ``async_generator`` as the async generator compatibility
   library
 - Made the current event loop accessible (from any thread) as the ``loop`` property from any
