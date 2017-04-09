@@ -103,9 +103,9 @@ class BoundSignal(Generic[T_Event]):
         except ValueError:
             pass
 
-    def dispatch_event(self, event: Event) -> Awaitable[bool]:
+    def dispatch_raw(self, event: Event) -> Awaitable[bool]:
         """
-        Dispatch the given event to all listeners.
+        Dispatch the given event object to all listeners.
 
         Creates a new task in which all listener callbacks are called with the given event as
         the only argument. Coroutine callbacks are converted to their own respective tasks and
@@ -118,7 +118,7 @@ class BoundSignal(Generic[T_Event]):
         :param event: the event object to dispatch
         :returns: an awaitable that completes when all the callbacks have been called (and any
             awaitables waited on) and resolves to ``True`` if there were no exceptions raised by
-            the callbacks, ``False``otherwise
+            the callbacks, ``False`` otherwise
 
         """
         async def do_dispatch() -> None:
@@ -171,11 +171,11 @@ class BoundSignal(Generic[T_Event]):
         :param kwargs: keyword arguments to the constructor of the associated event class
         :returns: an awaitable that completes when all the callbacks have been called (and any
             awaitables waited on) and resolves to ``True`` if there were no exceptions raised by
-            the callbacks, ``False``otherwise
+            the callbacks, ``False`` otherwise
 
         """
         event = self.event_class(self.source(), self.topic, *args, **kwargs)
-        return self.dispatch_event(event)
+        return self.dispatch_raw(event)
 
     def wait_event(self, filter: Callable[[Event], bool] = None) -> Awaitable[T_Event]:
         """Shortcut for calling :func:`wait_event` with this signal in the first argument."""

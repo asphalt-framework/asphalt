@@ -50,6 +50,7 @@ This library adheres to `Semantic Versioning <http://semver.org/>`_.
     waiting for the root component to start
   - Asynchronous generators are now closed after the context has been closed (on Python 3.6+)
   - The SIGTERM signal now cleanly shuts down the application
+- **BACKWARD INCOMPATIBLE** ``Signal.dispatch_event()`` was renamed to ``Signal.dispatch_raw()``
 - Switched from ``asyncio_extras`` to ``async_generator`` as the async generator compatibility
   library
 - Made the current event loop accessible (from any thread) as the ``loop`` property from any

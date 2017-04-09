@@ -90,12 +90,12 @@ class TestSignal:
         assert events[0].kwargs == {'a': 1, 'b': 2}
 
     @pytest.mark.asyncio
-    async def test_dispatch_event(self, source):
-        """Test that dispatch_event() correctly dispatches the given event."""
+    async def test_dispatch_raw(self, source):
+        """Test that dispatch_raw() correctly dispatches the given event."""
         events = []
         source.event_a.connect(events.append)
         event = DummyEvent(source, 'event_a', 'x', 'y', a=1, b=2)
-        assert await source.event_a.dispatch_event(event)
+        assert await source.event_a.dispatch_raw(event)
 
         assert events == [event]
 
@@ -141,10 +141,10 @@ class TestSignal:
         assert len(events) == 1
 
     @pytest.mark.asyncio
-    async def test_dispatch_event_class_mismatch(self, source):
+    async def test_dispatch_raw_class_mismatch(self, source):
         """Test that passing an event of the wrong type raises an AssertionError."""
         with pytest.raises(TypeError) as exc:
-            await source.event_a.dispatch_event(Event(source, 'event_a'))
+            await source.event_a.dispatch_raw(Event(source, 'event_a'))
 
         assert str(exc.value) == 'event must be of type test_event.DummyEvent'
 
