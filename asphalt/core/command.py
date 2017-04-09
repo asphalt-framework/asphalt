@@ -32,7 +32,3 @@ def run(configfile, unsafe: bool, loop: Optional[str]):
 
     # Start the application
     run_application(**config)
-
-
-if __name__ == '__main__':  # pragma: no cover
-    main()
