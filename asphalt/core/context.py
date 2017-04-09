@@ -513,7 +513,7 @@ def executor(arg: Union[Executor, str, Callable] = None):
         @wraps(func)
         def inner_wrapper(*args, **kwargs):
             try:
-                ctx = next(arg for arg in args if isinstance(arg, Context))
+                ctx = next(arg for arg in args[:2] if isinstance(arg, Context))
             except StopIteration:
                 raise RuntimeError('the first argument to %s() has to be a Context '
                                    'instance' % func_name) from None
