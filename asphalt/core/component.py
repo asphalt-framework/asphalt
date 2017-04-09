@@ -24,13 +24,16 @@ class Component(metaclass=ABCMeta):
         """
         Perform any necessary tasks to start the services provided by this component.
 
-        Components typically use the context to:
-          * publish resources (:meth:`~asphalt.core.context.Context.publish_resource` and
-            :meth:`~asphalt.core.context.Context.publish_lazy_resource`)
-          * request resources (:meth:`~asphalt.core.context.Context.request_resource`)
+        In this method, components typically use the context to:
+          * add resources and/or resource factories to it
+            (:meth:`~asphalt.core.context.Context.add_resource` and
+            :meth:`~asphalt.core.context.Context.add_resource_factory`)
+          * request resources from it asynchronously
+            (:meth:`~asphalt.core.context.Context.request_resource`)
 
-        It is advisable for Components to first publish all the resources they can before
-        requesting any. This will speed up the dependency resolution and prevent deadlocks.
+        It is advisable for Components to first add all the resources they can to the context
+        before requesting any from it. This will speed up the dependency resolution and prevent
+        deadlocks.
 
         :param ctx: the containing context for this component
         """
