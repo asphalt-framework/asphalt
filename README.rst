@@ -16,7 +16,7 @@ Its highlight features are:
 * A sophisticated signal system that lets you connect different services to create complex
   event-driven interactions
 * Supports uvloop_ and aiogevent_ as event loop policy providers (though YMMV with the latter one)
-* Elegant handling of blocking APIs through the use of `asyncio_extras`_
+* Elegant handling of blocking APIs through the use of thread pooling
 * Run time type checking for development and testing to fail early when functions are called with
   incompatible arguments (can be disabled with **zero** overhead for production deployments!)
 * `Type hints`_ and `semantic versioning`_ used throughout the core and all component libraries
@@ -34,7 +34,6 @@ with relatively little effort.
 .. _asyncio: https://docs.python.org/3/library/asyncio.html
 .. _uvloop: https://github.com/MagicStack/uvloop
 .. _aiogevent: https://bitbucket.org/haypo/aiogevent
-.. _asyncio_extras: https://github.com/agronholm/asyncio_extras
 .. _Type hints: https://www.python.org/dev/peps/pep-0484/
 .. _semantic versioning: http://semver.org/
 
