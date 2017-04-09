@@ -15,9 +15,9 @@ subcontexts are typically used in container components to isolate its resources 
 the application. Short lived subcontexts, on the other hand, usually encompass some *unit of work*
 (UOW). Examples of such UOWs are:
 
-  * handling of a request in a network service
-  * running a scheduled task
-  * running a test in a test suite
+* handling of a request in a network service
+* running a scheduled task
+* running a test in a test suite
 
 Resources
 ---------
@@ -81,7 +81,87 @@ guaranteed. This is usually used only in the components'
 
 The order of resource lookup is as follows:
 
-  #. search for a resource in the local context
-  #. search for a resource factory in the local context and its parents and, if found, generate the
-     local resource
-  #. search for a resource in the parent contexts
+#. search for a resource in the local context
+#. search for a resource factory in the local context and its parents and, if found, generate the
+   local resource
+#. search for a resource in the parent contexts
+
+Handling resource cleanup
+-------------------------
+
+Any code that adds resources to a context is also responsible for cleaning them up when the context
+is closed. This usually involves closing sockets and files and freeing whatever system resources
+were allocated. This should be done in a *teardown callback*, scheduled using
+:meth:`~asphalt.core.context.Context.add_teardown_callback`. When the context is closed, teardown
+callbacks are run in the reverse order in which they were added, and always one at a time, unlike
+with the :class:`~asphalt.core.event.Signal` class. This ensures that a resource that is still in
+use by another resource is never cleaned up prematurely.
+
+For example::
+
+    from asphalt.core import Component
+
+
+    class FooComponent(Component):
+        async def start(ctx):
+            service = SomeService()
+            await service.start(ctx)
+            ctx.add_teardown_callback(service.stop)
+            ctx.add_resource(service)
+
+
+There also exists a convenience decorator, :func:`~asphalt.core.context.context_teardown`, which
+makes use of asynchronous generators::
+
+    from asphalt.core import Component, context_teardown
+    from async_generator import yield_
+
+
+    class FooComponent(Component):
+        @context_teardown
+        async def start(ctx):
+            service = SomeService()
+            await service.start(ctx)
+            ctx.add_resource(service)
+
+            await yield_()  # just "yield" on Python 3.6+
+
+            # This part of the function is run when the context is closing
+            service.stop()
+
+Sometimes you may want the cleanup to know whether the context was ended because of an unhandled
+exception. The one use that has come up so far is committing or rolling back a database
+transaction. This can be achieved by passing the ``pass_exception`` keyword argument to
+:meth:`~asphalt.core.context.Context.add_teardown_callback`::
+
+    class FooComponent(Component):
+        async def start(ctx):
+            def teardown(exception: Optional[BaseException]):
+                if exception:
+                    db.rollback()
+                else:
+                    db.commit()
+
+            db = SomeDatabase()
+            await db.start(ctx)
+            ctx.add_teardown_callback(teardown)
+            ctx.add_resource(db)
+
+The same can be achieved with :func:`~asphalt.core.context.context_teardown` by storing the yielded
+value::
+
+    class FooComponent(Component):
+        @context_teardown
+        async def start(ctx):
+            db = SomeDatabase()
+            await db.start(ctx)
+            ctx.add_teardown_callback(teardown)
+            ctx.add_resource(db)
+
+            exception = await yield_()
+
+            if exception:
+                db.rollback()
+            else:
+                db.commit()
+
