@@ -60,9 +60,7 @@ You can also opt to execute entire blocks with a thread pool executor by using
         await connection.send(contents)
 
 Alternatively, you can run the whole function in an executor.
-You will then need to make it a regular function instead of a coroutine function.
-If the name of an executor resource is given, the first argument (second for instance/class
-methods) needs to be a :class:`Context` instance for the resource lookup to work::
+You will then need to make it a regular function instead of a coroutine function::
 
     from asphalt.core import executor
 
