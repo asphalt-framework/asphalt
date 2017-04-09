@@ -253,6 +253,7 @@ class Context:
 
         """
         assert check_argument_types()
+        self._check_closed()
         if isinstance(types, type):
             types = (types,)
         elif not types:
@@ -309,6 +310,7 @@ class Context:
 
         """
         assert check_argument_types()
+        self._check_closed()
         types = (types,) if isinstance(types, type) else types
         if not resource_name_re.fullmatch(name):
             raise ValueError('"name" must be a nonempty string consisting only of alphanumeric '
@@ -353,6 +355,7 @@ class Context:
 
         """
         assert check_argument_types()
+        self._check_closed()
         resources = set(resource for resource in self._resources.values()
                         if type is None or type in resource.types)
         if include_parents and self.parent:
@@ -370,6 +373,7 @@ class Context:
 
         """
         assert check_argument_types()
+        self._check_closed()
         key = (type, name)
 
         # First check if there's already a matching resource in this context
