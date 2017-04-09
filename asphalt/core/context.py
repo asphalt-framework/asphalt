@@ -515,13 +515,12 @@ def executor(arg: Union[Executor, str, Callable] = None):
             try:
                 ctx = next(arg for arg in args[:2] if isinstance(arg, Context))
             except StopIteration:
-                raise RuntimeError('the first argument to %s() has to be a Context '
-                                   'instance' % func_name) from None
+                raise RuntimeError('the first positional argument to {}() has to be a Context '
+                                   'instance'.format(callable_name(func))) from None
 
             executor = ctx.require_resource(Executor, resource_name)
             return asyncio_extras.call_in_executor(func, *args, executor=executor, **kwargs)
 
-        func_name = callable_name(func)
         return inner_wrapper
 
     if isinstance(arg, str):
@@ -564,19 +563,18 @@ def context_teardown(func: Callable):
             finally:
                 await generator.aclose()
 
-        if len(args) > 0 and isinstance(args[0], Context):
-            ctx = args[0]
-        elif len(args) > 1 and isinstance(args[1], Context):
-            ctx = args[1]
-        else:
-            raise RuntimeError(
-                'either the first or second positional argument needs to be a Context instance')
+        try:
+            ctx = next(arg for arg in args[:2] if isinstance(arg, Context))
+        except StopIteration:
+            raise RuntimeError('the first positional argument to {}() has to be a Context '
+                               'instance'.format(callable_name(func))) from None
 
         generator = func(*args, **kwargs)
         try:
             await generator.asend(None)
         except StopAsyncIteration:
-            raise RuntimeError('{} did not do "await yield_()"'.format(qualified_name(func)))
+            raise RuntimeError(
+                '{} did not do "await yield_()"'.format(callable_name(func))) from None
         except BaseException:
             await generator.aclose()
             raise
@@ -586,6 +584,6 @@ def context_teardown(func: Callable):
     if iscoroutinefunction(func):
         func = async_generator(func)
     elif not isasyncgenfunction(func):
-        raise TypeError('{} must be an async generator function'.format(qualified_name(func)))
+        raise TypeError('{} must be an async generator function'.format(callable_name(func)))
 
     return wrapper
