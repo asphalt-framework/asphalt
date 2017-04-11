@@ -29,6 +29,4 @@ logging:
       handlers: [console]
       level: INFO
     webnotifier:
-      handlers: [console]
       level: DEBUG
-      propagate: false
