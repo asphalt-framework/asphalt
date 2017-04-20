@@ -24,9 +24,9 @@ logging:
     console:
       class: logging.StreamHandler
       formatter: default
+  root:
+    handlers: [console]
+    level: INFO
   loggers:
-    root:
-      handlers: [console]
-      level: INFO
     webnotifier:
       level: DEBUG
