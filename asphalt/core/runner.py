@@ -115,12 +115,18 @@ def run_application(component: Union[Component, Dict[str, Any]], *, event_loop_p
         exception = e
         logger.exception('Error during application startup')
     else:
+        logger.info('Application started')
+
         # Enable the component tree to be garbage collected
         del component
 
+        # Add a signal handler to gracefully deal with SIGTERM
+        try:
+            event_loop.add_signal_handler(signal.SIGTERM, sigterm_handler, logger, event_loop)
+        except NotImplementedError:
+            pass  # Windows does not support signals very well
+
         # Finally, run the event loop until the process is terminated or Ctrl+C is pressed
-        logger.info('Application started')
-        event_loop.add_signal_handler(signal.SIGTERM, sigterm_handler, logger, event_loop)
         try:
             event_loop.run_forever()
         except (KeyboardInterrupt, SystemExit):

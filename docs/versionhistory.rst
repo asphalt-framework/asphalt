@@ -3,6 +3,11 @@ Version history
 
 This library adheres to `Semantic Versioning <http://semver.org/>`_.
 
+**3.0.1** (2017-04-30)
+
+- Fixed ``run_application()`` not working on Windows due to ``NotImplementedError`` when adding the
+  ``SIGTERM`` signal handler
+
 **3.0.0** (2017-04-10)
 
 - **BACKWARD INCOMPATIBLE** Upped the minimum Python version to 3.5.2 from 3.5.0
