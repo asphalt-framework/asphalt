@@ -170,7 +170,7 @@ And to make the the results look nicer in an email message, you can switch to us
                     await asyncio.sleep(10)
 
 You'll need to replace the ``host``, ``sender`` and ``to`` arguments for the mailer component and
-possibly add the ``ssl``, ``username`` and ``password`` arguments if your SMTP server requires
+possibly add the ``username`` and ``password`` arguments if your SMTP server requires
 authentication.
 
 With these changes, you'll get a new HTML formatted email each time the code detects changes in the

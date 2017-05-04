@@ -7,7 +7,6 @@ component:
       delay: 15
     mailer:
       host: your.smtp.server.here
-      ssl: true
       username: yourusername
       password: yourpassword
       message_defaults:
