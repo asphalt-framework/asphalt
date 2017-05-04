@@ -264,6 +264,7 @@ Asphalt application::
 
             # This part is run when the context is being torn down
             task.cancel()
+            await asyncio.gather(task, return_exceptions=True)
             logging.info('Shut down web page change detector')
 
 The component's ``start()`` method starts the detector's ``run()`` method as a new task, adds
