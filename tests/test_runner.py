@@ -190,7 +190,11 @@ def test_dict_config(event_loop, caplog):
 
 
 def test_run_cli_application(event_loop, caplog):
-    run_application(DummyCLIApp())
+    with pytest.raises(SystemExit) as exc:
+        run_application(DummyCLIApp())
+
+    assert exc.value.code == 20
+
     records = [record for record in caplog.records if record.name == 'asphalt.core.runner']
     assert len(records) == 5
     assert records[0].message == 'Running in development mode'

@@ -103,6 +103,7 @@ def run_application(component: Union[Component, Dict[str, Any]], *, event_loop_p
     logger.info('Starting application')
     context = Context()
     exception = None
+    exit_code = 0
 
     # Start the root component
     try:
@@ -111,9 +112,11 @@ def run_application(component: Union[Component, Dict[str, Any]], *, event_loop_p
     except asyncio.TimeoutError as e:
         exception = e
         logger.error('Timeout waiting for the root component to start')
+        exit_code = 1
     except Exception as e:
         exception = e
         logger.exception('Error during application startup')
+        exit_code = 1
     else:
         logger.info('Application started')
 
@@ -129,8 +132,10 @@ def run_application(component: Union[Component, Dict[str, Any]], *, event_loop_p
         # Finally, run the event loop until the process is terminated or Ctrl+C is pressed
         try:
             event_loop.run_forever()
-        except (KeyboardInterrupt, SystemExit):
+        except KeyboardInterrupt:
             pass
+        except SystemExit as e:
+            exit_code = e.code
 
     # Close the root context
     logger.info('Stopping application')
@@ -146,5 +151,5 @@ def run_application(component: Union[Component, Dict[str, Any]], *, event_loop_p
     event_loop.close()
     logger.info('Application stopped')
 
-    if exception:
-        sys.exit(1)
+    if exit_code:
+        sys.exit(exit_code)

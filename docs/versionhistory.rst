@@ -7,6 +7,7 @@ This library adheres to `Semantic Versioning <http://semver.org/>`_.
 
 - Fixed ``CLIApplicationComponent`` running prematurely (during the application start phase) and
   skipping the proper shutdown sequence
+- Fixed return code from ``CLIApplicationComponent`` being ignored
 
 **3.0.1** (2017-04-30)
 
