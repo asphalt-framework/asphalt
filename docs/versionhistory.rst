@@ -3,6 +3,11 @@ Version history
 
 This library adheres to `Semantic Versioning <http://semver.org/>`_.
 
+**3.0.2** (2017-05-05)
+
+- Fixed ``CLIApplicationComponent`` running prematurely (during the application start phase) and
+  skipping the proper shutdown sequence
+
 **3.0.1** (2017-04-30)
 
 - Fixed ``run_application()`` not working on Windows due to ``NotImplementedError`` when adding the

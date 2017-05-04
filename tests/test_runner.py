@@ -5,7 +5,7 @@ from unittest.mock import patch
 
 import pytest
 
-from asphalt.core.component import Component
+from asphalt.core.component import Component, CLIApplicationComponent
 from asphalt.core.context import Context
 from asphalt.core.runner import run_application, sigterm_handler
 
@@ -38,6 +38,11 @@ class ShutdownComponent(Component):
             raise RuntimeError('this should crash the application')
         elif self.method == 'timeout':
             await asyncio.sleep(1)
+
+
+class DummyCLIApp(CLIApplicationComponent):
+    async def run(self, ctx: Context):
+        return 20
 
 
 def test_sigterm_handler_loop_not_running(event_loop):
@@ -175,6 +180,17 @@ def test_dict_config(event_loop, caplog):
     component_class = '{0.__module__}:{0.__name__}'.format(ShutdownComponent)
     run_application(component={'type': component_class})
 
+    records = [record for record in caplog.records if record.name == 'asphalt.core.runner']
+    assert len(records) == 5
+    assert records[0].message == 'Running in development mode'
+    assert records[1].message == 'Starting application'
+    assert records[2].message == 'Application started'
+    assert records[3].message == 'Stopping application'
+    assert records[4].message == 'Application stopped'
+
+
+def test_run_cli_application(event_loop, caplog):
+    run_application(DummyCLIApp())
     records = [record for record in caplog.records if record.name == 'asphalt.core.runner']
     assert len(records) == 5
     assert records[0].message == 'Running in development mode'

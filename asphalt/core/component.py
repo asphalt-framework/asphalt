@@ -149,9 +149,12 @@ class CLIApplicationComponent(ContainerComponent):
             else:
                 sys.exit(0)
 
+        def start_run_task():
+            task = ctx.loop.create_task(self.run(ctx))
+            task.add_done_callback(run_complete)
+
         await super().start(ctx)
-        task = ctx.loop.create_task(self.run(ctx))
-        task.add_done_callback(run_complete)
+        ctx.loop.call_later(0.1, start_run_task)
 
     @abstractmethod
     async def run(self, ctx: Context) -> Optional[int]:
