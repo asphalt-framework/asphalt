@@ -239,7 +239,7 @@ Next, add another class in the same module that will do the HTTP requests and ch
                     await asyncio.sleep(self.delay)
 
 The constructor arguments allow you to freely specify the parameters for the detection process.
-The class includes a signal named ``change`` that uses the previously created
+The class includes a signal named ``changed`` that uses the previously created
 ``WebPageChangeEvent`` class. The code dispatches such an event when a change in the target web
 page is detected.
 
