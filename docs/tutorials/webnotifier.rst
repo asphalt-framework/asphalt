@@ -339,14 +339,12 @@ contents:
         console:
           class: logging.StreamHandler
           formatter: default
+      root:
+        handlers: [console]
+        level: INFO
       loggers:
-        root:
-          handlers: [console]
-          level: INFO
         webnotifier:
-          handlers: [console]
           level: DEBUG
-          propagate: false
 
 The ``component`` section defines parameters for the root component. Aside from the special
 ``type`` key which tells the runner where to find the component class, all the keys in this section
