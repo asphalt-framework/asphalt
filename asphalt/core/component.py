@@ -89,11 +89,13 @@ class ContainerComponent(Component):
         if alias in self.child_components:
             raise ValueError('there is already a child component named "{}"'.format(alias))
 
+        config['type'] = type or alias
+
         # Allow the external configuration to override the constructor arguments
         override_config = self.component_configs.get(alias) or {}
         config = merge_config(config, override_config)
 
-        component = component_types.create_object(type or alias, **config)
+        component = component_types.create_object(**config)
         self.child_components[alias] = component
 
     async def start(self, ctx: Context):

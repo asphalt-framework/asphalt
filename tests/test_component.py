@@ -40,6 +40,18 @@ class TestContainerComponent:
         assert isinstance(component, DummyComponent)
         assert component.kwargs == {'a': 1, 'b': 2, 'c': 3}
 
+    def test_add_component_with_type(self):
+        """
+        Test that add_component works with a `type` specified in a
+        configuration overriddes directly supplied configuration values.
+
+        """
+        container = ContainerComponent({'dummy': {'type': DummyComponent}})
+        container.add_component('dummy')
+        assert len(container.child_components) == 1
+        component = container.child_components['dummy']
+        assert isinstance(component, DummyComponent)
+
     @pytest.mark.parametrize('alias, cls, exc_cls, message', [
         ('', None, TypeError, 'component_alias must be a nonempty string'),
         ('foo', None, LookupError, 'no such entry point in asphalt.components: foo'),
