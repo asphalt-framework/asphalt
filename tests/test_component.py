@@ -27,6 +27,10 @@ class TestContainerComponent:
     def container(self):
         return ContainerComponent({'dummy': {'a': 1, 'c': 3}})
 
+    @pytest.fixture
+    def container_with_type(self):
+        return ContainerComponent({'dummy': {'type': DummyComponent}})
+
     def test_add_component(self, container):
         """
         Test that add_component works with an without an entry point and that external
@@ -39,6 +43,18 @@ class TestContainerComponent:
         component = container.child_components['dummy']
         assert isinstance(component, DummyComponent)
         assert component.kwargs == {'a': 1, 'b': 2, 'c': 3}
+
+    def test_add_component_with_type(self, container_with_type):
+        """
+        Test that add_component works with a `type` specified in a
+        configuration overriddes directly supplied configuration values.
+
+        """
+        container_with_type.add_component('dummy')
+
+        assert len(container_with_type.child_components) == 1
+        component = container_with_type.child_components['dummy']
+        assert isinstance(component, DummyComponent)
 
     @pytest.mark.parametrize('alias, cls, exc_cls, message', [
         ('', None, TypeError, 'component_alias must be a nonempty string'),
