@@ -88,7 +88,7 @@ class ContainerComponent(Component):
             raise TypeError('component_alias must be a nonempty string')
         if alias in self.child_components:
             raise ValueError('there is already a child component named "{}"'.format(alias))
-        
+
         config['type'] = type or alias
 
         # Allow the external configuration to override the constructor arguments
