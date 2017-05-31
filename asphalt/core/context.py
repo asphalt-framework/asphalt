@@ -4,6 +4,7 @@ from asyncio import get_event_loop, iscoroutinefunction, AbstractEventLoop
 from concurrent.futures import Executor
 from functools import wraps
 from inspect import isawaitable, getattr_static
+from traceback import format_exception
 from typing import Optional, Callable, Any, Sequence, Dict, Tuple, Type, List, Union, Awaitable
 
 import asyncio_extras
@@ -13,8 +14,8 @@ from typeguard import check_argument_types
 from asphalt.core.event import Signal, Event, wait_event
 from asphalt.core.utils import qualified_name, callable_name
 
-__all__ = ('ResourceEvent', 'ResourceConflict', 'ResourceNotFound', 'Context', 'executor',
-           'context_teardown')
+__all__ = ('ResourceEvent', 'ResourceConflict', 'ResourceNotFound', 'TeardownError', 'Context',
+           'executor', 'context_teardown')
 
 logger = logging.getLogger(__name__)
 factory_callback_type = Callable[['Context'], Any]
@@ -104,6 +105,27 @@ class ResourceNotFound(LookupError):
     def __str__(self):
         return 'no matching resource was found for type={typename} name={self.name!r}'.\
             format(self=self, typename=qualified_name(self.type))
+
+
+class TeardownError(Exception):
+    """
+    Raised after context teardown when one or more teardown callbacks raised an exception.
+
+    :ivar exceptions: exceptions raised during context teardown, in the order in which they were
+        raised
+    :vartype exceptions: List[Exception]
+    """
+
+    def __init__(self, exceptions: List[Exception]):
+        super().__init__(exceptions)
+        self.exceptions = exceptions
+
+    def __str__(self):
+        separator = '----------------------------\n'
+        tracebacks = separator.join('\n'.join(format_exception(type(exc), exc, exc.__traceback__))
+                                    for exc in self.exceptions)
+        return '{} exceptions(s) were raised by teardown callbacks:\n{}{}'.\
+            format(len(self.exceptions), separator, tracebacks)
 
 
 class Context:
@@ -208,24 +230,31 @@ class Context:
         If a teardown callback returns an awaitable, the return value is awaited on before calling
         any further teardown callbacks.
 
+        All callbacks will be processed, even if some of them raise exceptions. If at least one
+        callback raised an error, this method will raise a :exc:`~.TeardownError` at the end.
+
         After this method has been called, resources can no longer be requested or published on
         this context.
 
         :param exception: the exception, if any, that caused this context to be closed
+        :raises .TeardownError: if one or more teardown callbacks raise an exception
 
         """
         self._check_closed()
         self._closed = True
 
+        exceptions = []
         for callback, pass_exception in reversed(self._teardown_callbacks):
             try:
                 retval = callback(exception) if pass_exception else callback()
                 if isawaitable(retval):
                     await retval
-            except Exception:
-                logger.exception('Error calling teardown callback %s', callable_name(callback))
+            except Exception as e:
+                exceptions.append(e)
 
         del self._teardown_callbacks
+        if exceptions:
+            raise TeardownError(exceptions)
 
     def __enter__(self):
         self._check_closed()

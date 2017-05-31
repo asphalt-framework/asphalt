@@ -9,7 +9,7 @@ from async_generator import yield_
 
 from asphalt.core import (
     ResourceConflict, ResourceNotFound, Context, context_teardown, callable_name, executor)
-from asphalt.core.context import ResourceContainer
+from asphalt.core.context import ResourceContainer, TeardownError
 
 
 @pytest.fixture
@@ -84,18 +84,29 @@ class TestContext:
         assert called_functions == [(async_callback, exception), (callback, exception)]
 
     @pytest.mark.asyncio
-    async def test_teardown_callback_exception(self, context, caplog):
-        """Test that exceptions raised by teardown callbacks are logged."""
-        def callback():
+    async def test_teardown_callback_exception(self, context):
+        """
+        Test that all callbacks are called even when some teardown callbacks raise exceptions,
+        and that a TeardownError is raised in such a case, containing the exception objects.
+
+        """
+        def callback1():
+            items.append(1)
+
+        def callback2():
             raise Exception('foo')
 
-        context.add_teardown_callback(callback)
-        await context.close()
+        context.add_teardown_callback(callback1)
+        context.add_teardown_callback(callback2)
+        context.add_teardown_callback(callback1)
+        context.add_teardown_callback(callback2)
+        items = []
+        with pytest.raises(TeardownError) as exc:
+            await context.close()
 
-        callback_name = callable_name(callback)
-        records = [record for record in caplog.records if record.name == 'asphalt.core.context']
-        assert len(records) == 1
-        assert records[0].message == 'Error calling teardown callback ' + callback_name
+        assert 'foo' in str(exc.value)
+        assert items == [1, 1]
+        assert len(exc.value.exceptions) == 2
 
     @pytest.mark.asyncio
     async def test_close_closed(self, context):

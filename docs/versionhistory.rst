@@ -3,6 +3,11 @@ Version history
 
 This library adheres to `Semantic Versioning <http://semver.org/>`_.
 
+**4.0.0**
+
+- **BACKWARD INCOMPATIBLE** When a teardown callback raises an exception during
+  ``Context.close()``, a ``TeardownException`` is raised at the end instead the error being logged
+
 **3.0.2** (2017-05-05)
 
 - Fixed ``CLIApplicationComponent`` running prematurely (during the application start phase) and
