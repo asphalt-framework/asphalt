@@ -57,7 +57,7 @@ setup(
     },
     entry_points={
         'console_scripts': [
-            'asphalt = asphalt.core.command:main'
+            'asphalt = asphalt.core.cli:main'
         ],
         'asphalt.core.event_loop_policies': [
             'uvloop = asphalt.core.runner:uvloop_policy [uvloop]',

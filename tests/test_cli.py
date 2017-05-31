@@ -4,7 +4,7 @@ from unittest.mock import patch
 import pytest
 from click.testing import CliRunner
 
-from asphalt.core import command, Component, Context, qualified_name
+from asphalt.core import cli, Component, Context
 
 
 class DummyComponent(Component):
@@ -45,9 +45,9 @@ logging:
     if loop:
         args.extend(['--loop', loop])
 
-    with runner.isolated_filesystem(), patch('asphalt.core.command.run_application') as run_app:
+    with runner.isolated_filesystem(), patch('asphalt.core.cli.run_application') as run_app:
         Path('test.yml').write_text(config)
-        result = runner.invoke(command.run, args)
+        result = runner.invoke(cli.run, args)
 
         assert result.exit_code == 0
         assert run_app.call_count == 1
@@ -81,10 +81,10 @@ component:
   dummyval2: 10
 """
 
-    with runner.isolated_filesystem(), patch('asphalt.core.command.run_application') as run_app:
+    with runner.isolated_filesystem(), patch('asphalt.core.cli.run_application') as run_app:
         Path('conf1.yml').write_text(config1)
         Path('conf2.yml').write_text(config2)
-        result = runner.invoke(command.run, ['conf1.yml', 'conf2.yml'])
+        result = runner.invoke(cli.run, ['conf1.yml', 'conf2.yml'])
 
         assert result.exit_code == 0
         assert run_app.call_count == 1
