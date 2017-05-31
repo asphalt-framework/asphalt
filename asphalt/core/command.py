@@ -2,6 +2,7 @@ from typing import Optional
 
 import click
 from ruamel import yaml
+from ruamel.yaml import Loader
 
 from asphalt.core.runner import run_application, policies
 from asphalt.core.utils import merge_config
@@ -22,7 +23,7 @@ def run(configfile, unsafe: bool, loop: Optional[str]):
     # Read the configuration from the supplied YAML files
     config = {}
     for path in configfile:
-        config_data = yaml.load(path) if unsafe else yaml.safe_load(path)
+        config_data = yaml.load(path, Loader=Loader) if unsafe else yaml.safe_load(path)
         assert isinstance(config_data, dict), 'the document root element must be a dictionary'
         config = merge_config(config, config_data)
 
