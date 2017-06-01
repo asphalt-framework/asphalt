@@ -1,3 +1,3 @@
-from asphalt.core.command import main
+from asphalt.core.cli import main
 
 main()
