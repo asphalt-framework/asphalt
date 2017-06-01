@@ -4,7 +4,9 @@ from asyncio import get_event_loop, Queue, wait
 from datetime import datetime, timezone
 from inspect import isawaitable, getmembers
 from time import time as stdlib_time
-from typing import Callable, Any, Sequence, Awaitable, AsyncIterator, TypeVar, Generic, Type, Dict
+from typing import (
+    Callable, Any, Sequence, Awaitable, AsyncIterator, TypeVar, Generic, Type, List,
+    MutableMapping)
 from weakref import WeakKeyDictionary
 
 from async_generator import async_generator, aclosing, yield_
@@ -32,7 +34,7 @@ class Event:
 
     __slots__ = 'source', 'topic', 'time'
 
-    def __init__(self, source, topic: str, time: float = None):
+    def __init__(self, source, topic: str, time: float = None) -> None:
         self.source = source
         self.topic = topic
         self.time = time or stdlib_time()
@@ -70,16 +72,16 @@ class Signal(Generic[T_Event]):
 
     __slots__ = 'event_class', 'topic', 'source', 'listeners', 'bound_signals'
 
-    def __init__(self, event_class: Type[T_Event], *, source = None, topic: str = None):
+    def __init__(self, event_class: Type[T_Event], *, source = None, topic: str = None) -> None:
         assert check_argument_types()
         self.event_class = event_class
         self.topic = topic
         if source is not None:
             self.source = weakref.ref(source)
-            self.listeners = None
+            self.listeners = None  # type: List[Callable]
         else:
             assert issubclass(event_class, Event), 'event_class must be a subclass of Event'
-            self.bound_signals = WeakKeyDictionary()  # type: Dict[Any, 'Signal']
+            self.bound_signals = WeakKeyDictionary()  # type: MutableMapping[Any, 'Signal']
 
     def __get__(self, instance, owner) -> 'Signal':
         if instance is None:

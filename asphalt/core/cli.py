@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, Dict, Any
 
 import click
 from ruamel import yaml
@@ -21,7 +21,7 @@ def main():
               help='alternate event loop policy')
 def run(configfile, unsafe: bool, loop: Optional[str]):
     # Read the configuration from the supplied YAML files
-    config = {}
+    config = {}  # type: Dict[str, Any]
     for path in configfile:
         config_data = yaml.load(path, Loader=Loader) if unsafe else yaml.safe_load(path)
         assert isinstance(config_data, dict), 'the document root element must be a dictionary'

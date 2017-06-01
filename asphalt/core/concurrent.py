@@ -50,7 +50,6 @@ def executor(func_or_executor: Union[Executor, str, Callable[..., T_Retval]], *,
         the name of an :class:`~concurrent.futures.Executor` resource
 
     """
-    @wraps(func_or_executor)
     def wrapper(*args, **kwargs):
         try:
             loop = get_event_loop()
@@ -79,4 +78,4 @@ def executor(func_or_executor: Union[Executor, str, Callable[..., T_Retval]], *,
     assert check_argument_types()
     assert not inspect.iscoroutinefunction(func_or_executor), \
         'Cannot wrap coroutine functions to be run in an executor'
-    return wrapper
+    return wraps(func_or_executor)(wrapper)

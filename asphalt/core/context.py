@@ -37,7 +37,7 @@ class ResourceContainer:
     __slots__ = 'value_or_factory', 'types', 'name', 'context_attr', 'is_factory'
 
     def __init__(self, value_or_factory, types: Tuple[type, ...], name: str,
-                 context_attr: Optional[str], is_factory: bool):
+                 context_attr: Optional[str], is_factory: bool) -> None:
         self.value_or_factory = value_or_factory
         self.types = types
         self.name = name
@@ -80,7 +80,7 @@ class ResourceEvent(Event):
     __slots__ = 'resource_types', 'resource_name', 'is_factory'
 
     def __init__(self, source: 'Context', topic: str, types: Tuple[type, ...], name: str,
-                 is_factory: bool):
+                 is_factory: bool) -> None:
         super().__init__(source, topic)
         self.resource_types = types
         self.resource_name = name
@@ -97,7 +97,7 @@ class ResourceConflict(Exception):
 class ResourceNotFound(LookupError):
     """Raised when a resource request cannot be fulfilled within the allotted time."""
 
-    def __init__(self, type: type, name: str):
+    def __init__(self, type: type, name: str) -> None:
         super().__init__(type, name)
         self.type = type
         self.name = name
@@ -116,7 +116,7 @@ class TeardownError(Exception):
     :vartype exceptions: List[Exception]
     """
 
-    def __init__(self, exceptions: List[Exception]):
+    def __init__(self, exceptions: List[Exception]) -> None:
         super().__init__(exceptions)
         self.exceptions = exceptions
 
@@ -148,7 +148,7 @@ class Context:
 
     resource_added = Signal(ResourceEvent)
 
-    def __init__(self, parent: 'Context' = None):
+    def __init__(self, parent: 'Context' = None) -> None:
         assert check_argument_types()
         self._parent = parent
         self._loop = getattr(parent, 'loop', None) or get_event_loop()
@@ -271,7 +271,7 @@ class Context:
         await self.close(exc_val)
 
     def add_resource(self, value, name: str = 'default', context_attr: str = None,
-                     types: Union[type, Sequence[Type]] = ()) -> None:
+                     types: Union[type, Sequence[type]] = ()) -> None:
         """
         Add a resource to this context.
 
@@ -307,7 +307,7 @@ class Context:
                     'this context already contains a resource of type {} using the name {!r}'.
                     format(qualified_name(resource_type), name))
 
-        resource = ResourceContainer(value, types, name, context_attr, False)
+        resource = ResourceContainer(value, tuple(types), name, context_attr, False)
         for type_ in resource.types:
             self._resources[(type_, name)] = resource
 

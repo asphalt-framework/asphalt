@@ -112,7 +112,7 @@ class PluginContainer:
 
     __slots__ = 'namespace', 'base_class', '_entrypoints'
 
-    def __init__(self, namespace: str, base_class: type=None):
+    def __init__(self, namespace: str, base_class: type = None) -> None:
         self.namespace = namespace
         self.base_class = base_class
         self._entrypoints = {ep.name: ep for ep in iter_entry_points(namespace)}

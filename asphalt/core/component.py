@@ -55,9 +55,9 @@ class ContainerComponent(Component):
 
     __slots__ = 'child_components', 'component_configs'
 
-    def __init__(self, components: Dict[str, Optional[Dict[str, Any]]] = None):
+    def __init__(self, components: Dict[str, Optional[Dict[str, Any]]] = None) -> None:
         assert check_argument_types()
-        self.child_components = OrderedDict()
+        self.child_components = OrderedDict()  # type: Dict[str, Component]
         self.component_configs = components or {}
 
     def add_component(self, alias: str, type: Union[str, type] = None, **config):
@@ -108,8 +108,7 @@ class ContainerComponent(Component):
             if alias not in self.child_components:
                 self.add_component(alias)
 
-        tasks = [ctx.loop.create_task(component.start(ctx)) for component in
-                 self.child_components.values()]
+        tasks = [component.start(ctx) for component in self.child_components.values()]
         if tasks:
             await asyncio.gather(*tasks)
 
