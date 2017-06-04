@@ -3,10 +3,11 @@ Version history
 
 This library adheres to `Semantic Versioning <http://semver.org/>`_.
 
-**4.0.0**
+**4.0.0** (2017-06-04)
 
 - **BACKWARD INCOMPATIBLE** When a teardown callback raises an exception during
-  ``Context.close()``, a ``TeardownException`` is raised at the end instead the error being logged
+  ``Context.close()``, a ``TeardownException`` is raised at the end instead of the error being
+  logged
 - Renamed the ``asphalt.core.command`` module to ``asphalt.core.cli``
 - Fixed the inability to override the component type from external configuration
   (contributed by Devin Fee)
