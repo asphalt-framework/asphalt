@@ -48,6 +48,7 @@ setup(
     extras_require={
         'uvloop': ['uvloop >= 0.4.10'],
         'gevent': ['aiogevent >= 0.2'],
+        'tokio': ['tokio'],
         'testing': [
             'pytest',
             'pytest-asyncio',
@@ -61,7 +62,8 @@ setup(
         ],
         'asphalt.core.event_loop_policies': [
             'uvloop = asphalt.core.runner:uvloop_policy [uvloop]',
-            'gevent = asphalt.core.runner:gevent_policy [gevent]'
+            'gevent = asphalt.core.runner:gevent_policy [gevent]',
+            'tokio = asphalt.core.runner:tokio_policy [tokio]'
         ]
     }
 )

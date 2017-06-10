@@ -4,6 +4,7 @@ import sys
 from unittest.mock import patch
 
 import pytest
+from pkg_resources import DistributionNotFound
 
 from asphalt.core.component import Component, CLIApplicationComponent
 from asphalt.core.context import Context
@@ -83,14 +84,17 @@ def test_run_max_threads(event_loop, max_threads):
 
 @pytest.mark.parametrize('policy, policy_name', [
     ('uvloop', 'uvloop.EventLoopPolicy'),
-    ('gevent', 'aiogevent.EventLoopPolicy')
-], ids=['uvloop', 'gevent'])
+    ('gevent', 'aiogevent.EventLoopPolicy'),
+    ('tokio', 'tokio.TokioLoopPolicy'),
+], ids=['uvloop', 'gevent', 'tokio'])
 def test_event_loop_policy(caplog, policy, policy_name):
     """Test that a the runner switches to a different event loop policy when instructed to."""
     component = ShutdownComponent()
     old_policy = asyncio.get_event_loop_policy()
     try:
         run_application(component, event_loop_policy=policy)
+    except DistributionNotFound as e:
+        pytest.skip(str(e))
     finally:
         asyncio.set_event_loop_policy(old_policy)
 

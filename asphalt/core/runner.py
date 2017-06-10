@@ -28,6 +28,11 @@ def gevent_policy():
     return aiogevent.EventLoopPolicy()
 
 
+def tokio_policy():
+    import tokio
+    return tokio.TokioLoopPolicy()
+
+
 def sigterm_handler(logger: Logger, event_loop: AbstractEventLoop) -> None:
     if event_loop.is_running():
         logger.info('Received SIGTERM')

@@ -3,6 +3,10 @@ Version history
 
 This library adheres to `Semantic Versioning <http://semver.org/>`_.
 
+**4.1.0**
+
+- Added support for the `Tokio <https://github.com/PyO3/tokio>`_ event loop
+
 **4.0.0** (2017-06-04)
 
 - **BACKWARD INCOMPATIBLE** When a teardown callback raises an exception during
