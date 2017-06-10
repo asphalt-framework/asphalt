@@ -88,7 +88,11 @@ def test_run_max_threads(event_loop, max_threads):
 def test_event_loop_policy(caplog, policy, policy_name):
     """Test that a the runner switches to a different event loop policy when instructed to."""
     component = ShutdownComponent()
-    run_application(component, event_loop_policy=policy)
+    old_policy = asyncio.get_event_loop_policy()
+    try:
+        run_application(component, event_loop_policy=policy)
+    finally:
+        asyncio.set_event_loop_policy(old_policy)
 
     records = [record for record in caplog.records if record.name == 'asphalt.core.runner']
     assert len(records) == 6
