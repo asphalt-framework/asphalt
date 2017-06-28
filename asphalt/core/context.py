@@ -139,9 +139,6 @@ class Context:
     :param parent: the parent context, if any
 
     :ivar Context parent: the parent context, if any
-    :ivar loop: the event loop associated with the context (comes from the parent context, or
-        :func:`~asyncio.get_event_loop()` when no parent context is given)
-    :vartype loop: asyncio.AbstractEventLoop
     :var Signal resource_added: a signal (:class:`ResourceEvent`) dispatched when a resource
         has been published in this context
     """
