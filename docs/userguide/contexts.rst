@@ -144,7 +144,7 @@ transaction. This can be achieved by passing the ``pass_exception`` keyword argu
 
             db = SomeDatabase()
             await db.start(ctx)
-            ctx.add_teardown_callback(teardown)
+            ctx.add_teardown_callback(teardown, pass_exception=True)
             ctx.add_resource(db)
 
 The same can be achieved with :func:`~asphalt.core.context.context_teardown` by storing the yielded
@@ -155,7 +155,6 @@ value::
         async def start(ctx):
             db = SomeDatabase()
             await db.start(ctx)
-            ctx.add_teardown_callback(teardown)
             ctx.add_resource(db)
 
             exception = await yield_()
