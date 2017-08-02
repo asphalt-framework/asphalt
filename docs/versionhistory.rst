@@ -3,6 +3,10 @@ Version history
 
 This library adheres to `Semantic Versioning <http://semver.org/>`_.
 
+**4.1.1**
+
+- Increased the runner default start timeout to 10 seconds
+
 **4.1.0**
 
 - Added support for the `Tokio <https://github.com/PyO3/tokio>`_ event loop

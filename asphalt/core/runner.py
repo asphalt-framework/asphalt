@@ -41,7 +41,7 @@ def sigterm_handler(logger: Logger, event_loop: AbstractEventLoop) -> None:
 
 def run_application(component: Union[Component, Dict[str, Any]], *, event_loop_policy: str = None,
                     max_threads: int = None, logging: Union[Dict[str, Any], int, None] = INFO,
-                    start_timeout: Union[int, float, None] = 5):
+                    start_timeout: Union[int, float, None] = 10):
     """
     Configure logging and start the given root component in the default asyncio event loop.
 
