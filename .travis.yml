@@ -6,7 +6,9 @@ python:
   - "3.5"
   - "3.6"
 
-install: pip install -U setuptools tox-travis tox-virtualenv-no-download coveralls
+install:
+  - pip install -U setuptools
+  - pip install tox-travis tox-virtualenv-no-download coveralls
 
 script: tox
 
