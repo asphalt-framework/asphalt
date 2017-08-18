@@ -2,6 +2,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 import pytest
+from click.exceptions import ClickException
 from click.testing import CliRunner
 
 from asphalt.core import cli, Component, Context
@@ -94,3 +95,181 @@ component:
             'component': {'type': component_class, 'dummyval1': 'alternate', 'dummyval2': 10},
             'logging': {'version': 1, 'disable_existing_loggers': False}
         }
+
+
+class TestServices:
+    def write_config(self):
+        Path('config.yml').write_text("""\
+---
+max_threads: 15
+services:
+  server:
+    max_threads: 30
+    component:
+      type: myproject.server.ServerComponent
+      components:
+        wamp: &wamp
+          host: wamp.example.org
+          port: 8000
+          tls: true
+          auth_id: serveruser
+          auth_secret: serverpass
+        mailer:
+          backend: smtp
+  client:
+    component:
+      type: myproject.client.ClientComponent
+      components:
+        wamp:
+          <<: *wamp
+          auth_id: clientuser
+          auth_secret: clientpass
+logging:
+  version: 1
+  disable_existing_loggers: false
+""")
+
+    @pytest.mark.parametrize('service', ['server', 'client'])
+    def test_run_service(self, runner, service):
+        with runner.isolated_filesystem(), patch('asphalt.core.cli.run_application') as run_app:
+            self.write_config()
+            result = runner.invoke(cli.run, ['-s', service, 'config.yml'])
+
+            assert result.exit_code == 0
+            assert run_app.call_count == 1
+            args, kwargs = run_app.call_args
+            assert len(args) == 0
+            if service == 'server':
+                assert kwargs == {
+                    'max_threads': 30,
+                    'component': {
+                        'type': 'myproject.server.ServerComponent',
+                        'components': {
+                            'wamp': {
+                                'host': 'wamp.example.org',
+                                'port': 8000,
+                                'tls': True,
+                                'auth_id': 'serveruser',
+                                'auth_secret': 'serverpass'
+                            },
+                            'mailer': {'backend': 'smtp'}
+                        }
+                    },
+                    'logging': {'version': 1, 'disable_existing_loggers': False}
+                }
+            else:
+                assert kwargs == {
+                    'max_threads': 15,
+                    'component': {
+                        'type': 'myproject.client.ClientComponent',
+                        'components': {
+                            'wamp': {
+                                'host': 'wamp.example.org',
+                                'port': 8000,
+                                'tls': True,
+                                'auth_id': 'clientuser',
+                                'auth_secret': 'clientpass'
+                            }
+                        }
+                    },
+                    'logging': {'version': 1, 'disable_existing_loggers': False}
+                }
+
+    def test_service_not_found(self, runner):
+        with runner.isolated_filesystem(), patch('asphalt.core.cli.run_application') as run_app:
+            self.write_config()
+            result = runner.invoke(cli.run, ['-s', 'foobar', 'config.yml'])
+
+            assert result.exit_code == 1
+            assert run_app.call_count == 0
+            assert result.output == "Error: Service 'foobar' has not been defined\n"
+
+    def test_no_service_selected(self, runner):
+        with runner.isolated_filesystem(), patch('asphalt.core.cli.run_application') as run_app:
+            self.write_config()
+            result = runner.invoke(cli.run, ['config.yml'])
+
+            assert result.exit_code == 1
+            assert run_app.call_count == 0
+            assert result.output == (
+                'Error: Multiple services present in configuration file but no default service '
+                'has been defined and no service was explicitly selected with -s / --service\n')
+
+    def test_bad_services_type(self, runner):
+        with runner.isolated_filesystem(), patch('asphalt.core.cli.run_application') as run_app:
+            Path('config.yml').write_text("""\
+---
+services: blah
+logging:
+  version: 1
+  disable_existing_loggers: false
+""")
+            result = runner.invoke(cli.run, ['config.yml'])
+
+            assert result.exit_code == 1
+            assert run_app.call_count == 0
+            assert result.output == 'Error: The "services" key must be a dict, not str\n'
+
+    def test_no_services_defined(self, runner):
+        with runner.isolated_filesystem(), patch('asphalt.core.cli.run_application') as run_app:
+            Path('config.yml').write_text("""\
+---
+services: {}
+logging:
+  version: 1
+  disable_existing_loggers: false
+""")
+            result = runner.invoke(cli.run, ['config.yml'])
+
+            assert result.exit_code == 1
+            assert run_app.call_count == 0
+            assert result.output == 'Error: No services have been defined\n'
+
+    def test_run_only_service(self, runner):
+        with runner.isolated_filesystem(), patch('asphalt.core.cli.run_application') as run_app:
+            Path('config.yml').write_text("""\
+---
+services:
+  whatever:
+    component:
+      type: myproject.client.ClientComponent
+logging:
+  version: 1
+  disable_existing_loggers: false
+""")
+            result = runner.invoke(cli.run, ['config.yml'])
+
+            assert result.exit_code == 0
+            assert run_app.call_count == 1
+            args, kwargs = run_app.call_args
+            assert len(args) == 0
+            assert kwargs == {
+                'component': {'type': 'myproject.client.ClientComponent'},
+                'logging': {'version': 1, 'disable_existing_loggers': False}
+            }
+
+    def test_run_default_service(self, runner):
+        with runner.isolated_filesystem(), patch('asphalt.core.cli.run_application') as run_app:
+            Path('config.yml').write_text("""\
+---
+services:
+  whatever:
+    component:
+      type: myproject.client.ClientComponent
+  default:
+    component:
+      type: myproject.server.ServerComponent
+logging:
+  version: 1
+  disable_existing_loggers: false
+""")
+            result = runner.invoke(cli.run, ['config.yml'])
+
+            assert result.exit_code == 0
+            assert run_app.call_count == 1
+            args, kwargs = run_app.call_args
+            assert len(args) == 0
+            assert kwargs == {
+                'component': {'type': 'myproject.server.ServerComponent'},
+                'logging': {'version': 1, 'disable_existing_loggers': False}
+            }

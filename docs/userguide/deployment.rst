@@ -56,6 +56,7 @@ Suppose you had the following component class as your root component::
 You could then write a configuration file like this::
 
     ---
+    max_threads: 20
     component:
       type: myproject:MyRootComponent
       data_directory: /some/file/somewhere
@@ -65,7 +66,7 @@ You could then write a configuration file like this::
           ssl: true
         sqlalchemy:
           url: postgresql:///mydatabase
-    max_threads: 20
+
     logging:
       version: 1
       disable_existing_loggers: false
@@ -80,8 +81,8 @@ You could then write a configuration file like this::
         handlers: [console]
         level: INFO
 
-In the above configuration you have three top level configuration keys: ``component``,
-``max_threads`` and ``logging``, all of which are directly passed to
+In the above configuration you have three top level configuration keys: ``max_threads``,
+``component`` and ``logging``, all of which are directly passed to
 :func:`~asphalt.core.runner.run_application` as keyword arguments.
 
 The ``component`` section defines the type of the root component using the specially processed
@@ -148,6 +149,61 @@ The keys don't need to be on the top level either, so the following has the same
     ---
     logging:
         root.level: DEBUG
+
+Defining multiple services
+--------------------------
+
+.. versionadded:: 4.1.0
+
+Sometimes it may be more convenient to use a single configuration file for launching your
+application with different configurations or entry points. To this end, the runner supports the
+notion of "service definitions" in the configuration file. This is done by replacing the
+``component`` dictionary with a ``services`` dictionary at the top level of the configuration file
+while passing the ``--service`` (or ``-s``) option when launching the runner. This approach
+provides the additional advantage of allowing the use of YAML references, like so::
+
+    ---
+    services:
+      server:
+        max_threads: 30
+        component:
+          type: myproject.server.ServerComponent
+          components:
+            wamp: &wamp
+              host: wamp.example.org
+              port: 8000
+              tls: true
+              auth_id: serveruser
+              auth_secret: serverpass
+            mailer:
+              backend: smtp
+      client:
+        component:
+          type: myproject.client.ClientComponent
+          components:
+            wamp:
+              <<: *wamp
+              auth_id: clientuser
+              auth_secret: clientpass
+
+Each section under ``services`` is like its own distinct top level configuration. Additionally, the
+keys under each service are merged with any top level configuration, so you can, for example,
+define a logging configuration there.
+
+Now, to run the ``server`` service, do:
+
+.. code-block:: bash
+
+    asphalt run -s server config.yaml
+
+The ``client`` service is run in the same fashion:
+
+.. code-block:: bash
+
+    asphalt run -s client config.yaml
+
+You can also define a service with a special name, ``default``, which is used in case multiple
+services are present and no service has been explicitly selected.
 
 Performance tuning
 ------------------

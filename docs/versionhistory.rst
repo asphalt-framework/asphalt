@@ -6,6 +6,8 @@ This library adheres to `Semantic Versioning <http://semver.org/>`_.
 **4.1.0**
 
 - Added support for the `Tokio <https://github.com/PyO3/tokio>`_ event loop
+- Added a feature to the runner that lets one define multiple services in a configuration file and
+  select which one to run
 - Increased the runner default start timeout to 10 seconds
 
 **4.0.0** (2017-06-04)
