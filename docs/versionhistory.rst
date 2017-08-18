@@ -3,7 +3,7 @@ Version history
 
 This library adheres to `Semantic Versioning <http://semver.org/>`_.
 
-**4.1.0**
+**4.1.0** (2017-08-18)
 
 - Added support for the `Tokio <https://github.com/PyO3/tokio>`_ event loop
 - Added a feature to the runner that lets one define multiple services in a configuration file and
