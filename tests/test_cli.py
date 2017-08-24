@@ -273,3 +273,57 @@ logging:
                 'component': {'type': 'myproject.server.ServerComponent'},
                 'logging': {'version': 1, 'disable_existing_loggers': False}
             }
+
+    def test_service_env_variable(self, runner, monkeypatch):
+        with runner.isolated_filesystem(), patch('asphalt.core.cli.run_application') as run_app:
+            Path('config.yml').write_text("""\
+---
+services:
+  whatever:
+    component:
+      type: myproject.client.ClientComponent
+  default:
+    component:
+      type: myproject.server.ServerComponent
+logging:
+  version: 1
+  disable_existing_loggers: false
+""")
+            monkeypatch.setenv('ASPHALT_SERVICE', 'whatever')
+            result = runner.invoke(cli.run, ['config.yml'])
+
+            assert result.exit_code == 0
+            assert run_app.call_count == 1
+            args, kwargs = run_app.call_args
+            assert len(args) == 0
+            assert kwargs == {
+                'component': {'type': 'myproject.client.ClientComponent'},
+                'logging': {'version': 1, 'disable_existing_loggers': False}
+            }
+
+    def test_service_env_variable_override(self, runner, monkeypatch):
+        with runner.isolated_filesystem(), patch('asphalt.core.cli.run_application') as run_app:
+            Path('config.yml').write_text("""\
+---
+services:
+  whatever:
+    component:
+      type: myproject.client.ClientComponent
+  default:
+    component:
+      type: myproject.server.ServerComponent
+logging:
+  version: 1
+  disable_existing_loggers: false
+""")
+            monkeypatch.setenv('ASPHALT_SERVICE', 'whatever')
+            result = runner.invoke(cli.run, ['-s', 'default', 'config.yml'])
+
+            assert result.exit_code == 0
+            assert run_app.call_count == 1
+            args, kwargs = run_app.call_args
+            assert len(args) == 0
+            assert kwargs == {
+                'component': {'type': 'myproject.server.ServerComponent'},
+                'logging': {'version': 1, 'disable_existing_loggers': False}
+            }

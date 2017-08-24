@@ -3,6 +3,11 @@ Version history
 
 This library adheres to `Semantic Versioning <http://semver.org/>`_.
 
+**4.2.0** (2017-08-24)
+
+- Allowed selecting the service to run with ``asphalt run`` using an environment variable
+  (``ASPHALT_SERVICE``)
+
 **4.1.0** (2017-08-18)
 
 - Added support for the `Tokio <https://github.com/PyO3/tokio>`_ event loop

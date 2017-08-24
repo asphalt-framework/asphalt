@@ -1,3 +1,4 @@
+import os
 from typing import Optional, Dict, Any
 
 import click
@@ -44,6 +45,7 @@ def run(configfile, unsafe: bool, loop: Optional[str], service: Optional[str]):
         services.setdefault('default', dict(component=component))
 
     # Try to figure out which service to launch
+    service = service or os.getenv('ASPHALT_SERVICE')
     if len(services) == 0:
         raise click.ClickException('No services have been defined')
     elif service:

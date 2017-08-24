@@ -159,8 +159,9 @@ Sometimes it may be more convenient to use a single configuration file for launc
 application with different configurations or entry points. To this end, the runner supports the
 notion of "service definitions" in the configuration file. This is done by replacing the
 ``component`` dictionary with a ``services`` dictionary at the top level of the configuration file
-while passing the ``--service`` (or ``-s``) option when launching the runner. This approach
-provides the additional advantage of allowing the use of YAML references, like so::
+and either setting the ``ASPHALT_SERVICE`` environment variable or by passing the ``--service``
+(or ``-s``) option when launching the runner. This approach provides the additional advantage of
+allowing the use of YAML references, like so::
 
     ---
     services:
@@ -204,6 +205,9 @@ The ``client`` service is run in the same fashion:
 
 You can also define a service with a special name, ``default``, which is used in case multiple
 services are present and no service has been explicitly selected.
+
+.. note:: The ``-s/--service`` command line switch overrides the ``ASPHALT_SERVICE`` environment
+   variable.
 
 Performance tuning
 ------------------
