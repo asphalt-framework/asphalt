@@ -39,7 +39,7 @@ setup(
     python_requires='>= 3.5.2',
     install_requires=[
         'setuptools',  # this is here to tell downstream packagers that it needs pkg_resources
-        'ruamel.yaml >= 0.12',
+        'ruamel.yaml >= 0.12, < 0.15',
         'typeguard ~= 2.0',
         'async-generator ~= 1.4',
         'asyncio_extras ~= 1.3',
