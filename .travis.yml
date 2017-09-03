@@ -1,14 +1,24 @@
+language: python
 sudo: false
 
-language: python
-
-python:
-  - "3.5"
-  - "3.6"
+matrix:
+  include:
+    - env: TOXENV=py35
+      python: "3.5"
+    - env: TOXENV=py36
+      python: "3.6"
+    - env: TOXENV=pypy3
+      python: pypy3
+    - env: TOXENV=flake8
+      python: "3.5"
+    - env: TOXENV=mypy
+      python: "3.5"
+  allow_failures:
+    - env: TOXENV=mypy
 
 install:
   - pip install -U setuptools
-  - pip install tox-travis tox-virtualenv-no-download coveralls
+  - pip install tox coveralls
 
 script: tox
 
@@ -31,5 +41,5 @@ deploy:
   distributions: sdist bdist_wheel
   on:
     tags: true
-    python: "3.5"
+    condition: $TOXENV = py35
     repo: asphalt-framework/asphalt
