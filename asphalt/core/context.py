@@ -330,7 +330,7 @@ class Context:
         it was requested, regardless of where in the chain the factory itself was added to.
 
         :param factory_callback: a (non-coroutine) callable that takes a context instance as
-            argument and returns a tuple of (resource object, teardown callback)
+            argument and returns the created resource object
         :param types: one or more types to register the generated resource as on the target context
         :param name: name of the resource that will be created in the target context
         :param context_attr: name of the context attribute the created resource will be accessible
