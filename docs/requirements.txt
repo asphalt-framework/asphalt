@@ -1,0 +1,2 @@
+# This is for ReadTheDocs and can be removed once they upgrade to a newer setuptools release.
+setuptools >= 36.2.7
