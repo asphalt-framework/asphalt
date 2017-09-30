@@ -48,6 +48,9 @@ after_success:
   - coveralls
 
 notifications:
+  webhooks:
+    urls:
+      - https://webhooks.gitter.im/e/aa5a289b7a0df8aefd68
   irc:
     channels:
       - "chat.freenode.net#asphalt"
