@@ -30,7 +30,7 @@ def executor(func_or_executor: Union[Executor, str, Callable[..., T_Retval]], *,
 
     Example use with the default executor (``None``)::
 
-        @threadpool
+        @executor
         def this_runs_in_threadpool(ctx):
            return do_something_cpu_intensive()
 
@@ -39,7 +39,7 @@ def executor(func_or_executor: Union[Executor, str, Callable[..., T_Retval]], *,
 
     With a named :class:`~concurrent.futures.Executor` resource::
 
-        @threadpool('special_ops')
+        @executor('special_ops')
         def this_runs_in_threadpool(ctx):
            return do_something_cpu_intensive()
 
