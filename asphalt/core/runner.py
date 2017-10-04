@@ -3,7 +3,7 @@ import signal
 import sys
 from asyncio.events import AbstractEventLoop
 from concurrent.futures import ThreadPoolExecutor
-from logging import basicConfig, getLogger, INFO, Logger
+from logging import basicConfig, getLogger, INFO, Logger, shutdown
 from logging.config import dictConfig
 from typing import Union, Dict, Any
 
@@ -155,6 +155,9 @@ def run_application(component: Union[Component, Dict[str, Any]], *, event_loop_p
     # Finally, close the event loop itself
     event_loop.close()
     logger.info('Application stopped')
+
+    # Shut down the logging system
+    shutdown()
 
     if exit_code:
         sys.exit(exit_code)

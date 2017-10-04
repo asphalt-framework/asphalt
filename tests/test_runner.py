@@ -46,6 +46,11 @@ class DummyCLIApp(CLIApplicationComponent):
         return 20
 
 
+@pytest.fixture(autouse=True)
+def prevent_logging_shutdown(monkeypatch):
+    monkeypatch.setattr('asphalt.core.runner.shutdown', lambda: None)
+
+
 def test_sigterm_handler_loop_not_running(event_loop):
     """Test that the SIGTERM handler does nothing if the event loop is not running."""
     sigterm_handler(logging.getLogger(__name__), event_loop)
