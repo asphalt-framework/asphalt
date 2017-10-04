@@ -341,7 +341,6 @@ class Context:
         """
         assert check_argument_types()
         self._check_closed()
-        types = (types,) if isinstance(types, type) else types
         if not resource_name_re.fullmatch(name):
             raise ValueError('"name" must be a nonempty string consisting only of alphanumeric '
                              'characters and underscores')
@@ -350,6 +349,11 @@ class Context:
         if not types:
             raise ValueError('"types" must not be empty')
 
+        if isinstance(types, type):
+            resource_types = (types,)  # type: Tuple[type, ...]
+        else:
+            resource_types = tuple(types)
+
         # Check for a conflicting context attribute
         if context_attr in self._resource_factories_by_context_attr:
             raise ResourceConflict(
@@ -357,22 +361,21 @@ class Context:
                 format(context_attr))
 
         # Check for conflicts with existing resource factories
-        types = tuple(types)
-        for type_ in types:
+        for type_ in resource_types:
             if (type_, name) in self._resource_factories:
                 raise ResourceConflict('this context already contains a resource factory for the '
                                        'type {}'.format(qualified_name(type_)))
 
         # Add the resource factory to the appropriate lookup tables
-        resource = ResourceContainer(factory_callback, types, name, context_attr, True)
-        for type_ in types:
+        resource = ResourceContainer(factory_callback, resource_types, name, context_attr, True)
+        for type_ in resource_types:
             self._resource_factories[(type_, name)] = resource
 
         if context_attr:
             self._resource_factories_by_context_attr[context_attr] = resource
 
         # Notify listeners that a new resource has been made available
-        self.resource_added.dispatch(types, name, True)
+        self.resource_added.dispatch(resource_types, name, True)
 
     def get_resource(self, type: type, name: str = 'default'):
         """

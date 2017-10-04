@@ -215,7 +215,7 @@ class Signal(Generic[T_Event]):
         event = self.event_class(self.source(), self.topic, *args, **kwargs)
         return self.dispatch_raw(event)
 
-    def wait_event(self, filter: Callable[[Event], bool] = None) -> Awaitable[T_Event]:
+    def wait_event(self, filter: Callable[[T_Event], bool] = None) -> Awaitable[T_Event]:
         """Shortcut for calling :func:`wait_event` with this signal in the first argument."""
         return wait_event([self], filter)
 
@@ -254,7 +254,8 @@ async def stream_events(signals: Sequence[Signal], filter: Callable[[Event], boo
             signal.disconnect(queue.put_nowait)
 
 
-async def wait_event(signals: Sequence[Signal], filter: Callable[[Event], bool] = None) -> Event:
+async def wait_event(signals: Sequence[Signal[T_Event]],
+                     filter: Callable[[T_Event], bool] = None) -> T_Event:
     """
     Wait until any of the given signals dispatches an event that satisfies the filter (if any).
 
