@@ -18,21 +18,6 @@ __all__ = ('run_application',)
 policies = PluginContainer('asphalt.core.event_loop_policies')
 
 
-def uvloop_policy():
-    import uvloop
-    return uvloop.EventLoopPolicy()
-
-
-def gevent_policy():
-    import aiogevent
-    return aiogevent.EventLoopPolicy()
-
-
-def tokio_policy():
-    import tokio
-    return tokio.TokioLoopPolicy()
-
-
 def sigterm_handler(logger: Logger, event_loop: AbstractEventLoop) -> None:
     if event_loop.is_running():
         logger.info('Received SIGTERM')
