@@ -6,7 +6,7 @@ It is expected that the reader have at least basic understanding of the Python l
 
 Code for all tutorials can be found in the ``examples`` directory in the source distribution or in
 the
-`Github repository <https://github.com/asphalt-framework/asphalt/tree/master/asphalt/examples>`_.
+`Github repository <https://github.com/asphalt-framework/asphalt/tree/master/examples>`_.
 
 .. toctree::
    :maxdepth: 2
