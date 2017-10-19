@@ -5,7 +5,8 @@ from concurrent.futures import Executor
 from functools import wraps
 from inspect import isawaitable, getattr_static
 from traceback import format_exception
-from typing import Optional, Callable, Any, Sequence, Dict, Tuple, Type, List, Union, Awaitable
+from typing import (
+    Optional, Callable, Any, Sequence, Dict, Tuple, Type, List, Union, Awaitable, TypeVar, Set)
 
 import asyncio_extras
 from async_generator import async_generator, isasyncgenfunction
@@ -20,6 +21,7 @@ __all__ = ('ResourceEvent', 'ResourceConflict', 'ResourceNotFound', 'TeardownErr
 logger = logging.getLogger(__name__)
 factory_callback_type = Callable[['Context'], Any]
 resource_name_re = re.compile(r'\w+')
+T_Resource = TypeVar('T_Resource', covariant=True)
 
 
 class ResourceContainer:
@@ -377,7 +379,7 @@ class Context:
         # Notify listeners that a new resource has been made available
         self.resource_added.dispatch(resource_types, name, True)
 
-    def get_resource(self, type: type, name: str = 'default'):
+    def get_resource(self, type: Type[T_Resource], name: str = 'default') -> Optional[T_Resource]:
         """
         Look up a resource in the chain of contexts.
 
@@ -405,7 +407,41 @@ class Context:
         return next((ctx._resources[key].value_or_factory for ctx in self.context_chain
                      if key in ctx._resources), None)
 
-    def require_resource(self, type: type, name: str = 'default'):
+    def get_resources(self, type: Type[T_Resource]) -> Set[T_Resource]:
+        """
+        Retrieve all the resources of the given type in this context and its parents.
+
+        Any matching resource factories are also triggered if necessary.
+
+        :param type: type of the resources to get
+        :return: a set of all found resources of the given type
+
+        """
+        assert check_argument_types()
+
+        # Collect all the matching resources from this context
+        resources = {container.name: container.value_or_factory
+                     for container in self._resources.values()
+                     if not container.is_factory and type in container.types
+                     }  # type: Dict[str, T_Resource]
+
+        # Next, find all matching resource factories in the context chain and generate resources
+        resources.update({container.name: container.generate_value(self)
+                          for ctx in self.context_chain
+                          for container in ctx._resources.values()
+                          if container.is_factory and type in container.types and
+                          container.name not in resources})
+
+        # Finally, add the resource values from the parent contexts
+        resources.update({container.name: container.value_or_factory
+                          for ctx in self.context_chain[1:]
+                          for container in ctx._resources.values()
+                          if not container.is_factory and type in container.types and
+                          container.name not in resources})
+
+        return set(resources.values())
+
+    def require_resource(self, type: Type[T_Resource], name: str = 'default') -> T_Resource:
         """
         Look up a resource in the chain of contexts and raise an exception if it is not found.
 
@@ -425,7 +461,7 @@ class Context:
 
         return resource
 
-    async def request_resource(self, type: type, name: str = 'default'):
+    async def request_resource(self, type: Type[T_Resource], name: str = 'default') -> T_Resource:
         """
         Look up a resource in the chain of contexts.
 

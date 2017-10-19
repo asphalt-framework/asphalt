@@ -291,6 +291,14 @@ class TestContext:
         context.a = 2
         assert child_context.a == 2
 
+    def test_get_resources(self, context):
+        context.add_resource(9, 'foo')
+        context.add_resource_factory(lambda ctx: len(ctx.context_chain), int, 'bar')
+        context.require_resource(int, 'bar')
+        subctx = Context(context)
+        subctx.add_resource(4, 'foo')
+        assert subctx.get_resources(int) == {1, 4}
+
     def test_require_resource(self, context):
         context.add_resource(1)
         assert context.require_resource(int) == 1

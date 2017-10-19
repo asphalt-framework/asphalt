@@ -6,6 +6,7 @@ This library adheres to `Semantic Versioning <http://semver.org/>`_.
 **4.3.0**
 
 - The runner now calls ``logging.shutdown()`` after the event loop has been closed
+- Added the ``Context.get_resources()`` method
 
 **4.2.0** (2017-08-24)
 
