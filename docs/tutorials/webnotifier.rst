@@ -111,7 +111,7 @@ to the logger::
                             last_modified = resp.headers['date']
                             new_lines = (await resp.text()).split('\n')
                             if old_lines is not None and old_lines != new_lines:
-                                difference = '\n'.join(unified_diff(old_lines, new_lines))
+                                difference = diff.make_file(old_lines, new_lines, context=True)
                                 logger.info('Contents changed:\n%s', difference)
 
                             old_lines = new_lines
@@ -163,6 +163,9 @@ And to make the the results look nicer in an email message, you can switch to us
                             new_lines = (await resp.text()).split('\n')
                             if old_lines is not None and old_lines != new_lines:
                                 difference = diff.make_file(old_lines, new_lines, context=True)
+                                await ctx.mailer.create_and_deliver(
+                                    subject='Change detected in %s' % event.source.url,
+                                    html_body=difference)
                                 logger.info('Sent notification email')
 
                             old_lines = new_lines
