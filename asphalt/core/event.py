@@ -240,7 +240,7 @@ async def stream_events(signals: Sequence[Signal], filter: Callable[[Event], boo
 
     """
     assert check_argument_types()
-    queue = Queue(max_queue_size)
+    queue = Queue(max_queue_size)  # type: Queue[Event]
     for signal in signals:
         signal.connect(queue.put_nowait)
 

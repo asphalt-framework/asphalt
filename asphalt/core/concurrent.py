@@ -11,10 +11,11 @@ from asphalt.core import Context
 __all__ = ('executor',)
 
 T_Retval = TypeVar('T_Retval')
+WrappedCallable = Callable[..., Awaitable[T_Retval]]
 
 
-def executor(func_or_executor: Union[Executor, str, Callable[..., T_Retval]], *,
-             _executor: Union[Executor, str] = None) -> Callable[..., Awaitable[T_Retval]]:
+def executor(func_or_executor: Union[Executor, str, Callable[..., T_Retval]]) -> \
+        Union[WrappedCallable, Callable[..., WrappedCallable]]:
     """
     Decorate a function to run in an executor.
 
@@ -50,32 +51,36 @@ def executor(func_or_executor: Union[Executor, str, Callable[..., T_Retval]], *,
         the name of an :class:`~concurrent.futures.Executor` resource
 
     """
-    def wrapper(*args, **kwargs):
-        try:
-            loop = get_event_loop()
-        except RuntimeError:
-            # Event loop not available -- we're in a worker thread
-            return func_or_executor(*args, **kwargs)
-
-        # Resolve the executor resource name to an Executor instance
-        if isinstance(_executor, str):
+    def outer(func: Callable[..., T_Retval],
+              executor: Union[Executor, str] = None) -> Callable[..., Awaitable[T_Retval]]:
+        def wrapper(*args, **kwargs):
             try:
-                ctx = next(obj for obj in args[:2] if isinstance(obj, Context))
-            except StopIteration:
-                raise RuntimeError('the callable needs to be called with a Context as the '
-                                   'first or second positional argument')
+                loop = get_event_loop()
+            except RuntimeError:
+                # Event loop not available -- we're in a worker thread
+                return func(*args, **kwargs)
 
-            executor = ctx.require_resource(Executor, _executor)
-        else:
-            executor = _executor
+            # Resolve the executor resource name to an Executor instance
+            if isinstance(executor, str):
+                try:
+                    ctx = next(obj for obj in args[:2] if isinstance(obj, Context))
+                except StopIteration:
+                    raise RuntimeError('the callable needs to be called with a Context as the '
+                                       'first or second positional argument')
 
-        callback = partial(func_or_executor, *args, **kwargs)
-        return loop.run_in_executor(executor, callback)
+                _executor = ctx.require_resource(Executor, executor)
+            else:
+                _executor = executor
 
-    if not callable(func_or_executor):
-        return partial(executor, _executor=func_or_executor)
+            callback = partial(func, *args, **kwargs)
+            return loop.run_in_executor(_executor, callback)
 
-    assert check_argument_types()
-    assert not inspect.iscoroutinefunction(func_or_executor), \
-        'Cannot wrap coroutine functions to be run in an executor'
-    return wraps(func_or_executor)(wrapper)
+        assert check_argument_types()
+        assert not inspect.iscoroutinefunction(func), \
+            'Cannot wrap coroutine functions to be run in an executor'
+        return wraps(func)(wrapper)
+
+    if isinstance(func_or_executor, (str, Executor)):
+        return partial(outer, executor=func_or_executor)
+    else:
+        return outer(func_or_executor)

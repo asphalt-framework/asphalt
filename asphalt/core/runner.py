@@ -5,7 +5,7 @@ from asyncio.events import AbstractEventLoop
 from concurrent.futures import ThreadPoolExecutor
 from logging import basicConfig, getLogger, INFO, Logger, shutdown
 from logging.config import dictConfig
-from typing import Union, Dict, Any
+from typing import Union, Dict, Any, cast
 
 from typeguard import check_argument_types
 
@@ -88,7 +88,7 @@ def run_application(component: Union[Component, Dict[str, Any]], *, event_loop_p
 
     # Instantiate the root component if a dict was given
     if isinstance(component, dict):
-        component = component_types.create_object(**component)
+        component = cast(Component, component_types.create_object(**component))
 
     logger.info('Starting application')
     context = Context()
@@ -109,9 +109,6 @@ def run_application(component: Union[Component, Dict[str, Any]], *, event_loop_p
         exit_code = 1
     else:
         logger.info('Application started')
-
-        # Enable the component tree to be garbage collected
-        del component
 
         # Add a signal handler to gracefully deal with SIGTERM
         try:

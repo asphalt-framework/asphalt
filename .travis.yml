@@ -34,8 +34,6 @@ matrix:
         on:
           tags: true
           repo: asphalt-framework/asphalt
-  allow_failures:
-    - env: TOXENV=mypy
 
 install:
   - pip install -U setuptools
