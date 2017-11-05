@@ -224,9 +224,8 @@ class Signal(Generic[T_Event]):
         return stream_events([self], filter, max_queue_size=max_queue_size)
 
 
-@async_generator
-async def stream_events(signals: Sequence[Signal], filter: Callable[[Event], bool] = None, *,
-                        max_queue_size: int = 0) -> AsyncIterator[Event]:
+def stream_events(signals: Sequence[Signal], filter: Callable[[T_Event], bool] = None, *,
+                  max_queue_size: int = 0) -> AsyncIterator[T_Event]:
     """
     Return an async generator that yields events from the given signals.
 
@@ -239,19 +238,23 @@ async def stream_events(signals: Sequence[Signal], filter: Callable[[Event], boo
     :param max_queue_size: maximum size of the queue, after which it will start to drop events
 
     """
+    @async_generator
+    async def streamer():
+        try:
+            while True:
+                event = await queue.get()
+                if filter is None or filter(event):
+                    await yield_(event)
+        finally:
+            for signal in signals:
+                signal.disconnect(queue.put_nowait)
+
     assert check_argument_types()
-    queue = Queue(max_queue_size)  # type: Queue[Event]
+    queue = Queue(max_queue_size)  # type: Queue[T_Event]
     for signal in signals:
         signal.connect(queue.put_nowait)
 
-    try:
-        while True:
-            event = await queue.get()
-            if filter is None or filter(event):
-                await yield_(event)
-    finally:
-        for signal in signals:
-            signal.disconnect(queue.put_nowait)
+    return streamer()
 
 
 async def wait_event(signals: Sequence[Signal[T_Event]],

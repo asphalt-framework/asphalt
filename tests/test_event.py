@@ -159,14 +159,14 @@ class TestSignal:
         (lambda event: event.args[0] in (3, None), [3])
     ], ids=['nofilter', 'filter'])
     @pytest.mark.asyncio
-    async def test_stream_events(self, event_loop, source, filter, expected_values):
+    async def test_stream_events(self, source, filter, expected_values):
         values = []
-        for i in range(1, 4):
-            event_loop.call_soon(source.event_a.dispatch, i)
-
-        event_loop.call_soon(source.event_a.dispatch, None)
-
         async with aclosing(source.event_a.stream_events(filter)) as stream:
+            for i in range(1, 4):
+                source.event_a.dispatch(i)
+
+            source.event_a.dispatch(None)
+
             async for event in stream:
                 if event.args[0] is not None:
                     values.append(event.args[0])
@@ -215,16 +215,16 @@ async def test_wait_event(event_loop, filter, expected_value):
     (lambda event: event.args[0] in (3, None), [3, 3])
 ], ids=['nofilter', 'filter'])
 @pytest.mark.asyncio
-async def test_stream_events(event_loop, filter, expected_values):
+async def test_stream_events(filter, expected_values):
     source1, source2 = DummySource(), DummySource()
     values = []
-    for signal in [source1.event_a, source2.event_b]:
-        for i in range(1, 4):
-            event_loop.call_soon(signal.dispatch, i)
-
-    event_loop.call_soon(source1.event_a.dispatch, None)
-
     async with aclosing(stream_events([source1.event_a, source2.event_b], filter)) as stream:
+        for signal in [source1.event_a, source2.event_b]:
+            for i in range(1, 4):
+                signal.dispatch(i)
+
+        source1.event_a.dispatch(None)
+
         async for event in stream:
             if event.args[0] is not None:
                 values.append(event.args[0])

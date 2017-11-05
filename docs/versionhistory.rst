@@ -7,6 +7,8 @@ This library adheres to `Semantic Versioning <http://semver.org/>`_.
 
 - The runner now calls ``logging.shutdown()`` after the event loop has been closed
 - Added the ``Context.get_resources()`` method
+- Made ``stream_events()`` connect to the signal when called instead of the first iteration of the
+  async generator
 
 **4.2.0** (2017-08-24)
 
