@@ -3,7 +3,7 @@ Version history
 
 This library adheres to `Semantic Versioning <http://semver.org/>`_.
 
-**4.4.0**
+**4.4.0** (2017-11-25)
 
 - Removed the requirement for async generators to yield at least once when wrapped with
   ``@context_teardown``
