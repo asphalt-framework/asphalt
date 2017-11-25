@@ -426,7 +426,7 @@ class TestExecutor:
                   callable_name(runs_in_default_worker))
 
 
-class TestContextCleanup:
+class TestContextTeardown:
     @pytest.mark.parametrize('expected_exc', [
         None, Exception('foo')
     ], ids=['no_exception', 'exception'])
@@ -509,7 +509,4 @@ class TestContextCleanup:
         async def start(ctx: Context):
             pass
 
-        with pytest.raises(RuntimeError) as exc_info:
-            await start(Context())
-
-        exc_info.match(' did not do "await yield_\(\)"$')
+        await start(Context())

@@ -623,8 +623,7 @@ def context_teardown(func: Callable):
         try:
             await generator.asend(None)
         except StopAsyncIteration:
-            raise RuntimeError(
-                '{} did not do "await yield_()"'.format(callable_name(func))) from None
+            pass
         except BaseException:
             await generator.aclose()
             raise
