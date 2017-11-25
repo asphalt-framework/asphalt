@@ -7,6 +7,7 @@ This library adheres to `Semantic Versioning <http://semver.org/>`_.
 
 - Removed the requirement for async generators to yield at least once when wrapped with
   ``@context_teardown``
+- Removed aiogevent support since it has been removed from PyPI
 
 **4.3.0** (2017-11-05)
 

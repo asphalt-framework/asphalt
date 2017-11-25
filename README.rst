@@ -15,8 +15,7 @@ Its highlight features are:
   configuration
 * A sophisticated signal system that lets you connect different services to create complex
   event-driven interactions
-* Supports uvloop_, tokio_ and aiogevent_ as event loop policy providers (though YMMV with the last
-  two)
+* Supports uvloop_ and tokio_ as event loop policy providers (though YMMV with the last one)
 * Elegant handling of blocking APIs through the use of thread pooling
 * Run time type checking for development and testing to fail early when functions are called with
   incompatible arguments (can be disabled with **zero** overhead for production deployments!)
@@ -35,7 +34,6 @@ with relatively little effort.
 .. _asyncio: https://docs.python.org/3/library/asyncio.html
 .. _uvloop: https://github.com/MagicStack/uvloop
 .. _tokio: https://github.com/PyO3/tokio
-.. _aiogevent: https://bitbucket.org/haypo/aiogevent
 .. _Type hints: https://www.python.org/dev/peps/pep-0484/
 .. _semantic versioning: http://semver.org/
 
