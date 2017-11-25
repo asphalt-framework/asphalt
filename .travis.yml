@@ -3,7 +3,7 @@ sudo: false
 
 stages:
   - name: deploy to pypi
-    if: type = push AND tag =~ ^v\d+\.\d+\.\d+
+    if: type = push AND tag =~ ^\d+\.\d+\.\d+
 
 jobs:
   fast_finish: true
