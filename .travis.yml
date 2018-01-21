@@ -38,7 +38,7 @@ jobs:
         on:
           tags: true
 
-python: "3.5"
+python: "3.5.2"
 
 install:
   - pip install "setuptools >= 36.2.7"

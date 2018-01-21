@@ -1,4 +1,5 @@
 import logging
+import sys
 import weakref
 from asyncio import get_event_loop, Queue, wait
 from datetime import datetime, timezone
@@ -257,7 +258,7 @@ def stream_events(signals: Sequence[Signal], filter: Callable[[T_Event], bool] =
     return streamer()
 
 
-async def wait_event(signals: Sequence[Signal[T_Event]],
+async def wait_event(signals: Sequence['Signal[T_Event]'],
                      filter: Callable[[T_Event], bool] = None) -> T_Event:
     """
     Wait until any of the given signals dispatches an event that satisfies the filter (if any).
@@ -270,6 +271,8 @@ async def wait_event(signals: Sequence[Signal[T_Event]],
     :return: the event that was dispatched
 
     """
-    assert check_argument_types()
+    if sys.version_info >= (3, 5, 3):
+        assert check_argument_types()
+
     async with aclosing(stream_events(signals, filter)) as events:
         return await events.asend(None)
