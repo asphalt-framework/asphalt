@@ -93,6 +93,7 @@ def test_run_max_threads(event_loop, max_threads):
 ], ids=['uvloop', 'tokio'])
 def test_event_loop_policy(caplog, policy, policy_name):
     """Test that a the runner switches to a different event loop policy when instructed to."""
+    caplog.set_level(logging.INFO)
     component = ShutdownComponent()
     old_policy = asyncio.get_event_loop_policy()
     try:
@@ -118,6 +119,7 @@ def test_run_callbacks(event_loop, caplog):
     and that the proper logging messages are emitted.
 
     """
+    caplog.set_level(logging.INFO)
     component = ShutdownComponent()
     run_application(component)
 
@@ -138,6 +140,7 @@ def test_clean_exit(event_loop, caplog, method):
     cleanly.
 
     """
+    caplog.set_level(logging.INFO)
     component = ShutdownComponent(method=method)
     run_application(component)
 
@@ -156,6 +159,7 @@ def test_run_start_exception(event_loop, caplog):
     application context and made available to teardown callbacks.
 
     """
+    caplog.set_level(logging.INFO)
     component = ShutdownComponent(method='exception')
     pytest.raises(SystemExit, run_application, component)
 
@@ -175,6 +179,7 @@ def test_run_start_timeout(event_loop, caplog):
     appropriate error message.
 
     """
+    caplog.set_level(logging.INFO)
     component = ShutdownComponent(method='timeout')
     pytest.raises(SystemExit, run_application, component, start_timeout=1)
 
@@ -189,6 +194,7 @@ def test_run_start_timeout(event_loop, caplog):
 
 def test_dict_config(event_loop, caplog):
     """Test that component configuration passed as a dictionary works."""
+    caplog.set_level(logging.INFO)
     component_class = '{0.__module__}:{0.__name__}'.format(ShutdownComponent)
     run_application(component={'type': component_class})
 
@@ -202,6 +208,7 @@ def test_dict_config(event_loop, caplog):
 
 
 def test_run_cli_application(event_loop, caplog):
+    caplog.set_level(logging.INFO)
     with pytest.raises(SystemExit) as exc:
         run_application(DummyCLIApp())
 
