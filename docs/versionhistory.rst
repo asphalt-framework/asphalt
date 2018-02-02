@@ -3,6 +3,10 @@ Version history
 
 This library adheres to `Semantic Versioning <http://semver.org/>`_.
 
+**4.4.2**
+
+- Fixed memory leak when `stream_events()` is called but the returned generator is never used
+
 **4.4.1** (2018-01-21)
 
 - Fixed incompatibility with Python 3.5.2

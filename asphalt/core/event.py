@@ -247,15 +247,20 @@ def stream_events(signals: Sequence[Signal], filter: Callable[[T_Event], bool] =
                 if filter is None or filter(event):
                     await yield_(event)
         finally:
-            for signal in signals:
-                signal.disconnect(queue.put_nowait)
+            cleanup()
+
+    def cleanup():
+        for signal in signals:
+            signal.disconnect(queue.put_nowait)
 
     assert check_argument_types()
     queue = Queue(max_queue_size)  # type: Queue[T_Event]
     for signal in signals:
         signal.connect(queue.put_nowait)
 
-    return streamer()
+    gen = [streamer()]  # this is to allow the reference count to drop to 0
+    weakref.finalize(gen[0], cleanup)
+    return gen.pop()
 
 
 async def wait_event(signals: Sequence['Signal[T_Event]'],

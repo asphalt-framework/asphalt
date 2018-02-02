@@ -1,5 +1,5 @@
 import gc
-from asyncio import Task
+from asyncio import Task, Queue
 from datetime import datetime, timezone, timedelta
 
 import pytest
@@ -232,3 +232,17 @@ async def test_stream_events(filter, expected_values):
                 break
 
     assert values == expected_values
+
+
+@pytest.mark.asyncio
+async def test_stream_events_memleak():
+    """Test that closing but never iterating the event stream will not cause a memory leak."""
+    source = DummySource()
+    gc.collect()
+    num_queues_before = len([x for x in gc.get_objects() if type(x) is Queue])
+    async with aclosing(stream_events([source.event_a])):
+        pass
+
+    gc.collect()
+    num_queues_after = len([x for x in gc.get_objects() if type(x) is Queue])
+    assert num_queues_after == num_queues_before
