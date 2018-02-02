@@ -3,7 +3,7 @@ Version history
 
 This library adheres to `Semantic Versioning <http://semver.org/>`_.
 
-**4.4.2**
+**4.4.2** (2018-02-02)
 
 - Fixed memory leak when `stream_events()` is called but the returned generator is never used
 
