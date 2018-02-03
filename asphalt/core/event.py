@@ -250,8 +250,11 @@ def stream_events(signals: Sequence[Signal], filter: Callable[[T_Event], bool] =
             cleanup()
 
     def cleanup():
+        nonlocal queue
         for signal in signals:
             signal.disconnect(queue.put_nowait)
+
+        del queue
 
     assert check_argument_types()
     queue = Queue(max_queue_size)  # type: Queue[T_Event]
