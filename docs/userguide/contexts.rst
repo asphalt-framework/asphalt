@@ -72,7 +72,7 @@ factory matching the given type and name. If the resource is found, it returns i
 The second one, :meth:`~asphalt.core.context.Context.require_resource`, works exactly the same way
 except that it raises :exc:`~asphalt.core.context.ResourceNotFound` if the resource is not found.
 
-The third method, meth:`~asphalt.core.context.Context.request_resource`, calls
+The third method, :meth:`~asphalt.core.context.Context.request_resource`, calls
 :meth:`~asphalt.core.context.Context.get_resource` and if the resource is not found, it waits
 indefinitely for the resource to be added to the context or its parents. When that happens, it
 calls :meth:`~asphalt.core.context.Context.get_resource` again, at which point success is
