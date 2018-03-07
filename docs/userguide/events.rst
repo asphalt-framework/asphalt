@@ -98,7 +98,7 @@ events dispatched from a signal::
 
     async def listen_to_events(source):
         async with aclosing(source.somesignal.stream_events()) as stream:
-            async for event in events:
+            async for event in stream:
                 print(event)
 
 Using :func:`~asphalt.core.event.stream_events`, you can stream events from multiple signals::
@@ -109,7 +109,7 @@ Using :func:`~asphalt.core.event.stream_events`, you can stream events from mult
     async def listen_to_events(source1, source2, source3):
         stream = stream_events(source1.some_signal, source2.another_signal, source3.some_signal)
         async with aclosing(stream):
-            async for event in stream):
+            async for event in stream:
                 print(event)
 
 The filtering capability of :func:`~asphalt.core.event.wait_event` works here too::
@@ -118,5 +118,5 @@ The filtering capability of :func:`~asphalt.core.event.wait_event` works here to
         stream = stream_events(source1.some_signal, source2.another_signal, source3.some_signal,
                                lambda event: event.randomproperty == 'foo')
         async with aclosing(stream):
-            async for event in stream):
+            async for event in stream:
                 print(event)
