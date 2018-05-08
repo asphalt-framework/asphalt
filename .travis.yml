@@ -12,6 +12,7 @@ jobs:
     - env: TOXENV=flake8
 
     - env: TOXENV=mypy
+      python: "3.6"
 
     - env: TOXENV=pypy3
       cache: pip
