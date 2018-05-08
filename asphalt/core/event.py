@@ -7,7 +7,7 @@ from inspect import isawaitable, getmembers
 from time import time as stdlib_time
 from typing import (
     Callable, Any, Sequence, Awaitable, AsyncIterator, TypeVar, Generic, Type, List,
-    MutableMapping)
+    MutableMapping, Optional, cast)
 from weakref import WeakKeyDictionary
 
 from async_generator import async_generator, aclosing, yield_
@@ -79,7 +79,7 @@ class Signal(Generic[T_Event]):
         self.topic = topic
         if source is not None:
             self.source = weakref.ref(source)
-            self.listeners = None  # type: List[Callable]
+            self.listeners = None  # type: Optional[List[Callable]]
         else:
             assert issubclass(event_class, Event), 'event_class must be a subclass of Event'
             self.bound_signals = WeakKeyDictionary()  # type: MutableMapping[Any, 'Signal']
@@ -213,7 +213,7 @@ class Signal(Generic[T_Event]):
             the callbacks, ``False`` otherwise
 
         """
-        event = self.event_class(self.source(), self.topic, *args, **kwargs)
+        event = self.event_class(self.source(), cast(str, self.topic), *args, **kwargs)
         return self.dispatch_raw(event)
 
     def wait_event(self, filter: Callable[[T_Event], bool] = None) -> Awaitable[T_Event]:

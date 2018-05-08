@@ -176,7 +176,7 @@ class Context:
     def context_chain(self) -> List['Context']:
         """Return a list of contexts starting from this one, its parent and so on."""
         contexts = []
-        ctx = self
+        ctx = self  # type: Optional[Context]
         while ctx is not None:
             contexts.append(ctx)
             ctx = ctx.parent
@@ -482,7 +482,7 @@ class Context:
         signals = [ctx.resource_added for ctx in self.context_chain]
         await wait_event(
             signals, lambda event: event.resource_name == name and type in event.resource_types)
-        return self.get_resource(type, name)
+        return self.require_resource(type, name)
 
     def call_async(self, func: Callable, *args, **kwargs):
         """

@@ -5,7 +5,7 @@ from asyncio.events import AbstractEventLoop
 from concurrent.futures import ThreadPoolExecutor
 from logging import basicConfig, getLogger, INFO, Logger, shutdown
 from logging.config import dictConfig
-from typing import Union, Dict, Any, cast
+from typing import Union, Dict, Any, cast, Optional
 
 from typeguard import check_argument_types
 
@@ -92,7 +92,7 @@ def run_application(component: Union[Component, Dict[str, Any]], *, event_loop_p
 
     logger.info('Starting application')
     context = Context()
-    exception = None  # type: BaseException
+    exception = None  # type: Optional[BaseException]
     exit_code = 0
 
     # Start the root component
