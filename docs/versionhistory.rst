@@ -3,6 +3,10 @@ Version history
 
 This library adheres to `Semantic Versioning <http://semver.org/>`_.
 
+**4.4.4** (2018-05-08)
+
+- Changed the ``async_timeout`` dependency to allow the 3.x and newer releases
+
 **4.4.3** (2018-02-05)
 
 - Fixed exception in `stream_events()` cleanup code introduced in the previous release
