@@ -4,6 +4,9 @@
 .. image:: https://coveralls.io/repos/github/asphalt-framework/asphalt/badge.svg?branch=master
   :target: https://coveralls.io/github/asphalt-framework/asphalt?branch=master
   :alt: Code Coverage
+.. image:: https://readthedocs.org/projects/asphalt/badge/?version=latest
+  :target: https://asphalt.readthedocs.io/en/latest/?badge=latest
+  :alt: Documentation Status
 
 Asphalt is an asyncio_ based microframework for network oriented applications.
 
@@ -36,12 +39,3 @@ with relatively little effort.
 .. _tokio: https://github.com/PyO3/tokio
 .. _Type hints: https://www.python.org/dev/peps/pep-0484/
 .. _semantic versioning: http://semver.org/
-
-Project links
--------------
-
-* `Component projects <https://github.com/asphalt-framework>`_
-* `Documentation <http://asphalt.readthedocs.org/en/latest/>`_
-* `Help and support <https://github.com/asphalt-framework/asphalt/wiki/Help-and-support>`_
-* `Source code <https://github.com/asphalt-framework/asphalt>`_
-* `Issue tracker <https://github.com/asphalt-framework/asphalt/issues>`_
