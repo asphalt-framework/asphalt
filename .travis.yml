@@ -28,7 +28,7 @@ jobs:
       after_success: *after_success
 
     - stage: deploy to pypi
-      install: pip install "pip >= 10"
+      install: pip install "setuptools >= 36.2.7"
       script: skip
       deploy:
         provider: pypi
@@ -42,7 +42,7 @@ jobs:
 python: "3.5.2"
 
 install:
-  - pip install "pip >= 10"
+  - pip install "setuptools >= 36.2.7"
   - pip install tox
 
 script: tox
