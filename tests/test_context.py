@@ -422,7 +422,7 @@ class TestExecutor:
         with pytest.raises(RuntimeError) as exc:
             await runs_in_default_worker()
 
-        exc.match('the first positional argument to %s\(\) has to be a Context instance' %
+        exc.match(r'the first positional argument to %s\(\) has to be a Context instance' %
                   callable_name(runs_in_default_worker))
 
 
@@ -488,7 +488,7 @@ class TestContextTeardown:
         with pytest.raises(RuntimeError) as exc:
             await start(None)
 
-        exc.match('the first positional argument to %s\(\) has to be a Context instance' %
+        exc.match(r'the first positional argument to %s\(\) has to be a Context instance' %
                   callable_name(start))
 
     @pytest.mark.asyncio

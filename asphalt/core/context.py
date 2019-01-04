@@ -429,15 +429,15 @@ class Context:
         resources.update({container.name: container.generate_value(self)
                           for ctx in self.context_chain
                           for container in ctx._resources.values()
-                          if container.is_factory and type in container.types and
-                          container.name not in resources})
+                          if container.is_factory and type in container.types
+                          and container.name not in resources})
 
         # Finally, add the resource values from the parent contexts
         resources.update({container.name: container.value_or_factory
                           for ctx in self.context_chain[1:]
                           for container in ctx._resources.values()
-                          if not container.is_factory and type in container.types and
-                          container.name not in resources})
+                          if not container.is_factory and type in container.types
+                          and container.name not in resources})
 
         return set(resources.values())
 
