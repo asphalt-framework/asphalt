@@ -1,34 +1,48 @@
+dist: xenial
 language: python
-sudo: false
-cache: pip
+python: "3.6"
 
 stages:
+  - name: static analysis
   - name: test
   - name: deploy to pypi
     if: type = push AND tag =~ ^\d+\.\d+\.\d+
 
 jobs:
-  fast_finish: true
   include:
-    - env: TOXENV=flake8
+    - stage: static analysis
+      env: TOXENV=flake8
 
-    - env: TOXENV=mypy
-      python: "3.6"
+    - stage: static analysis
+      env: TOXENV=mypy
 
-    - env: TOXENV=pypy3
-      python: pypy3
-
-    - env: TOXENV=py35
-      after_success: &after_success
+    - &test
+      stage: test
+      env: TOXENV=pypy3
+      python: pypy3.5-6.0
+      install:
+        - pip install "setuptools >= 40.1.0"
+        - pip install tox
+      services:
+        - redis-server
+      after_success:
         - pip install coveralls
         - coveralls
 
-    - env: TOXENV=py36
+    - <<: *test
+      env: TOXENV=py35
+      python: "3.5.2"
+
+    - <<: *test
+      env: TOXENV=py36
       python: "3.6"
-      after_success: *after_success
+
+    - <<: *test
+      env: TOXENV=py37
+      python: "3.7"
 
     - stage: deploy to pypi
-      install: pip install "setuptools >= 36.2.7"
+      install: true
       script: skip
       deploy:
         provider: pypi
@@ -38,12 +52,9 @@ jobs:
         distributions: sdist bdist_wheel
         on:
           tags: true
+          repo: asphalt-framework/asphalt
 
-python: "3.5.2"
-
-install:
-  - pip install "setuptools >= 36.2.7"
-  - pip install tox
+install: pip install tox
 
 script: tox
 
@@ -51,10 +62,3 @@ notifications:
   webhooks:
     urls:
       - https://webhooks.gitter.im/e/aa5a289b7a0df8aefd68
-  irc:
-    channels:
-      - "chat.freenode.net#asphalt"
-    on_success: change
-    on_failure: change
-    use_notice: true
-    skip_join: true
