@@ -20,11 +20,6 @@ jobs:
       stage: test
       env: TOXENV=pypy3
       python: pypy3.5-6.0
-      install:
-        - pip install "setuptools >= 40.1.0"
-        - pip install tox
-      services:
-        - redis-server
       after_success:
         - pip install coveralls
         - coveralls
