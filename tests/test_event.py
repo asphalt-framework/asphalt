@@ -1,11 +1,18 @@
 import gc
-from asyncio import Task, Queue
+from asyncio import Queue
 from datetime import datetime, timezone, timedelta
 
 import pytest
 from async_generator import aclosing
 
 from asphalt.core import Event, Signal, stream_events, wait_event
+
+try:
+    from asyncio import all_tasks, current_task
+except ImportError:
+    from asyncio import Task
+    all_tasks = Task.all_tasks
+    current_task = Task.current_task
 
 
 class DummyEvent(Event):
@@ -127,7 +134,7 @@ class TestSignal:
         source.event_a.connect(lambda event: None)
         future = source.event_a.dispatch()
         future.cancel()
-        task = next(t for t in Task.all_tasks() if t is not Task.current_task())
+        task = next(t for t in all_tasks() if t is not current_task())
         await task
 
     @pytest.mark.asyncio
