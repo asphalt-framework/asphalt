@@ -3,6 +3,10 @@ Version history
 
 This library adheres to `Semantic Versioning <http://semver.org/>`_.
 
+**4.5.0** (2019-03-26)
+
+- Added new custom YAML tags (``!Env``, ``!BinaryFile`` and ``!TextFile``)
+
 **4.4.4** (2018-05-08)
 
 - Changed the ``async_timeout`` dependency to allow the 3.x and newer releases

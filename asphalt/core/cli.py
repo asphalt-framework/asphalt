@@ -1,12 +1,34 @@
 import os
+from pathlib import Path
 from typing import Optional, Dict, Any
 
 import click
 from ruamel import yaml
-from ruamel.yaml import Loader
+from ruamel.yaml import Loader, SafeLoader
 
 from asphalt.core.runner import run_application, policies
 from asphalt.core.utils import merge_config, qualified_name
+
+
+def env_constructor(loader, node):
+    value = loader.construct_scalar(node)
+    return os.getenv(value)
+
+
+def text_file_constructor(loader, node):
+    value = loader.construct_scalar(node)
+    return Path(value).read_text()
+
+
+def binary_file_constructor(loader, node):
+    value = loader.construct_scalar(node)
+    return Path(value).read_bytes()
+
+
+for loader_cls in Loader, SafeLoader:
+    loader_cls.add_constructor('!Env', env_constructor)
+    loader_cls.add_constructor('!TextFile', text_file_constructor)
+    loader_cls.add_constructor('!BinaryFile', binary_file_constructor)
 
 
 @click.group()
@@ -26,7 +48,7 @@ def run(configfile, unsafe: bool, loop: Optional[str], service: Optional[str]):
     # Read the configuration from the supplied YAML files
     config = {}  # type: Dict[str, Any]
     for path in configfile:
-        config_data = yaml.load(path, Loader=Loader) if unsafe else yaml.safe_load(path)
+        config_data = yaml.load(path, Loader=Loader if unsafe else SafeLoader)
         assert isinstance(config_data, dict), 'the document root element must be a dictionary'
         config = merge_config(config, config_data)
 

@@ -105,6 +105,39 @@ least ``INFO`` level to the console. You may want to set up more granular loggin
 configuration file. See the
 :ref:`Python standard library documentation <python:logging-config-dictschema>` for details.
 
+Using data from environment variables and files
+-----------------------------------------------
+
+Many deployment environments (Kubernetes, Docker Swarm, Heroku, etc.) require applications to input
+configuration values and/or secrets using environment variables or external files. To support this,
+Asphalt extends the YAML parser with three custom tags:
+
+* ``!Env``: substitute with the value of an environment variable
+* ``!TextFile`` substitute with the contents of a (UTF-8 encoded) text file (as ``str``)
+* ``!BinaryFile`` substitute with the contents of a file (as ``bytes``)
+
+For example::
+
+    ---
+    component:
+      type: myproject:MyRootComponent
+      param_from_environment: !Env MY_ENV_VAR
+      files:
+        - !TextFile /path/to/file.txt
+        - !BinaryFile /path/to/file.bin
+
+If a file path contains spaces, you can just quote it::
+
+    ---
+    component:
+      type: myproject:MyRootComponent
+      param_from_text_file: !TextFile "/path with spaces/to/file.txt"
+
+.. note:: This does **not** allow you to include other YAML documents as part of the configuration,
+          except as text/binary blobs. See the next section if this is what you want.
+
+.. versionadded:: 4.5.0
+
 Configuration overlays
 ----------------------
 
