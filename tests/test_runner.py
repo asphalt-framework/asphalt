@@ -6,7 +6,7 @@ from unittest.mock import patch
 import pytest
 from pkg_resources import DistributionNotFound
 
-from asphalt.core.component import Component, CLIApplicationComponent
+from asphalt.core.component import CLIApplicationComponent, Component
 from asphalt.core.context import Context
 from asphalt.core.runner import run_application, sigterm_handler
 

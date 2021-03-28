@@ -1,8 +1,8 @@
 import inspect
 from asyncio import get_event_loop
 from concurrent.futures import Executor
-from functools import wraps, partial
-from typing import Callable, Union, TypeVar, Awaitable
+from functools import partial, wraps
+from typing import Awaitable, Callable, TypeVar, Union
 
 from typeguard import check_argument_types
 

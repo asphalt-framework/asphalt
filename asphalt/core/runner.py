@@ -3,9 +3,9 @@ import signal
 import sys
 from asyncio.events import AbstractEventLoop
 from concurrent.futures import ThreadPoolExecutor
-from logging import basicConfig, getLogger, INFO, Logger, shutdown
+from logging import INFO, Logger, basicConfig, getLogger, shutdown
 from logging.config import dictConfig
-from typing import Union, Dict, Any, cast, Optional
+from typing import Any, Dict, Optional, Union, cast
 
 from typeguard import check_argument_types
 

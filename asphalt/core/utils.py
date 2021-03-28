@@ -1,6 +1,6 @@
 from importlib import import_module
 from inspect import isclass
-from typing import Any, Union, List, Dict, Callable, Optional
+from typing import Any, Callable, Dict, List, Optional, Union
 
 from pkg_resources import EntryPoint, iter_entry_points
 from typeguard import check_argument_types

@@ -1,12 +1,12 @@
 import os
 from pathlib import Path
-from typing import Optional, Dict, Any
+from typing import Any, Dict, Optional
 
 import click
 from ruamel import yaml
 from ruamel.yaml import Loader, SafeLoader
 
-from asphalt.core.runner import run_application, policies
+from asphalt.core.runner import policies, run_application
 from asphalt.core.utils import merge_config, qualified_name
 
 

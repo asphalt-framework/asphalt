@@ -3,7 +3,7 @@ import sys
 from abc import ABCMeta, abstractmethod
 from collections import OrderedDict
 from traceback import print_exception
-from typing import Dict, Any, Union, Optional
+from typing import Any, Dict, Optional, Union
 from warnings import warn
 
 from typeguard import check_argument_types

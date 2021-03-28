@@ -2,8 +2,8 @@ import asyncio
 
 import pytest
 
-from asphalt.core.component import ContainerComponent, Component, component_types, \
-    CLIApplicationComponent
+from asphalt.core.component import (
+    CLIApplicationComponent, Component, ContainerComponent, component_types)
 from asphalt.core.context import Context
 
 

@@ -1,19 +1,19 @@
 import logging
 import re
-from asyncio import get_event_loop, iscoroutinefunction, AbstractEventLoop
+from asyncio import AbstractEventLoop, get_event_loop, iscoroutinefunction
 from concurrent.futures import Executor
 from functools import wraps
-from inspect import isawaitable, getattr_static
+from inspect import getattr_static, isawaitable
 from traceback import format_exception
 from typing import (
-    Optional, Callable, Any, Sequence, Dict, Tuple, Type, List, Union, Awaitable, TypeVar, Set)
+    Any, Awaitable, Callable, Dict, List, Optional, Sequence, Set, Tuple, Type, TypeVar, Union)
 
 import asyncio_extras
 from async_generator import async_generator, isasyncgenfunction
 from typeguard import check_argument_types
 
-from asphalt.core.event import Signal, Event, wait_event
-from asphalt.core.utils import qualified_name, callable_name
+from asphalt.core.event import Event, Signal, wait_event
+from asphalt.core.utils import callable_name, qualified_name
 
 __all__ = ('ResourceEvent', 'ResourceConflict', 'ResourceNotFound', 'TeardownError', 'Context',
            'executor', 'context_teardown')

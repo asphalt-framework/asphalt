@@ -1,4 +1,4 @@
-from concurrent.futures import ThreadPoolExecutor, Executor
+from concurrent.futures import Executor, ThreadPoolExecutor
 from threading import current_thread
 
 import pytest

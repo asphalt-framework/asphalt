@@ -1,16 +1,16 @@
 import logging
 import sys
 import weakref
-from asyncio import get_event_loop, Queue, wait
+from asyncio import Queue, get_event_loop, wait
 from datetime import datetime, timezone
-from inspect import isawaitable, getmembers
+from inspect import getmembers, isawaitable
 from time import time as stdlib_time
 from typing import (
-    Callable, Any, Sequence, Awaitable, AsyncIterator, TypeVar, Generic, Type, List,
-    MutableMapping, Optional, cast)
+    Any, AsyncIterator, Awaitable, Callable, Generic, List, MutableMapping, Optional, Sequence,
+    Type, TypeVar, cast)
 from weakref import WeakKeyDictionary
 
-from async_generator import async_generator, aclosing, yield_
+from async_generator import aclosing, async_generator, yield_
 from typeguard import check_argument_types
 
 from asphalt.core.utils import qualified_name

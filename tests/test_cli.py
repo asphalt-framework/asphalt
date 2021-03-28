@@ -4,7 +4,7 @@ from unittest.mock import patch
 import pytest
 from click.testing import CliRunner
 
-from asphalt.core import cli, Component, Context
+from asphalt.core import Component, Context, cli
 
 
 class DummyComponent(Component):

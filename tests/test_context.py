@@ -1,5 +1,5 @@
 import asyncio
-from concurrent.futures import ThreadPoolExecutor, Executor
+from concurrent.futures import Executor, ThreadPoolExecutor
 from itertools import count
 from threading import current_thread
 from unittest.mock import patch
@@ -8,7 +8,7 @@ import pytest
 from async_generator import yield_
 
 from asphalt.core import (
-    ResourceConflict, ResourceNotFound, Context, context_teardown, callable_name, executor)
+    Context, ResourceConflict, ResourceNotFound, callable_name, context_teardown, executor)
 from asphalt.core.context import ResourceContainer, TeardownError
 
 

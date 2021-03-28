@@ -1,6 +1,6 @@
 import gc
 from asyncio import Queue
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 
 import pytest
 from async_generator import aclosing
