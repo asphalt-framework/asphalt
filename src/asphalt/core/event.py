@@ -176,7 +176,7 @@ class Signal(Generic[T_Event]):
             # For any callbacks that returned awaitables, wait for their completion and log any
             # exceptions they raised
             if awaitables:
-                done, _ = await wait(awaitables, loop=loop)
+                done, _ = await wait(awaitables)
                 for f in done:
                     exc = f.exception()
                     if exc is not None:

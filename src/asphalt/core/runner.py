@@ -97,7 +97,7 @@ def run_application(component: Union[Component, Dict[str, Any]], *, event_loop_p
 
     # Start the root component
     try:
-        coro = asyncio.wait_for(component.start(context), start_timeout, loop=event_loop)
+        coro = asyncio.wait_for(component.start(context), start_timeout)
         event_loop.run_until_complete(coro)
     except asyncio.TimeoutError as e:
         exception = e
