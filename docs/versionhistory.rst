@@ -3,6 +3,11 @@ Version history
 
 This library adheres to `Semantic Versioning <http://semver.org/>`_.
 
+**UNRELEASED**
+
+- Added support for Python 3.10
+- Dropped support for Python 3.5 and 3.6
+
 **4.5.0** (2019-03-26)
 
 - Added new custom YAML tags (``!Env``, ``!BinaryFile`` and ``!TextFile``)
