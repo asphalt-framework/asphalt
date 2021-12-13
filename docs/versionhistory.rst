@@ -8,6 +8,7 @@ This library adheres to `Semantic Versioning <http://semver.org/>`_.
 - Added support for Python 3.10
 - Dropped support for Python 3.5 and 3.6
 - Removed all uses of the ``loop`` argument (fixes Python 3.10 compatibility)
+- Switched to v0.15+ API of ``ruamel.yaml``
 
 **4.5.0** (2019-03-26)
 
