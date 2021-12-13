@@ -1,9 +1,14 @@
+import sys
 from importlib import import_module
 from inspect import isclass
 from typing import Any, Callable, Dict, List, Optional, Union
 
-from pkg_resources import EntryPoint, iter_entry_points
 from typeguard import check_argument_types
+
+if sys.version_info >= (3, 8):
+    from importlib.metadata import EntryPoint, entry_points
+else:
+    from importlib_metadata import EntryPoint, entry_points
 
 __all__ = ('resolve_reference', 'qualified_name', 'callable_name', 'merge_config',
            'PluginContainer')
@@ -115,7 +120,7 @@ class PluginContainer:
     def __init__(self, namespace: str, base_class: type = None) -> None:
         self.namespace = namespace
         self.base_class = base_class
-        self._entrypoints = {ep.name: ep for ep in iter_entry_points(namespace)}
+        self._entrypoints = {ep.name: ep for ep in entry_points().get(namespace, ())}
 
     def resolve(self, obj):
         """

@@ -1,8 +1,8 @@
 import asyncio
+from importlib.metadata import EntryPoint
 from unittest.mock import Mock
 
 import pytest
-from pkg_resources import EntryPoint
 
 from asphalt.core.utils import (
     PluginContainer, callable_name, merge_config, qualified_name, resolve_reference)
@@ -75,7 +75,7 @@ class TestPluginContainer:
     @pytest.fixture
     def container(self):
         container = PluginContainer('asphalt.core.test_plugin_container', BaseDummyPlugin)
-        entrypoint = EntryPoint('dummy', 'test_utils')
+        entrypoint = EntryPoint('dummy', 'test_utils', 'asphalt.core.test_plugin_container')
         entrypoint.load = Mock(return_value=DummyPlugin)
         container._entrypoints = {'dummy': entrypoint}
         return container
