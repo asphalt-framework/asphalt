@@ -87,17 +87,13 @@ def test_run_max_threads(event_loop, max_threads):
         assert not mock_executor.called
 
 
-@pytest.mark.parametrize('policy, policy_name', [
-    ('uvloop', 'uvloop.EventLoopPolicy'),
-    ('tokio', 'tokio.TokioLoopPolicy'),
-], ids=['uvloop', 'tokio'])
-def test_event_loop_policy(caplog, policy, policy_name):
-    """Test that a the runner switches to a different event loop policy when instructed to."""
+def test_uvloop_policy(caplog):
+    """Test that the runner switches to a different event loop policy when instructed to."""
     caplog.set_level(logging.INFO)
     component = ShutdownComponent()
     old_policy = asyncio.get_event_loop_policy()
     try:
-        run_application(component, event_loop_policy=policy)
+        run_application(component, event_loop_policy='uvloop')
     except DistributionNotFound as e:
         pytest.skip(str(e))
     finally:
@@ -106,7 +102,7 @@ def test_event_loop_policy(caplog, policy, policy_name):
     records = [record for record in caplog.records if record.name == 'asphalt.core.runner']
     assert len(records) == 6
     assert records[0].message == 'Running in development mode'
-    assert records[1].message == 'Switched event loop policy to %s' % policy_name
+    assert records[1].message == 'Switched event loop policy to uvloop.EventLoopPolicy'
     assert records[2].message == 'Starting application'
     assert records[3].message == 'Application started'
     assert records[4].message == 'Stopping application'
