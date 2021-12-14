@@ -1,6 +1,9 @@
 import asyncio
 import logging
+import platform
 import sys
+from concurrent.futures import ThreadPoolExecutor
+from typing import Any, Callable, Tuple
 from unittest.mock import patch
 
 import pytest
@@ -79,6 +82,8 @@ def test_run_max_threads(event_loop, max_threads):
     """
     component = ShutdownComponent()
     with patch('asphalt.core.runner.ThreadPoolExecutor') as mock_executor:
+        mock_executor.configure_mock(
+            side_effect=lambda *args, **kwargs: ThreadPoolExecutor(*args, **kwargs))
         run_application(component, max_threads=max_threads)
 
     if max_threads:
@@ -87,6 +92,8 @@ def test_run_max_threads(event_loop, max_threads):
         assert not mock_executor.called
 
 
+@pytest.mark.skipif(platform.python_implementation() != 'CPython',
+                    reason='uvloop only works on CPython')
 def test_uvloop_policy(caplog):
     """Test that the runner switches to a different event loop policy when instructed to."""
     caplog.set_level(logging.INFO)
