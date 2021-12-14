@@ -10,6 +10,7 @@ This library adheres to `Semantic Versioning <http://semver.org/>`_.
 - Removed all uses of the ``loop`` argument (fixes Python 3.10 compatibility)
 - Switched to v0.15+ API of ``ruamel.yaml``
 - Switched from ``pkg_resources`` to ``importlib.metadata`` for loading entry points
+- Fixed ``DeprecationWarning`` about passing coroutine objects to ``asyncio.wait()``
 
 **4.5.0** (2019-03-26)
 

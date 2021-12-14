@@ -1,7 +1,7 @@
 import logging
 import sys
 import weakref
-from asyncio import Queue, get_event_loop, wait
+from asyncio import Queue, create_task, get_event_loop, iscoroutine, wait
 from datetime import datetime, timezone
 from inspect import getmembers, isawaitable
 from time import time as stdlib_time
@@ -170,7 +170,9 @@ class Signal(Generic[T_Event]):
                     logger.exception('Uncaught exception in event listener')
                     all_successful = False
                 else:
-                    if isawaitable(retval):
+                    if iscoroutine(retval):
+                        awaitables.append(create_task(retval))
+                    elif isawaitable(retval):
                         awaitables.append(retval)
 
             # For any callbacks that returned awaitables, wait for their completion and log any
