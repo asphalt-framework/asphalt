@@ -1,5 +1,5 @@
 import inspect
-from asyncio import get_event_loop
+from asyncio import get_running_loop
 from concurrent.futures import Executor
 from functools import partial, wraps
 from typing import Awaitable, Callable, TypeVar, Union
@@ -55,7 +55,7 @@ def executor(func_or_executor: Union[Executor, str, Callable[..., T_Retval]]) ->
               executor: Union[Executor, str] = None) -> Callable[..., Awaitable[T_Retval]]:
         def wrapper(*args, **kwargs):
             try:
-                loop = get_event_loop()
+                loop = get_running_loop()
             except RuntimeError:
                 # Event loop not available -- we're in a worker thread
                 return func(*args, **kwargs)
