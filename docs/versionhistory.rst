@@ -11,6 +11,8 @@ This library adheres to `Semantic Versioning <http://semver.org/>`_.
 - Switched to v0.15+ API of ``ruamel.yaml``
 - Switched from ``pkg_resources`` to ``importlib.metadata`` for loading entry points
 - Fixed ``DeprecationWarning`` about passing coroutine objects to ``asyncio.wait()``
+- Fixed ``DeprecationWarning`` about implicitly creating a new event loop using
+  ``get_event_loop()``
 
 **4.5.0** (2019-03-26)
 

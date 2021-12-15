@@ -81,62 +81,62 @@ def run_application(component: Union[Component, Dict[str, Any]], *, event_loop_p
         logger.info('Switched event loop policy to %s', qualified_name(policy))
 
     # Assign a new default executor with the given max worker thread limit if one was provided
-    event_loop = asyncio.get_event_loop()
-    if max_threads is not None:
-        event_loop.set_default_executor(ThreadPoolExecutor(max_threads))
-        logger.info('Installed a new thread pool executor with max_workers=%d', max_threads)
-
-    # Instantiate the root component if a dict was given
-    if isinstance(component, dict):
-        component = cast(Component, component_types.create_object(**component))
-
-    logger.info('Starting application')
-    context = Context()
-    exception = None  # type: Optional[BaseException]
-    exit_code = 0
-
-    # Start the root component
+    event_loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(event_loop)
     try:
-        coro = asyncio.wait_for(component.start(context), start_timeout)
-        event_loop.run_until_complete(coro)
-    except asyncio.TimeoutError as e:
-        exception = e
-        logger.error('Timeout waiting for the root component to start')
-        exit_code = 1
-    except Exception as e:
-        exception = e
-        logger.exception('Error during application startup')
-        exit_code = 1
-    else:
-        logger.info('Application started')
+        if max_threads is not None:
+            event_loop.set_default_executor(ThreadPoolExecutor(max_threads))
+            logger.info('Installed a new thread pool executor with max_workers=%d', max_threads)
 
-        # Add a signal handler to gracefully deal with SIGTERM
+        # Instantiate the root component if a dict was given
+        if isinstance(component, dict):
+            component = cast(Component, component_types.create_object(**component))
+
+        logger.info('Starting application')
+        context = Context()
+        exception = None  # type: Optional[BaseException]
+        exit_code = 0
+
+        # Start the root component
         try:
-            event_loop.add_signal_handler(signal.SIGTERM, sigterm_handler, logger, event_loop)
-        except NotImplementedError:
-            pass  # Windows does not support signals very well
+            coro = asyncio.wait_for(component.start(context), start_timeout)
+            event_loop.run_until_complete(coro)
+        except asyncio.TimeoutError as e:
+            exception = e
+            logger.error('Timeout waiting for the root component to start')
+            exit_code = 1
+        except Exception as e:
+            exception = e
+            logger.exception('Error during application startup')
+            exit_code = 1
+        else:
+            logger.info('Application started')
 
-        # Finally, run the event loop until the process is terminated or Ctrl+C is pressed
-        try:
-            event_loop.run_forever()
-        except KeyboardInterrupt:
-            pass
-        except SystemExit as e:
-            exit_code = e.code
+            # Add a signal handler to gracefully deal with SIGTERM
+            try:
+                event_loop.add_signal_handler(signal.SIGTERM, sigterm_handler, logger, event_loop)
+            except NotImplementedError:
+                pass  # Windows does not support signals very well
 
-    # Close the root context
-    logger.info('Stopping application')
-    event_loop.run_until_complete(context.close(exception))
+            # Finally, run the event loop until the process is terminated or Ctrl+C is pressed
+            try:
+                event_loop.run_forever()
+            except KeyboardInterrupt:
+                pass
+            except SystemExit as e:
+                exit_code = e.code
 
-    # Shut down leftover async generators (requires Python 3.6+)
-    try:
+        # Close the root context
+        logger.info('Stopping application')
+        event_loop.run_until_complete(context.close(exception))
+
+        # Shut down leftover async generators
         event_loop.run_until_complete(event_loop.shutdown_asyncgens())
-    except (AttributeError, NotImplementedError):
-        pass
-
-    # Finally, close the event loop itself
-    event_loop.close()
-    logger.info('Application stopped')
+    finally:
+        # Finally, close the event loop itself
+        event_loop.close()
+        asyncio.set_event_loop(None)
+        logger.info('Application stopped')
 
     # Shut down the logging system
     shutdown()
