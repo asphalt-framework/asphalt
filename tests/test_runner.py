@@ -94,6 +94,8 @@ def test_run_max_threads(event_loop, max_threads):
 
 @pytest.mark.skipif(platform.python_implementation() != 'CPython',
                     reason='uvloop only works on CPython')
+@pytest.mark.skipif(platform.system() == 'Windows',
+                    reason='uvloop does not work on Windows')
 def test_uvloop_policy(caplog):
     """Test that the runner switches to a different event loop policy when instructed to."""
     caplog.set_level(logging.INFO)
