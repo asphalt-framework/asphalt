@@ -73,7 +73,8 @@ class Signal(Generic[T_Event]):
 
     __slots__ = 'event_class', 'topic', 'source', 'listeners', 'bound_signals'
 
-    def __init__(self, event_class: Type[T_Event], *, source = None, topic: str = None) -> None:
+    def __init__(self, event_class: Type[T_Event], *, source: Any = None,
+                 topic: str = None) -> None:
         assert check_argument_types()
         self.event_class = event_class
         self.topic = topic

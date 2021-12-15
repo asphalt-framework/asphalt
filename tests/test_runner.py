@@ -3,11 +3,9 @@ import logging
 import platform
 import sys
 from concurrent.futures import ThreadPoolExecutor
-from typing import Any, Callable, Tuple
 from unittest.mock import patch
 
 import pytest
-from pkg_resources import DistributionNotFound
 
 from asphalt.core.component import CLIApplicationComponent, Component
 from asphalt.core.context import Context
