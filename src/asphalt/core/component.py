@@ -87,7 +87,7 @@ class ContainerComponent(Component):
         if not isinstance(alias, str) or not alias:
             raise TypeError('component_alias must be a nonempty string')
         if alias in self.child_components:
-            raise ValueError('there is already a child component named "{}"'.format(alias))
+            raise ValueError(f'there is already a child component named "{alias}"')
 
         config['type'] = type or alias
 

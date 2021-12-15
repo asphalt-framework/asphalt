@@ -37,7 +37,7 @@ def resolve_reference(ref):
         obj = import_module(modulename)
     except ImportError as e:
         raise LookupError(
-            'error resolving reference {}: could not import module'.format(ref)) from e
+            f'error resolving reference {ref}: could not import module') from e
 
     try:
         for name in rest.split('.'):
@@ -45,7 +45,7 @@ def resolve_reference(ref):
 
         return obj
     except AttributeError:
-        raise LookupError('error resolving reference {}: error looking up object'.format(ref))
+        raise LookupError(f'error resolving reference {ref}: error looking up object')
 
 
 def qualified_name(obj) -> str:
@@ -61,7 +61,7 @@ def qualified_name(obj) -> str:
     if obj.__module__ == 'builtins':
         return obj.__name__
     else:
-        return '{}.{}'.format(obj.__module__, obj.__qualname__)
+        return f'{obj.__module__}.{obj.__qualname__}'
 
 
 def callable_name(func: Callable) -> str:
@@ -69,7 +69,7 @@ def callable_name(func: Callable) -> str:
     if func.__module__ == 'builtins':
         return func.__name__
     else:
-        return '{}.{}'.format(func.__module__, func.__qualname__)
+        return f'{func.__module__}.{func.__qualname__}'
 
 
 def merge_config(original: Optional[Dict[str, Any]],
@@ -143,7 +143,7 @@ class PluginContainer:
 
         value = self._entrypoints.get(obj)
         if value is None:
-            raise LookupError('no such entry point in {}: {}'.format(self.namespace, obj))
+            raise LookupError(f'no such entry point in {self.namespace}: {obj}')
 
         if isinstance(value, EntryPoint):
             value = self._entrypoints[obj] = value.load()

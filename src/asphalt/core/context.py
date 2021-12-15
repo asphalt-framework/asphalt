@@ -171,7 +171,7 @@ class Context:
             if value is not None:
                 return getattr(ctx, name)
 
-        raise AttributeError('no such context variable: {}'.format(name))
+        raise AttributeError(f'no such context variable: {name}')
 
     @property
     def context_chain(self) -> List['Context']:
@@ -649,6 +649,6 @@ def context_teardown(func: Callable):
     if iscoroutinefunction(func):
         func = async_generator(func)
     elif not isasyncgenfunction(func):
-        raise TypeError('{} must be an async generator function'.format(callable_name(func)))
+        raise TypeError(f'{callable_name(func)} must be an async generator function')
 
     return wrapper

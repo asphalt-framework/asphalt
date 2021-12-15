@@ -73,7 +73,7 @@ def run(configfile, unsafe: bool, loop: Optional[str], service: Optional[str]):
             service_config = services[service]
         except KeyError:
             raise click.ClickException(
-                'Service {!r} has not been defined'.format(service)) from None
+                f'Service {service!r} has not been defined') from None
     elif len(services) == 1:
         service_config = next(iter(services.values()))
     elif 'default' in services:

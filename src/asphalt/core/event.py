@@ -190,7 +190,7 @@ class Signal(Generic[T_Event]):
                 future.set_result(all_successful)
 
         if not isinstance(event, self.event_class):
-            raise TypeError('event must be of type {}'.format(qualified_name(self.event_class)))
+            raise TypeError(f'event must be of type {qualified_name(self.event_class)}')
 
         loop = get_running_loop()
         future = loop.create_future()
