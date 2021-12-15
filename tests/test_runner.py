@@ -101,12 +101,8 @@ def test_uvloop_policy(caplog):
     caplog.set_level(logging.INFO)
     component = ShutdownComponent()
     old_policy = asyncio.get_event_loop_policy()
-    try:
-        run_application(component, event_loop_policy='uvloop')
-    except DistributionNotFound as e:
-        pytest.skip(str(e))
-    finally:
-        asyncio.set_event_loop_policy(old_policy)
+    run_application(component, event_loop_policy='uvloop')
+    asyncio.set_event_loop_policy(old_policy)
 
     records = [record for record in caplog.records if record.name == 'asphalt.core.runner']
     assert len(records) == 6
