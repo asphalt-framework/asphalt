@@ -3,7 +3,7 @@ Version history
 
 This library adheres to `Semantic Versioning 2.0 <http://semver.org/>`_.
 
-**UNRELEASED**
+**4.6.0** (2021-12-15)
 
 - Added support for Python 3.10
 - Dropped support for Python 3.5 and 3.6
