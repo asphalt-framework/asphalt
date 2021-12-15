@@ -14,6 +14,7 @@ This library adheres to `Semantic Versioning <http://semver.org/>`_.
 - Fixed ``DeprecationWarning`` about implicitly creating a new event loop using
   ``get_event_loop()``
 - Added the ``py.typed`` marker to enable type checking with dependent projects
+- Deprecated the use of ``Context`` as a synchronous context manager
 
 **4.5.0** (2019-03-26)
 
