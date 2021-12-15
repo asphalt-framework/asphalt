@@ -13,6 +13,7 @@ This library adheres to `Semantic Versioning <http://semver.org/>`_.
 - Fixed ``DeprecationWarning`` about passing coroutine objects to ``asyncio.wait()``
 - Fixed ``DeprecationWarning`` about implicitly creating a new event loop using
   ``get_event_loop()``
+- Added the ``py.typed`` marker to enable type checking with dependent projects
 
 **4.5.0** (2019-03-26)
 
