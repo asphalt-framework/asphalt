@@ -1,11 +1,16 @@
 import asyncio
-from importlib.metadata import EntryPoint
+import sys
 from unittest.mock import Mock
 
 import pytest
 
 from asphalt.core.utils import (
     PluginContainer, callable_name, merge_config, qualified_name, resolve_reference)
+
+if sys.version_info >= (3, 10):
+    from importlib.metadata import EntryPoint
+else:
+    from importlib_metadata import EntryPoint
 
 
 class BaseDummyPlugin:
@@ -75,8 +80,8 @@ class TestPluginContainer:
     @pytest.fixture
     def container(self):
         container = PluginContainer('asphalt.core.test_plugin_container', BaseDummyPlugin)
-        entrypoint = EntryPoint('dummy', 'test_utils', 'asphalt.core.test_plugin_container')
-        entrypoint.load = Mock(return_value=DummyPlugin)
+        entrypoint = Mock(EntryPoint)
+        entrypoint.load.configure_mock(return_value=DummyPlugin)
         container._entrypoints = {'dummy': entrypoint}
         return container
 

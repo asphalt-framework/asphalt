@@ -5,7 +5,7 @@ from typing import Any, Callable, Dict, List, Optional, Union
 
 from typeguard import check_argument_types
 
-if sys.version_info >= (3, 8):
+if sys.version_info >= (3, 10):
     from importlib.metadata import EntryPoint, entry_points
 else:
     from importlib_metadata import EntryPoint, entry_points
@@ -120,7 +120,7 @@ class PluginContainer:
     def __init__(self, namespace: str, base_class: type = None) -> None:
         self.namespace = namespace
         self.base_class = base_class
-        self._entrypoints = {ep.name: ep for ep in entry_points().get(namespace, ())}
+        self._entrypoints = {ep.name: ep for ep in entry_points().select(group=namespace)}
 
     def resolve(self, obj):
         """
