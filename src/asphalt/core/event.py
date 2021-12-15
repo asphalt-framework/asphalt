@@ -80,10 +80,10 @@ class Signal(Generic[T_Event]):
         self.topic = topic
         if source is not None:
             self.source = weakref.ref(source)
-            self.listeners = None  # type: Optional[List[Callable]]
+            self.listeners: Optional[List[Callable]] = None
         else:
             assert issubclass(event_class, Event), 'event_class must be a subclass of Event'
-            self.bound_signals = WeakKeyDictionary()  # type: MutableMapping[Any, 'Signal']
+            self.bound_signals: MutableMapping[Any, 'Signal'] = WeakKeyDictionary()
 
     def __get__(self, instance, owner) -> 'Signal':
         if instance is None:
@@ -261,7 +261,7 @@ def stream_events(signals: Sequence[Signal], filter: Callable[[T_Event], bool] =
             queue = None
 
     assert check_argument_types()
-    queue = Queue(max_queue_size)  # type: Queue[T_Event]
+    queue: Queue[T_Event] = Queue(max_queue_size)
     for signal in signals:
         signal.connect(queue.put_nowait)
 

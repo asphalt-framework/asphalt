@@ -57,7 +57,7 @@ class ContainerComponent(Component):
 
     def __init__(self, components: Dict[str, Optional[Dict[str, Any]]] = None) -> None:
         assert check_argument_types()
-        self.child_components = OrderedDict()  # type: Dict[str, Component]
+        self.child_components: OrderedDict[str, Component] = OrderedDict()
         self.component_configs = components or {}
 
     def add_component(self, alias: str, type: Union[str, type] = None, **config):

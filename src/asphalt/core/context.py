@@ -153,10 +153,10 @@ class Context:
         self._parent = parent
         self._loop = getattr(parent, 'loop', None)
         self._closed = False
-        self._resources = {}  # type: Dict[Tuple[type, str], ResourceContainer]
-        self._resource_factories = {}  # type: Dict[Tuple[type, str], ResourceContainer]
-        self._resource_factories_by_context_attr = {}  # type: Dict[str, ResourceContainer]
-        self._teardown_callbacks = []  # type: List[Tuple[Callable, bool]]
+        self._resources: Dict[Tuple[type, str], ResourceContainer] = {}
+        self._resource_factories: Dict[Tuple[type, str], ResourceContainer] = {}
+        self._resource_factories_by_context_attr: Dict[str, ResourceContainer] = {}
+        self._teardown_callbacks: List[Tuple[Callable, bool]] = []
 
     def __getattr__(self, name):
         # First look for a resource factory in the whole context chain
@@ -177,7 +177,7 @@ class Context:
     def context_chain(self) -> List['Context']:
         """Return a list of contexts starting from this one, its parent and so on."""
         contexts = []
-        ctx = self  # type: Optional[Context]
+        ctx: Optional[Context] = self
         while ctx is not None:
             contexts.append(ctx)
             ctx = ctx.parent
@@ -364,7 +364,7 @@ class Context:
             raise ValueError('"types" must not be empty')
 
         if isinstance(types, type):
-            resource_types = (types,)  # type: Tuple[type, ...]
+            resource_types: Tuple[type, ...] = (types,)
         else:
             resource_types = tuple(types)
 
@@ -432,10 +432,11 @@ class Context:
         assert check_argument_types()
 
         # Collect all the matching resources from this context
-        resources = {container.name: container.value_or_factory
-                     for container in self._resources.values()
-                     if not container.is_factory and type in container.types
-                     }  # type: Dict[str, T_Resource]
+        resources: Dict[str, T_Resource] = {
+            container.name: container.value_or_factory
+            for container in self._resources.values()
+            if not container.is_factory and type in container.types
+        }
 
         # Next, find all matching resource factories in the context chain and generate resources
         resources.update({container.name: container.generate_value(self)

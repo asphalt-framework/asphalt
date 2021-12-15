@@ -94,7 +94,7 @@ def run_application(component: Union[Component, Dict[str, Any]], *, event_loop_p
 
         logger.info('Starting application')
         context = Context()
-        exception = None  # type: Optional[BaseException]
+        exception: Optional[BaseException] = None
         exit_code = 0
 
         # Start the root component

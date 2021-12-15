@@ -44,7 +44,7 @@ def run(configfile, unsafe: bool, loop: Optional[str], service: Optional[str]):
     yaml.constructor.add_constructor('!BinaryFile', binary_file_constructor)
 
     # Read the configuration from the supplied YAML files
-    config = {}  # type: Dict[str, Any]
+    config: Dict[str, Any] = {}
     for path in configfile:
         config_data = yaml.load(path)
         assert isinstance(config_data, dict), 'the document root element must be a dictionary'
