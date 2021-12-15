@@ -1,7 +1,7 @@
 import logging
 import sys
 import weakref
-from asyncio import Queue, create_task, get_event_loop, iscoroutine, wait
+from asyncio import Queue, create_task, get_running_loop, iscoroutine, wait
 from datetime import datetime, timezone
 from inspect import getmembers, isawaitable
 from time import time as stdlib_time
@@ -191,7 +191,7 @@ class Signal(Generic[T_Event]):
         if not isinstance(event, self.event_class):
             raise TypeError('event must be of type {}'.format(qualified_name(self.event_class)))
 
-        loop = get_event_loop()
+        loop = get_running_loop()
         future = loop.create_future()
         if self.listeners:
             listeners = list(self.listeners)

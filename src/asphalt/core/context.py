@@ -1,6 +1,7 @@
 import logging
 import re
-from asyncio import AbstractEventLoop, get_event_loop, iscoroutinefunction
+import warnings
+from asyncio import AbstractEventLoop, get_event_loop, get_running_loop, iscoroutinefunction
 from concurrent.futures import Executor
 from functools import wraps
 from inspect import getattr_static, isawaitable
@@ -150,7 +151,7 @@ class Context:
     def __init__(self, parent: 'Context' = None) -> None:
         assert check_argument_types()
         self._parent = parent
-        self._loop = getattr(parent, 'loop', None) or get_event_loop()
+        self._loop = getattr(parent, 'loop', None)
         self._closed = False
         self._resources = {}  # type: Dict[Tuple[type, str], ResourceContainer]
         self._resource_factories = {}  # type: Dict[Tuple[type, str], ResourceContainer]
@@ -186,6 +187,9 @@ class Context:
     @property
     def loop(self) -> AbstractEventLoop:
         """Return the event loop associated with this context."""
+        if self._loop is None:
+            self._loop = get_running_loop()
+
         return self._loop
 
     @property
@@ -256,7 +260,15 @@ class Context:
             raise TeardownError(exceptions)
 
     def __enter__(self):
+        warnings.warn('Using Context as a synchronous context manager has been deprecated',
+                      DeprecationWarning)
         self._check_closed()
+
+        if self._loop is None:
+            with warnings.catch_warnings():
+                warnings.simplefilter('ignore', DeprecationWarning)
+                self._loop = get_event_loop()
+
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
@@ -517,6 +529,10 @@ class Context:
         assert check_argument_types()
         if isinstance(executor, str):
             executor = self.require_resource(Executor, executor)
+
+        # Fill in self._loop if it's None
+        if self._loop is None:
+            self._loop = get_running_loop()
 
         return asyncio_extras.call_in_executor(func, *args, executor=executor, **kwargs)
 

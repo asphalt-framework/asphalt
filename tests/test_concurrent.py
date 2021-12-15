@@ -8,14 +8,13 @@ from asphalt.core.concurrent import executor
 
 
 @pytest.fixture
-def context(event_loop):
-    ctx = Context()
-    yield ctx
-    event_loop.run_until_complete(ctx.close())
+async def context():
+    async with Context() as ctx:
+        yield ctx
 
 
 @pytest.fixture
-def special_executor(context):
+async def special_executor(context):
     executor = ThreadPoolExecutor(1)
     context.add_resource(executor, 'special', types=[Executor])
     context.add_teardown_callback(executor.shutdown)
