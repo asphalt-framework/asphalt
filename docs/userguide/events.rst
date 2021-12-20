@@ -93,7 +93,7 @@ Receiving events iteratively
 With :meth:`~asphalt.core.event.Signal.stream_events`, you can even asynchronously iterate over
 events dispatched from a signal::
 
-    from async_generator import aclosing
+    from contextlib import aclosing  # on Python < 3.10, import from async_generator or contextlib2
 
 
     async def listen_to_events(source):

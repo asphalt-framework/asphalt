@@ -114,7 +114,6 @@ There also exists a convenience decorator, :func:`~asphalt.core.context.context_
 makes use of asynchronous generators::
 
     from asphalt.core import Component, context_teardown
-    from async_generator import yield_
 
 
     class FooComponent(Component):
@@ -124,7 +123,7 @@ makes use of asynchronous generators::
             await service.start(ctx)
             ctx.add_resource(service)
 
-            await yield_()  # just "yield" on Python 3.6+
+            yield
 
             # This part of the function is run when the context is closing
             service.stop()
@@ -157,7 +156,7 @@ value::
             await db.start(ctx)
             ctx.add_resource(db)
 
-            exception = await yield_()
+            exception = yield
 
             if exception:
                 db.rollback()

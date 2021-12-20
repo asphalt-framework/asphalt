@@ -441,7 +441,7 @@ class TestContextTeardown:
         async def start(ctx: Context):
             nonlocal phase, received_exception
             phase = 'started'
-            exc = await yield_()
+            exc = yield
             phase = 'finished'
             received_exception = exc
 
@@ -464,7 +464,7 @@ class TestContextTeardown:
             async def start(self, ctx: Context):
                 nonlocal phase, received_exception
                 phase = 'started'
-                exc = await yield_()
+                exc = yield
                 phase = 'finished'
                 received_exception = exc
 
@@ -486,9 +486,10 @@ class TestContextTeardown:
 
     @pytest.mark.asyncio
     async def test_bad_args(self):
-        @context_teardown
-        async def start(ctx):
-            pass
+        with pytest.deprecated_call():
+            @context_teardown
+            async def start(ctx):
+                pass
 
         with pytest.raises(RuntimeError) as exc:
             await start(None)
@@ -501,6 +502,7 @@ class TestContextTeardown:
         @context_teardown
         async def start(ctx):
             raise Exception('dummy error')
+            yield
 
         context = Context()
         with pytest.raises(Exception) as exc_info:
@@ -510,9 +512,19 @@ class TestContextTeardown:
 
     @pytest.mark.asyncio
     async def test_missing_yield(self):
-        @context_teardown
-        async def start(ctx: Context):
-            pass
+        with pytest.deprecated_call():
+            @context_teardown
+            async def start(ctx: Context):
+                pass
+
+        await start(Context())
+
+    @pytest.mark.asyncio
+    async def test_py35_generator(self):
+        with pytest.deprecated_call():
+            @context_teardown
+            async def start(ctx: Context):
+                await yield_()
 
         await start(Context())
 

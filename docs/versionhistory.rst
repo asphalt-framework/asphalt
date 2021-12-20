@@ -3,6 +3,10 @@ Version history
 
 This library adheres to `Semantic Versioning 2.0 <http://semver.org/>`_.
 
+**UNRELEASED**
+
+- Removed all uses of Python 3.5 style ``await yield_()`` from core code and documentation
+
 **4.6.0** (2021-12-15)
 
 - Added support for Python 3.10

@@ -4,13 +4,13 @@ import warnings
 from asyncio import AbstractEventLoop, get_event_loop, get_running_loop, iscoroutinefunction
 from concurrent.futures import Executor
 from functools import wraps
-from inspect import getattr_static, isawaitable
+from inspect import getattr_static, isasyncgenfunction, isawaitable
 from traceback import format_exception
 from typing import (
     Any, Awaitable, Callable, Dict, List, Optional, Sequence, Set, Tuple, Type, TypeVar, Union)
 
 import asyncio_extras
-from async_generator import async_generator, isasyncgenfunction
+from async_generator import async_generator
 from typeguard import check_argument_types
 
 from asphalt.core.event import Event, Signal, wait_event
@@ -603,8 +603,8 @@ def context_teardown(func: Callable):
 
     This function returns an async function, which, when called, starts the wrapped async
     generator. The wrapped async function is run until the first ``yield`` statement
-    (``await async_generator.yield_()`` on Python 3.5). When the context is being torn down, the
-    exception that ended the context, if any, is sent to the generator.
+    When the context is being torn down, the exception that ended the context, if any, is sent to
+    the generator.
 
     For example::
 
@@ -647,9 +647,12 @@ def context_teardown(func: Callable):
         else:
             ctx.add_teardown_callback(teardown_callback, True)
 
-    if iscoroutinefunction(func):
-        func = async_generator(func)
-    elif not isasyncgenfunction(func):
-        raise TypeError(f'{callable_name(func)} must be an async generator function')
+    if not isasyncgenfunction(func):
+        if async_generator and iscoroutinefunction(func):
+            warnings.warn('Using @context_teardown on regular coroutine functions has been '
+                          'deprecated', DeprecationWarning, stacklevel=2)
+            func = async_generator(func)
+        else:
+            raise TypeError(f'{callable_name(func)} must be an async generator function')
 
     return wrapper

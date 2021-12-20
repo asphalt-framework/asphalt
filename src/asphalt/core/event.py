@@ -10,10 +10,14 @@ from typing import (
     Type, TypeVar, cast)
 from weakref import WeakKeyDictionary
 
-from async_generator import aclosing, async_generator, yield_
 from typeguard import check_argument_types
 
 from asphalt.core.utils import qualified_name
+
+if sys.version_info >= (3, 10):
+    from contextlib import aclosing
+else:
+    from async_generator import aclosing
 
 __all__ = ('Event', 'Signal', 'wait_event', 'stream_events')
 
@@ -162,7 +166,7 @@ class Signal(Generic[T_Event]):
 
         """
         async def do_dispatch() -> None:
-            awaitables = []
+            awaitables: List[Awaitable[Any]] = []
             all_successful = True
             for callback in listeners:
                 try:
@@ -242,13 +246,12 @@ def stream_events(signals: Sequence[Signal], filter: Callable[[T_Event], bool] =
     :param max_queue_size: maximum size of the queue, after which it will start to drop events
 
     """
-    @async_generator
     async def streamer():
         try:
             while True:
                 event = await queue.get()
                 if filter is None or filter(event):
-                    await yield_(event)
+                    yield event
         finally:
             cleanup()
 
