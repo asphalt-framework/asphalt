@@ -22,7 +22,6 @@ max_line_length = 99
 
 [tool.flake8]
 max-line-length = 99
-#ignore = E251, F401, F403, F999, W503
 
 [tool.pytest.ini_options]
 addopts = "-rsx --tb=short"
