@@ -3,7 +3,6 @@ import asyncio
 import logging
 
 import aiohttp
-from async_generator import yield_
 
 from asphalt.core import Component, Event, Signal
 from asphalt.core.context import context_teardown
@@ -57,8 +56,7 @@ class ChangeDetectorComponent(Component):
         logging.info('Started web page change detector for url "%s" with a delay of %d seconds',
                      self.url, self.delay)
 
-        # Can be replaced with plain "yield" on Python 3.6+
-        await yield_()
+        yield
 
         # This part is run when the context is finished
         task.cancel()
