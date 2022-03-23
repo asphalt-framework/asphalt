@@ -43,7 +43,7 @@ adapt code from the `aiohttp HTTP client tutorial`_::
 
     class ApplicationComponent(CLIApplicationComponent):
         async def run(self, ctx):
-            with aiohttp.ClientSession() as session:
+            async with aiohttp.ClientSession() as session:
                 while True:
                     async with session.get('http://imgur.com') as resp:
                         await resp.text()
@@ -68,7 +68,7 @@ So, modify the code as follows::
     class ApplicationComponent(CLIApplicationComponent):
         async def run(self, ctx):
             last_modified = None
-            with aiohttp.ClientSession() as session:
+            async with aiohttp.ClientSession() as session:
                 while True:
                     headers = {'if-modified-since': last_modified} if last_modified else {}
                     async with session.get('http://imgur.com', headers=headers) as resp:
@@ -100,7 +100,7 @@ to the logger::
 
     class ApplicationComponent(CLIApplicationComponent):
         async def run(self, ctx):
-            with aiohttp.ClientSession() as session:
+            async with aiohttp.ClientSession() as session:
                 last_modified, old_lines = None, None
                 while True:
                     logger.debug('Fetching webpage')
@@ -150,7 +150,7 @@ And to make the the results look nicer in an email message, you can switch to us
             await super().start(ctx)
 
         async def run(self, ctx):
-            with aiohttp.ClientSession() as session:
+            async with aiohttp.ClientSession() as session:
                 last_modified, old_lines = None, None
                 diff = HtmlDiff()
                 while True:
@@ -223,7 +223,7 @@ Next, add another class in the same module that will do the HTTP requests and ch
             self.delay = delay
 
         async def run(self):
-            with aiohttp.ClientSession() as session:
+            async with aiohttp.ClientSession() as session:
                 last_modified, old_lines = None, None
                 while True:
                     logger.debug('Fetching contents of %s', self.url)

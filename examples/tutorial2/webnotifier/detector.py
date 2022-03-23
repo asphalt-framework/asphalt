@@ -25,7 +25,7 @@ class Detector:
         self.delay = delay
 
     async def run(self):
-        with aiohttp.ClientSession() as session:
+        async with aiohttp.ClientSession() as session:
             last_modified, old_lines = None, None
             while True:
                 logger.debug('Fetching contents of %s', self.url)
