@@ -8,14 +8,15 @@ from typeguard import check_argument_types
 
 from asphalt.core import Context
 
-__all__ = ('executor',)
+__all__ = ("executor",)
 
-T_Retval = TypeVar('T_Retval')
+T_Retval = TypeVar("T_Retval")
 WrappedCallable = Callable[..., Awaitable[T_Retval]]
 
 
-def executor(func_or_executor: Union[Executor, str, Callable[..., T_Retval]]) -> \
-        Union[WrappedCallable, Callable[..., WrappedCallable]]:
+def executor(
+    func_or_executor: Union[Executor, str, Callable[..., T_Retval]]
+) -> Union[WrappedCallable, Callable[..., WrappedCallable]]:
     """
     Decorate a function to run in an executor.
 
@@ -51,8 +52,10 @@ def executor(func_or_executor: Union[Executor, str, Callable[..., T_Retval]]) ->
         the name of an :class:`~concurrent.futures.Executor` resource
 
     """
-    def outer(func: Callable[..., T_Retval],
-              executor: Union[Executor, str] = None) -> Callable[..., Awaitable[T_Retval]]:
+
+    def outer(
+        func: Callable[..., T_Retval], executor: Union[Executor, str] = None
+    ) -> Callable[..., Awaitable[T_Retval]]:
         def wrapper(*args, **kwargs):
             try:
                 loop = get_running_loop()
@@ -65,8 +68,10 @@ def executor(func_or_executor: Union[Executor, str, Callable[..., T_Retval]]) ->
                 try:
                     ctx = next(obj for obj in args[:2] if isinstance(obj, Context))
                 except StopIteration:
-                    raise RuntimeError('the callable needs to be called with a Context as the '
-                                       'first or second positional argument')
+                    raise RuntimeError(
+                        "the callable needs to be called with a Context as the "
+                        "first or second positional argument"
+                    )
 
                 _executor = ctx.require_resource(Executor, executor)
             else:
@@ -76,8 +81,9 @@ def executor(func_or_executor: Union[Executor, str, Callable[..., T_Retval]]) ->
             return loop.run_in_executor(_executor, callback)
 
         assert check_argument_types()
-        assert not inspect.iscoroutinefunction(func), \
-            'Cannot wrap coroutine functions to be run in an executor'
+        assert not inspect.iscoroutinefunction(
+            func
+        ), "Cannot wrap coroutine functions to be run in an executor"
         return wraps(func)(wrapper)
 
     if isinstance(func_or_executor, (str, Executor)):

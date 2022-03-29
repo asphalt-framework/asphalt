@@ -8,14 +8,14 @@ async def client_connected(reader, writer):
     message = await reader.readline()
     writer.write(message)
     writer.close()
-    print('Message from client:', message.decode().rstrip())
+    print("Message from client:", message.decode().rstrip())
 
 
 class ServerComponent(Component):
     async def start(self, ctx):
-        await start_server(client_connected, 'localhost', 64100)
+        await start_server(client_connected, "localhost", 64100)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     component = ServerComponent()
     run_application(component)

@@ -45,12 +45,12 @@ adapt code from the `aiohttp HTTP client tutorial`_::
         async def run(self, ctx):
             async with aiohttp.ClientSession() as session:
                 while True:
-                    async with session.get('http://imgur.com') as resp:
+                    async with session.get("http://imgur.com") as resp:
                         await resp.text()
 
                     await asyncio.sleep(10)
 
-    if __name__ == '__main__':
+    if __name__ == "__main__":
         run_application(ApplicationComponent(), logging=logging.DEBUG)
 
 Great, so now the code fetches the contents of ``http://imgur.com`` at 10 second intervals.
@@ -70,13 +70,13 @@ So, modify the code as follows::
             last_modified = None
             async with aiohttp.ClientSession() as session:
                 while True:
-                    headers = {'if-modified-since': last_modified} if last_modified else {}
-                    async with session.get('http://imgur.com', headers=headers) as resp:
-                        logger.debug('Response status: %d', resp.status)
+                    headers = {"if-modified-since": last_modified} if last_modified else {}
+                    async with session.get("http://imgur.com", headers=headers) as resp:
+                        logger.debug("Response status: %d", resp.status)
                         if resp.status == 200:
-                            last_modified = resp.headers['date']
+                            last_modified = resp.headers["date"]
                             await resp.text()
-                            logger.info('Contents changed')
+                            logger.info("Contents changed")
 
                     await asyncio.sleep(10)
 
@@ -103,24 +103,24 @@ to the logger::
             async with aiohttp.ClientSession() as session:
                 last_modified, old_lines = None, None
                 while True:
-                    logger.debug('Fetching webpage')
-                    headers = {'if-modified-since': last_modified} if last_modified else {}
-                    async with session.get('http://imgur.com', headers=headers) as resp:
-                        logger.debug('Response status: %d', resp.status)
+                    logger.debug("Fetching webpage")
+                    headers = {"if-modified-since": last_modified} if last_modified else {}
+                    async with session.get("http://imgur.com", headers=headers) as resp:
+                        logger.debug("Response status: %d", resp.status)
                         if resp.status == 200:
-                            last_modified = resp.headers['date']
-                            new_lines = (await resp.text()).split('\n')
+                            last_modified = resp.headers["date"]
+                            new_lines = (await resp.text()).split("\n")
                             if old_lines is not None and old_lines != new_lines:
                                 difference = unified_diff(old_lines, new_lines)
-                                logger.info('Contents changed:\n%s', difference)
+                                logger.info("Contents changed:\n%s", difference)
 
                             old_lines = new_lines
 
                     await asyncio.sleep(10)
 
 This modified code now stores the old and new contents in different variables to enable them to be
-compared. The ``.split('\n')`` is needed because :func:`~difflib.unified_diff` requires the input
-to be iterables of strings. Likewise, the ``'\n'.join(...)`` is necessary because the output is
+compared. The ``.split("\n")`` is needed because :func:`~difflib.unified_diff` requires the input
+to be iterables of strings. Likewise, the ``"\n".join(...)`` is necessary because the output is
 also an iterable of strings.
 
 Sending changes via email
@@ -145,8 +145,8 @@ And to make the the results look nicer in an email message, you can switch to us
     class ApplicationComponent(CLIApplicationComponent):
         async def start(self, ctx):
             self.add_component(
-                'mailer', backend='smtp', host='your.smtp.server.here',
-                message_defaults={'sender': 'your@email.here', 'to': 'your@email.here'})
+                "mailer", backend="smtp", host="your.smtp.server.here",
+                message_defaults={"sender": "your@email.here", "to": "your@email.here"})
             await super().start(ctx)
 
         async def run(self, ctx):
@@ -154,19 +154,19 @@ And to make the the results look nicer in an email message, you can switch to us
                 last_modified, old_lines = None, None
                 diff = HtmlDiff()
                 while True:
-                    logger.debug('Fetching webpage')
-                    headers = {'if-modified-since': last_modified} if last_modified else {}
-                    async with session.get('http://imgur.com', headers=headers) as resp:
-                        logger.debug('Response status: %d', resp.status)
+                    logger.debug("Fetching webpage")
+                    headers = {"if-modified-since": last_modified} if last_modified else {}
+                    async with session.get("http://imgur.com", headers=headers) as resp:
+                        logger.debug("Response status: %d", resp.status)
                         if resp.status == 200:
-                            last_modified = resp.headers['date']
-                            new_lines = (await resp.text()).split('\n')
+                            last_modified = resp.headers["date"]
+                            new_lines = (await resp.text()).split("\n")
                             if old_lines is not None and old_lines != new_lines:
                                 difference = diff.make_file(old_lines, new_lines, context=True)
                                 await ctx.mailer.create_and_deliver(
-                                    subject='Change detected in %s' % event.source.url,
+                                    subject="Change detected in %s" % event.source.url,
                                     html_body=difference)
-                                logger.info('Sent notification email')
+                                logger.info("Sent notification email")
 
                             old_lines = new_lines
 
@@ -226,13 +226,13 @@ Next, add another class in the same module that will do the HTTP requests and ch
             async with aiohttp.ClientSession() as session:
                 last_modified, old_lines = None, None
                 while True:
-                    logger.debug('Fetching contents of %s', self.url)
-                    headers = {'if-modified-since': last_modified} if last_modified else {}
+                    logger.debug("Fetching contents of %s", self.url)
+                    headers = {"if-modified-since": last_modified} if last_modified else {}
                     async with session.get(self.url, headers=headers) as resp:
-                        logger.debug('Response status: %d', resp.status)
+                        logger.debug("Response status: %d", resp.status)
                         if resp.status == 200:
-                            last_modified = resp.headers['date']
-                            new_lines = (await resp.text()).split('\n')
+                            last_modified = resp.headers["date"]
+                            new_lines = (await resp.text()).split("\n")
                             if old_lines is not None and old_lines != new_lines:
                                 self.changed.dispatch(old_lines, new_lines)
 
@@ -266,7 +266,7 @@ Asphalt application::
             # This part is run when the context is being torn down
             task.cancel()
             await asyncio.gather(task, return_exceptions=True)
-            logging.info('Shut down web page change detector')
+            logging.info("Shut down web page change detector")
 
 The component's ``start()`` method starts the detector's ``run()`` method as a new task, adds
 the detector object as resource and installs an event listener that will shut down the detector
@@ -280,10 +280,10 @@ become somewhat lighter::
 
     class ApplicationComponent(CLIApplicationComponent):
         async def start(self, ctx):
-            self.add_component('detector', ChangeDetectorComponent, url='http://imgur.com')
+            self.add_component("detector", ChangeDetectorComponent, url="http://imgur.com")
             self.add_component(
-                'mailer', backend='smtp', host='your.smtp.server.here',
-                message_defaults={'sender': 'your@email.here', 'to': 'your@email.here'})
+                "mailer", backend="smtp", host="your.smtp.server.here",
+                message_defaults={"sender": "your@email.here", "to": "your@email.here"})
             await super().start(ctx)
 
         async def run(self, ctx):
@@ -292,8 +292,8 @@ become somewhat lighter::
                 async for event in stream:
                     difference = diff.make_file(event.old_lines, event.new_lines, context=True)
                     await ctx.mailer.create_and_deliver(
-                        subject='Change detected in %s' % event.source.url, html_body=difference)
-                    logger.info('Sent notification email')
+                        subject="Change detected in %s" % event.source.url, html_body=difference)
+                    logger.info("Sent notification email")
 
 The main application component will now use the detector resource added by
 ``ChangeDetectorComponent``. It adds one event listener which reacts to change events by creating

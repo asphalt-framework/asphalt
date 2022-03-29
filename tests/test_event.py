@@ -11,6 +11,7 @@ try:
     from asyncio import all_tasks, current_task
 except ImportError:
     from asyncio import Task
+
     all_tasks = Task.all_tasks
     current_task = Task.current_task
 
@@ -35,12 +36,12 @@ def source():
 class TestEvent:
     def test_utc_timestamp(self, source):
         timestamp = datetime.now(timezone(timedelta(hours=2)))
-        event = Event(source, 'sometopic', timestamp.timestamp())
+        event = Event(source, "sometopic", timestamp.timestamp())
         assert event.utc_timestamp == timestamp
         assert event.utc_timestamp.tzinfo == timezone.utc
 
     def test_event_repr(self, source):
-        event = Event(source, 'sometopic')
+        event = Event(source, "sometopic")
         assert repr(event) == "Event(source=%r, topic='sometopic')" % source
 
 
@@ -85,23 +86,24 @@ class TestSignal:
     @pytest.mark.asyncio
     async def test_dispatch_event_coroutine(self, source):
         """Test that a coroutine function can be an event listener."""
+
         async def callback(event: Event):
             events.append(event)
 
         events = []
         source.event_a.connect(callback)
-        assert await source.event_a.dispatch('x', 'y', a=1, b=2)
+        assert await source.event_a.dispatch("x", "y", a=1, b=2)
 
         assert len(events) == 1
-        assert events[0].args == ('x', 'y')
-        assert events[0].kwargs == {'a': 1, 'b': 2}
+        assert events[0].args == ("x", "y")
+        assert events[0].kwargs == {"a": 1, "b": 2}
 
     @pytest.mark.asyncio
     async def test_dispatch_raw(self, source):
         """Test that dispatch_raw() correctly dispatches the given event."""
         events = []
         source.event_a.connect(events.append)
-        event = DummyEvent(source, 'event_a', 'x', 'y', a=1, b=2)
+        event = DummyEvent(source, "event_a", "x", "y", a=1, b=2)
         assert await source.event_a.dispatch_raw(event)
 
         assert events == [event]
@@ -109,11 +111,12 @@ class TestSignal:
     @pytest.mark.asyncio
     async def test_dispatch_log_exceptions(self, event_loop, source, caplog):
         """Test that listener exceptions are logged and that dispatch() resolves to ``False``."""
+
         def listener(event):
-            raise Exception('regular')
+            raise Exception("regular")
 
         async def coro_listener(event):
-            raise Exception('coroutine')
+            raise Exception("coroutine")
 
         source.event_a.connect(listener)
         source.event_a.connect(coro_listener)
@@ -121,7 +124,7 @@ class TestSignal:
 
         assert len(caplog.records) == 2
         for record in caplog.records:
-            assert 'Uncaught exception in event listener' in record.message
+            assert "Uncaught exception in event listener" in record.message
 
     @pytest.mark.asyncio
     async def test_dispatch_event_no_listeners(self, source):
@@ -151,20 +154,21 @@ class TestSignal:
     async def test_dispatch_raw_class_mismatch(self, source):
         """Test that passing an event of the wrong type raises an AssertionError."""
         with pytest.raises(TypeError) as exc:
-            await source.event_a.dispatch_raw(Event(source, 'event_a'))
+            await source.event_a.dispatch_raw(Event(source, "event_a"))
 
-        assert str(exc.value) == 'event must be of type test_event.DummyEvent'
+        assert str(exc.value) == "event must be of type test_event.DummyEvent"
 
     @pytest.mark.asyncio
     async def test_wait_event(self, source, event_loop):
         event_loop.call_soon(source.event_a.dispatch)
         received_event = await source.event_a.wait_event()
-        assert received_event.topic == 'event_a'
+        assert received_event.topic == "event_a"
 
-    @pytest.mark.parametrize('filter, expected_values', [
-        (None, [1, 2, 3]),
-        (lambda event: event.args[0] in (3, None), [3])
-    ], ids=['nofilter', 'filter'])
+    @pytest.mark.parametrize(
+        "filter, expected_values",
+        [(None, [1, 2, 3]), (lambda event: event.args[0] in (3, None), [3])],
+        ids=["nofilter", "filter"],
+    )
     @pytest.mark.asyncio
     async def test_stream_events(self, source, filter, expected_values):
         values = []
@@ -188,6 +192,7 @@ class TestSignal:
         collected.
 
         """
+
         class SignalOwner:
             dummy = Signal(Event)
 
@@ -195,13 +200,17 @@ class TestSignal:
         owner.dummy
         del owner
         gc.collect()  # needed on PyPy
-        assert next((x for x in gc.get_objects() if isinstance(x, SignalOwner)), None) is None
+        assert (
+            next((x for x in gc.get_objects() if isinstance(x, SignalOwner)), None)
+            is None
+        )
 
 
-@pytest.mark.parametrize('filter, expected_value', [
-    (None, 1),
-    (lambda event: event.args[0] == 3, 3)
-], ids=['nofilter', 'filter'])
+@pytest.mark.parametrize(
+    "filter, expected_value",
+    [(None, 1), (lambda event: event.args[0] == 3, 3)],
+    ids=["nofilter", "filter"],
+)
 @pytest.mark.asyncio
 async def test_wait_event(event_loop, filter, expected_value):
     """
@@ -217,15 +226,18 @@ async def test_wait_event(event_loop, filter, expected_value):
     assert event.args == (expected_value,)
 
 
-@pytest.mark.parametrize('filter, expected_values', [
-    (None, [1, 2, 3, 1, 2, 3]),
-    (lambda event: event.args[0] in (3, None), [3, 3])
-], ids=['nofilter', 'filter'])
+@pytest.mark.parametrize(
+    "filter, expected_values",
+    [(None, [1, 2, 3, 1, 2, 3]), (lambda event: event.args[0] in (3, None), [3, 3])],
+    ids=["nofilter", "filter"],
+)
 @pytest.mark.asyncio
 async def test_stream_events(filter, expected_values):
     source1, source2 = DummySource(), DummySource()
     values = []
-    async with aclosing(stream_events([source1.event_a, source2.event_b], filter)) as stream:
+    async with aclosing(
+        stream_events([source1.event_a, source2.event_b], filter)
+    ) as stream:
         for signal in [source1.event_a, source2.event_b]:
             for i in range(1, 4):
                 signal.dispatch(i)

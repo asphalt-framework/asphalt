@@ -19,12 +19,12 @@ repos:
     rev: v2.31.1
     hooks:
       - id: pyupgrade
-        args: [ "--py37-plus", "--keep-runtime-typing" ]
+        args: [ "--py37-plus" ]
 
-  - repo: https://github.com/pre-commit/mirrors-autopep8
-    rev: v1.6.0
+  - repo: https://github.com/psf/black
+    rev: 22.3.0
     hooks:
-      - id: autopep8
+      - id: black
 
   - repo: https://github.com/pycqa/isort
     rev: 5.10.1

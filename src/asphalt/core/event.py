@@ -6,8 +6,19 @@ from datetime import datetime, timezone
 from inspect import getmembers, isawaitable
 from time import time as stdlib_time
 from typing import (
-    Any, AsyncIterator, Awaitable, Callable, Generic, List, MutableMapping, Optional, Sequence,
-    Type, TypeVar, cast)
+    Any,
+    AsyncIterator,
+    Awaitable,
+    Callable,
+    Generic,
+    List,
+    MutableMapping,
+    Optional,
+    Sequence,
+    Type,
+    TypeVar,
+    cast,
+)
 from weakref import WeakKeyDictionary
 
 from typeguard import check_argument_types
@@ -19,7 +30,7 @@ if sys.version_info >= (3, 10):
 else:
     from async_generator import aclosing
 
-__all__ = ('Event', 'Signal', 'wait_event', 'stream_events')
+__all__ = ("Event", "Signal", "wait_event", "stream_events")
 
 logger = logging.getLogger(__name__)
 
@@ -37,7 +48,7 @@ class Event:
     :ivar float time: event creation time as seconds from the UNIX epoch
     """
 
-    __slots__ = 'source', 'topic', 'time'
+    __slots__ = "source", "topic", "time"
 
     def __init__(self, source, topic: str, time: float = None) -> None:
         self.source = source
@@ -54,11 +65,12 @@ class Event:
         return datetime.fromtimestamp(self.time, timezone.utc)
 
     def __repr__(self):
-        return '{self.__class__.__name__}(source={self.source!r}, topic={self.topic!r})'.\
-            format(self=self)
+        return "{self.__class__.__name__}(source={self.source!r}, topic={self.topic!r})".format(
+            self=self
+        )
 
 
-T_Event = TypeVar('T_Event', bound=Event)
+T_Event = TypeVar("T_Event", bound=Event)
 
 
 class Signal(Generic[T_Event]):
@@ -75,10 +87,11 @@ class Signal(Generic[T_Event]):
     :param event_class: an event class
     """
 
-    __slots__ = 'event_class', 'topic', 'source', 'listeners', 'bound_signals'
+    __slots__ = "event_class", "topic", "source", "listeners", "bound_signals"
 
-    def __init__(self, event_class: Type[T_Event], *, source: Any = None,
-                 topic: str = None) -> None:
+    def __init__(
+        self, event_class: Type[T_Event], *, source: Any = None, topic: str = None
+    ) -> None:
         assert check_argument_types()
         self.event_class = event_class
         self.topic = topic
@@ -86,17 +99,20 @@ class Signal(Generic[T_Event]):
             self.source = weakref.ref(source)
             self.listeners: Optional[List[Callable]] = None
         else:
-            assert issubclass(event_class, Event), 'event_class must be a subclass of Event'
-            self.bound_signals: MutableMapping[Any, 'Signal'] = WeakKeyDictionary()
+            assert issubclass(
+                event_class, Event
+            ), "event_class must be a subclass of Event"
+            self.bound_signals: MutableMapping[Any, "Signal"] = WeakKeyDictionary()
 
-    def __get__(self, instance, owner) -> 'Signal':
+    def __get__(self, instance, owner) -> "Signal":
         if instance is None:
             return self
 
         # Find the attribute this Signal was assigned to (needed only on Python 3.5)
         if self.topic is None:
             self.topic = next(
-                attr for attr, value in getmembers(owner, lambda value: value is self))
+                attr for attr, value in getmembers(owner, lambda value: value is self)
+            )
 
         try:
             return self.bound_signals[instance]
@@ -165,6 +181,7 @@ class Signal(Generic[T_Event]):
             the callbacks, ``False`` otherwise
 
         """
+
         async def do_dispatch() -> None:
             awaitables: List[Awaitable[Any]] = []
             all_successful = True
@@ -172,7 +189,7 @@ class Signal(Generic[T_Event]):
                 try:
                     retval = callback(event)
                 except Exception:
-                    logger.exception('Uncaught exception in event listener')
+                    logger.exception("Uncaught exception in event listener")
                     all_successful = False
                 else:
                     if iscoroutine(retval):
@@ -188,13 +205,15 @@ class Signal(Generic[T_Event]):
                     exc = f.exception()
                     if exc is not None:
                         all_successful = False
-                        logger.error('Uncaught exception in event listener', exc_info=exc)
+                        logger.error(
+                            "Uncaught exception in event listener", exc_info=exc
+                        )
 
             if not future.cancelled():
                 future.set_result(all_successful)
 
         if not isinstance(event, self.event_class):
-            raise TypeError(f'event must be of type {qualified_name(self.event_class)}')
+            raise TypeError(f"event must be of type {qualified_name(self.event_class)}")
 
         loop = get_running_loop()
         future = loop.create_future()
@@ -223,17 +242,25 @@ class Signal(Generic[T_Event]):
         event = self.event_class(self.source(), cast(str, self.topic), *args, **kwargs)
         return self.dispatch_raw(event)
 
-    def wait_event(self, filter: Callable[[T_Event], bool] = None) -> Awaitable[T_Event]:
+    def wait_event(
+        self, filter: Callable[[T_Event], bool] = None
+    ) -> Awaitable[T_Event]:
         """Shortcut for calling :func:`wait_event` with this signal in the first argument."""
         return wait_event([self], filter)
 
-    def stream_events(self, filter: Callable[[Event], bool] = None, *, max_queue_size: int = 0):
+    def stream_events(
+        self, filter: Callable[[Event], bool] = None, *, max_queue_size: int = 0
+    ):
         """Shortcut for calling :func:`stream_events` with this signal in the first argument."""
         return stream_events([self], filter, max_queue_size=max_queue_size)
 
 
-def stream_events(signals: Sequence[Signal], filter: Callable[[T_Event], bool] = None, *,
-                  max_queue_size: int = 0) -> AsyncIterator[T_Event]:
+def stream_events(
+    signals: Sequence[Signal],
+    filter: Callable[[T_Event], bool] = None,
+    *,
+    max_queue_size: int = 0,
+) -> AsyncIterator[T_Event]:
     """
     Return an async generator that yields events from the given signals.
 
@@ -246,6 +273,7 @@ def stream_events(signals: Sequence[Signal], filter: Callable[[T_Event], bool] =
     :param max_queue_size: maximum size of the queue, after which it will start to drop events
 
     """
+
     async def streamer():
         try:
             while True:
@@ -273,8 +301,9 @@ def stream_events(signals: Sequence[Signal], filter: Callable[[T_Event], bool] =
     return gen.pop()
 
 
-async def wait_event(signals: Sequence['Signal[T_Event]'],
-                     filter: Callable[[T_Event], bool] = None) -> T_Event:
+async def wait_event(
+    signals: Sequence["Signal[T_Event]"], filter: Callable[[T_Event], bool] = None
+) -> T_Event:
     """
     Wait until any of the given signals dispatches an event that satisfies the filter (if any).
 

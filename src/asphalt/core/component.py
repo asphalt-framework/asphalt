@@ -11,7 +11,7 @@ from typeguard import check_argument_types
 from asphalt.core.context import Context
 from asphalt.core.utils import PluginContainer, merge_config, qualified_name
 
-__all__ = ('Component', 'ContainerComponent', 'CLIApplicationComponent')
+__all__ = ("Component", "ContainerComponent", "CLIApplicationComponent")
 
 
 class Component(metaclass=ABCMeta):
@@ -53,7 +53,7 @@ class ContainerComponent(Component):
     :vartype component_configs: Dict[str, Optional[Dict[str, Any]]]
     """
 
-    __slots__ = 'child_components', 'component_configs'
+    __slots__ = "child_components", "component_configs"
 
     def __init__(self, components: Dict[str, Optional[Dict[str, Any]]] = None) -> None:
         assert check_argument_types()
@@ -85,11 +85,11 @@ class ContainerComponent(Component):
         """
         assert check_argument_types()
         if not isinstance(alias, str) or not alias:
-            raise TypeError('component_alias must be a nonempty string')
+            raise TypeError("component_alias must be a nonempty string")
         if alias in self.child_components:
             raise ValueError(f'there is already a child component named "{alias}"')
 
-        config['type'] = type or alias
+        config["type"] = type or alias
 
         # Allow the external configuration to override the constructor arguments
         override_config = self.component_configs.get(alias) or {}
@@ -141,11 +141,13 @@ class CLIApplicationComponent(ContainerComponent):
                 if 0 <= retval <= 127:
                     sys.exit(retval)
                 else:
-                    warn('exit code out of range: %d' % retval)
+                    warn("exit code out of range: %d" % retval)
                     sys.exit(1)
             elif retval is not None:
-                warn('run() must return an integer or None, not %s' %
-                     qualified_name(retval.__class__))
+                warn(
+                    "run() must return an integer or None, not %s"
+                    % qualified_name(retval.__class__)
+                )
                 sys.exit(1)
             else:
                 sys.exit(0)
@@ -168,4 +170,4 @@ class CLIApplicationComponent(ContainerComponent):
         """
 
 
-component_types = PluginContainer('asphalt.components', Component)
+component_types = PluginContainer("asphalt.components", Component)

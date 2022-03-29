@@ -1,13 +1,30 @@
 import logging
 import re
 import warnings
-from asyncio import AbstractEventLoop, get_event_loop, get_running_loop, iscoroutinefunction
+from asyncio import (
+    AbstractEventLoop,
+    get_event_loop,
+    get_running_loop,
+    iscoroutinefunction,
+)
 from concurrent.futures import Executor
 from functools import wraps
 from inspect import getattr_static, isasyncgenfunction, isawaitable
 from traceback import format_exception
 from typing import (
-    Any, Awaitable, Callable, Dict, List, Optional, Sequence, Set, Tuple, Type, TypeVar, Union)
+    Any,
+    Awaitable,
+    Callable,
+    Dict,
+    List,
+    Optional,
+    Sequence,
+    Set,
+    Tuple,
+    Type,
+    TypeVar,
+    Union,
+)
 
 import asyncio_extras
 from async_generator import async_generator
@@ -16,13 +33,20 @@ from typeguard import check_argument_types
 from asphalt.core.event import Event, Signal, wait_event
 from asphalt.core.utils import callable_name, qualified_name
 
-__all__ = ('ResourceEvent', 'ResourceConflict', 'ResourceNotFound', 'TeardownError', 'Context',
-           'executor', 'context_teardown')
+__all__ = (
+    "ResourceEvent",
+    "ResourceConflict",
+    "ResourceNotFound",
+    "TeardownError",
+    "Context",
+    "executor",
+    "context_teardown",
+)
 
 logger = logging.getLogger(__name__)
-factory_callback_type = Callable[['Context'], Any]
-resource_name_re = re.compile(r'\w+')
-T_Resource = TypeVar('T_Resource', covariant=True)
+factory_callback_type = Callable[["Context"], Any]
+resource_name_re = re.compile(r"\w+")
+T_Resource = TypeVar("T_Resource", covariant=True)
 
 
 class ResourceContainer:
@@ -37,21 +61,29 @@ class ResourceContainer:
     :ivar bool is_factory: ``True`` if ``value_or_factory`` if this is a resource factory
     """
 
-    __slots__ = 'value_or_factory', 'types', 'name', 'context_attr', 'is_factory'
+    __slots__ = "value_or_factory", "types", "name", "context_attr", "is_factory"
 
-    def __init__(self, value_or_factory, types: Tuple[type, ...], name: str,
-                 context_attr: Optional[str], is_factory: bool) -> None:
+    def __init__(
+        self,
+        value_or_factory,
+        types: Tuple[type, ...],
+        name: str,
+        context_attr: Optional[str],
+        is_factory: bool,
+    ) -> None:
         self.value_or_factory = value_or_factory
         self.types = types
         self.name = name
         self.context_attr = context_attr
         self.is_factory = is_factory
 
-    def generate_value(self, ctx: 'Context'):
-        assert self.is_factory, 'generate_value() only works for resource factories'
+    def generate_value(self, ctx: "Context"):
+        assert self.is_factory, "generate_value() only works for resource factories"
         value = self.value_or_factory(ctx)
 
-        container = ResourceContainer(value, self.types, self.name, self.context_attr, False)
+        container = ResourceContainer(
+            value, self.types, self.name, self.context_attr, False
+        )
         for type_ in self.types:
             ctx._resources[(type_, self.name)] = container
 
@@ -61,12 +93,18 @@ class ResourceContainer:
         return value
 
     def __repr__(self):
-        typenames = ', '.join(qualified_name(cls) for cls in self.types)
-        value_repr = ('factory=%s' % callable_name(self.value_or_factory) if self.is_factory
-                      else 'value=%r' % self.value_or_factory)
-        return ('{self.__class__.__name__}({value_repr}, types=[{typenames}], name={self.name!r}, '
-                'context_attr={self.context_attr!r})'.format(
-                    self=self, value_repr=value_repr, typenames=typenames))
+        typenames = ", ".join(qualified_name(cls) for cls in self.types)
+        value_repr = (
+            "factory=%s" % callable_name(self.value_or_factory)
+            if self.is_factory
+            else "value=%r" % self.value_or_factory
+        )
+        return (
+            "{self.__class__.__name__}({value_repr}, types=[{typenames}], name={self.name!r}, "
+            "context_attr={self.context_attr!r})".format(
+                self=self, value_repr=value_repr, typenames=typenames
+            )
+        )
 
 
 class ResourceEvent(Event):
@@ -80,10 +118,16 @@ class ResourceEvent(Event):
         resource was added
     """
 
-    __slots__ = 'resource_types', 'resource_name', 'is_factory'
+    __slots__ = "resource_types", "resource_name", "is_factory"
 
-    def __init__(self, source: 'Context', topic: str, types: Tuple[type, ...], name: str,
-                 is_factory: bool) -> None:
+    def __init__(
+        self,
+        source: "Context",
+        topic: str,
+        types: Tuple[type, ...],
+        name: str,
+        is_factory: bool,
+    ) -> None:
         super().__init__(source, topic)
         self.resource_types = types
         self.resource_name = name
@@ -106,8 +150,9 @@ class ResourceNotFound(LookupError):
         self.name = name
 
     def __str__(self):
-        return 'no matching resource was found for type={typename} name={self.name!r}'.\
-            format(self=self, typename=qualified_name(self.type))
+        return "no matching resource was found for type={typename} name={self.name!r}".format(
+            self=self, typename=qualified_name(self.type)
+        )
 
 
 class TeardownError(Exception):
@@ -124,11 +169,14 @@ class TeardownError(Exception):
         self.exceptions = exceptions
 
     def __str__(self):
-        separator = '----------------------------\n'
-        tracebacks = separator.join('\n'.join(format_exception(type(exc), exc, exc.__traceback__))
-                                    for exc in self.exceptions)
-        return '{} exceptions(s) were raised by teardown callbacks:\n{}{}'.\
-            format(len(self.exceptions), separator, tracebacks)
+        separator = "----------------------------\n"
+        tracebacks = separator.join(
+            "\n".join(format_exception(type(exc), exc, exc.__traceback__))
+            for exc in self.exceptions
+        )
+        return "{} exceptions(s) were raised by teardown callbacks:\n{}{}".format(
+            len(self.exceptions), separator, tracebacks
+        )
 
 
 class Context:
@@ -148,10 +196,10 @@ class Context:
 
     resource_added = Signal(ResourceEvent)
 
-    def __init__(self, parent: 'Context' = None) -> None:
+    def __init__(self, parent: "Context" = None) -> None:
         assert check_argument_types()
         self._parent = parent
-        self._loop = getattr(parent, 'loop', None)
+        self._loop = getattr(parent, "loop", None)
         self._closed = False
         self._resources: Dict[Tuple[type, str], ResourceContainer] = {}
         self._resource_factories: Dict[Tuple[type, str], ResourceContainer] = {}
@@ -171,10 +219,10 @@ class Context:
             if value is not None:
                 return getattr(ctx, name)
 
-        raise AttributeError(f'no such context variable: {name}')
+        raise AttributeError(f"no such context variable: {name}")
 
     @property
-    def context_chain(self) -> List['Context']:
+    def context_chain(self) -> List["Context"]:
         """Return a list of contexts starting from this one, its parent and so on."""
         contexts = []
         ctx: Optional[Context] = self
@@ -193,7 +241,7 @@ class Context:
         return self._loop
 
     @property
-    def parent(self) -> Optional['Context']:
+    def parent(self) -> Optional["Context"]:
         """Return the parent context, or ``None`` if there is no parent."""
         return self._parent
 
@@ -204,9 +252,11 @@ class Context:
 
     def _check_closed(self):
         if self._closed:
-            raise RuntimeError('this context has already been closed')
+            raise RuntimeError("this context has already been closed")
 
-    def add_teardown_callback(self, callback: Callable, pass_exception: bool = False) -> None:
+    def add_teardown_callback(
+        self, callback: Callable, pass_exception: bool = False
+    ) -> None:
         """
         Add a callback to be called when this context closes.
 
@@ -260,13 +310,15 @@ class Context:
             raise TeardownError(exceptions)
 
     def __enter__(self):
-        warnings.warn('Using Context as a synchronous context manager has been deprecated',
-                      DeprecationWarning)
+        warnings.warn(
+            "Using Context as a synchronous context manager has been deprecated",
+            DeprecationWarning,
+        )
         self._check_closed()
 
         if self._loop is None:
             with warnings.catch_warnings():
-                warnings.simplefilter('ignore', DeprecationWarning)
+                warnings.simplefilter("ignore", DeprecationWarning)
                 self._loop = get_event_loop()
 
         return self
@@ -281,8 +333,13 @@ class Context:
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         await self.close(exc_val)
 
-    def add_resource(self, value, name: str = 'default', context_attr: str = None,
-                     types: Union[type, Sequence[type]] = ()) -> None:
+    def add_resource(
+        self,
+        value,
+        name: str = "default",
+        context_attr: str = None,
+        types: Union[type, Sequence[type]] = (),
+    ) -> None:
         """
         Add a resource to this context.
 
@@ -307,16 +364,20 @@ class Context:
         if value is None:
             raise ValueError('"value" must not be None')
         if not resource_name_re.fullmatch(name):
-            raise ValueError('"name" must be a nonempty string consisting only of alphanumeric '
-                             'characters and underscores')
+            raise ValueError(
+                '"name" must be a nonempty string consisting only of alphanumeric '
+                "characters and underscores"
+            )
         if context_attr and getattr_static(self, context_attr, None) is not None:
-            raise ResourceConflict('this context already has an attribute {!r}'.format(
-                context_attr))
+            raise ResourceConflict(
+                f"this context already has an attribute {context_attr!r}"
+            )
         for resource_type in types:
             if (resource_type, name) in self._resources:
                 raise ResourceConflict(
-                    'this context already contains a resource of type {} using the name {!r}'.
-                    format(qualified_name(resource_type), name))
+                    f"this context already contains a resource of type "
+                    f"{qualified_name(resource_type)} using the name {name!r}"
+                )
 
         resource = ResourceContainer(value, tuple(types), name, context_attr, False)
         for type_ in resource.types:
@@ -328,9 +389,13 @@ class Context:
         # Notify listeners that a new resource has been made available
         self.resource_added.dispatch(types, name, False)
 
-    def add_resource_factory(self, factory_callback: factory_callback_type,
-                             types: Union[type, Sequence[Type]], name: str = 'default',
-                             context_attr: str = None) -> None:
+    def add_resource_factory(
+        self,
+        factory_callback: factory_callback_type,
+        types: Union[type, Sequence[Type]],
+        name: str = "default",
+        context_attr: str = None,
+    ) -> None:
         """
         Add a resource factory to this context.
 
@@ -356,8 +421,10 @@ class Context:
         assert check_argument_types()
         self._check_closed()
         if not resource_name_re.fullmatch(name):
-            raise ValueError('"name" must be a nonempty string consisting only of alphanumeric '
-                             'characters and underscores')
+            raise ValueError(
+                '"name" must be a nonempty string consisting only of alphanumeric '
+                "characters and underscores"
+            )
         if iscoroutinefunction(factory_callback):
             raise TypeError('"factory_callback" must not be a coroutine function')
         if not types:
@@ -371,17 +438,22 @@ class Context:
         # Check for a conflicting context attribute
         if context_attr in self._resource_factories_by_context_attr:
             raise ResourceConflict(
-                'this context already contains a resource factory for the context attribute {!r}'.
-                format(context_attr))
+                f"this context already contains a resource factory for the context attribute "
+                f"{context_attr!r}"
+            )
 
         # Check for conflicts with existing resource factories
         for type_ in resource_types:
             if (type_, name) in self._resource_factories:
-                raise ResourceConflict('this context already contains a resource factory for the '
-                                       'type {}'.format(qualified_name(type_)))
+                raise ResourceConflict(
+                    "this context already contains a resource factory for the "
+                    "type {}".format(qualified_name(type_))
+                )
 
         # Add the resource factory to the appropriate lookup tables
-        resource = ResourceContainer(factory_callback, resource_types, name, context_attr, True)
+        resource = ResourceContainer(
+            factory_callback, resource_types, name, context_attr, True
+        )
         for type_ in resource_types:
             self._resource_factories[(type_, name)] = resource
 
@@ -391,7 +463,9 @@ class Context:
         # Notify listeners that a new resource has been made available
         self.resource_added.dispatch(resource_types, name, True)
 
-    def get_resource(self, type: Type[T_Resource], name: str = 'default') -> Optional[T_Resource]:
+    def get_resource(
+        self, type: Type[T_Resource], name: str = "default"
+    ) -> Optional[T_Resource]:
         """
         Look up a resource in the chain of contexts.
 
@@ -410,14 +484,26 @@ class Context:
             return resource.value_or_factory
 
         # Next, check if there's a resource factory available on the context chain
-        resource = next((ctx._resource_factories[key] for ctx in self.context_chain
-                         if key in ctx._resource_factories), None)
+        resource = next(
+            (
+                ctx._resource_factories[key]
+                for ctx in self.context_chain
+                if key in ctx._resource_factories
+            ),
+            None,
+        )
         if resource is not None:
             return resource.generate_value(self)
 
         # Finally, check parents for a matching resource
-        return next((ctx._resources[key].value_or_factory for ctx in self.context_chain
-                     if key in ctx._resources), None)
+        return next(
+            (
+                ctx._resources[key].value_or_factory
+                for ctx in self.context_chain
+                if key in ctx._resources
+            ),
+            None,
+        )
 
     def get_resources(self, type: Type[T_Resource]) -> Set[T_Resource]:
         """
@@ -439,22 +525,34 @@ class Context:
         }
 
         # Next, find all matching resource factories in the context chain and generate resources
-        resources.update({container.name: container.generate_value(self)
-                          for ctx in self.context_chain
-                          for container in ctx._resources.values()
-                          if container.is_factory and type in container.types
-                          and container.name not in resources})
+        resources.update(
+            {
+                container.name: container.generate_value(self)
+                for ctx in self.context_chain
+                for container in ctx._resources.values()
+                if container.is_factory
+                and type in container.types
+                and container.name not in resources
+            }
+        )
 
         # Finally, add the resource values from the parent contexts
-        resources.update({container.name: container.value_or_factory
-                          for ctx in self.context_chain[1:]
-                          for container in ctx._resources.values()
-                          if not container.is_factory and type in container.types
-                          and container.name not in resources})
+        resources.update(
+            {
+                container.name: container.value_or_factory
+                for ctx in self.context_chain[1:]
+                for container in ctx._resources.values()
+                if not container.is_factory
+                and type in container.types
+                and container.name not in resources
+            }
+        )
 
         return set(resources.values())
 
-    def require_resource(self, type: Type[T_Resource], name: str = 'default') -> T_Resource:
+    def require_resource(
+        self, type: Type[T_Resource], name: str = "default"
+    ) -> T_Resource:
         """
         Look up a resource in the chain of contexts and raise an exception if it is not found.
 
@@ -474,7 +572,9 @@ class Context:
 
         return resource
 
-    async def request_resource(self, type: Type[T_Resource], name: str = 'default') -> T_Resource:
+    async def request_resource(
+        self, type: Type[T_Resource], name: str = "default"
+    ) -> T_Resource:
         """
         Look up a resource in the chain of contexts.
 
@@ -494,7 +594,9 @@ class Context:
         # Wait until a matching resource or resource factory is available
         signals = [ctx.resource_added for ctx in self.context_chain]
         await wait_event(
-            signals, lambda event: event.resource_name == name and type in event.resource_types)
+            signals,
+            lambda event: event.resource_name == name and type in event.resource_types,
+        )
         return self.require_resource(type, name)
 
     def call_async(self, func: Callable, *args, **kwargs):
@@ -514,8 +616,9 @@ class Context:
         """
         return asyncio_extras.call_async(self.loop, func, *args, **kwargs)
 
-    def call_in_executor(self, func: Callable, *args, executor: Union[Executor, str] = None,
-                         **kwargs) -> Awaitable:
+    def call_in_executor(
+        self, func: Callable, *args, executor: Union[Executor, str] = None, **kwargs
+    ) -> Awaitable:
         """
         Call the given callable in an executor.
 
@@ -576,17 +679,22 @@ def executor(arg: Union[Executor, str, Callable] = None):
     :return: the wrapped function
 
     """
+
     def outer_wrapper(func: Callable):
         @wraps(func)
         def inner_wrapper(*args, **kwargs):
             try:
                 ctx = next(arg for arg in args[:2] if isinstance(arg, Context))
             except StopIteration:
-                raise RuntimeError('the first positional argument to {}() has to be a Context '
-                                   'instance'.format(callable_name(func))) from None
+                raise RuntimeError(
+                    "the first positional argument to {}() has to be a Context "
+                    "instance".format(callable_name(func))
+                ) from None
 
             executor = ctx.require_resource(Executor, resource_name)
-            return asyncio_extras.call_in_executor(func, *args, executor=executor, **kwargs)
+            return asyncio_extras.call_in_executor(
+                func, *args, executor=executor, **kwargs
+            )
 
         return inner_wrapper
 
@@ -620,6 +728,7 @@ def context_teardown(func: Callable):
     :return: an async function
 
     """
+
     @wraps(func)
     async def wrapper(*args, **kwargs) -> None:
         async def teardown_callback(exception: Optional[Exception]):
@@ -633,8 +742,10 @@ def context_teardown(func: Callable):
         try:
             ctx = next(arg for arg in args[:2] if isinstance(arg, Context))
         except StopIteration:
-            raise RuntimeError('the first positional argument to {}() has to be a Context '
-                               'instance'.format(callable_name(func))) from None
+            raise RuntimeError(
+                "the first positional argument to {}() has to be a Context "
+                "instance".format(callable_name(func))
+            ) from None
 
         generator = func(*args, **kwargs)
         try:
@@ -649,10 +760,16 @@ def context_teardown(func: Callable):
 
     if not isasyncgenfunction(func):
         if async_generator and iscoroutinefunction(func):
-            warnings.warn('Using @context_teardown on regular coroutine functions has been '
-                          'deprecated', DeprecationWarning, stacklevel=2)
+            warnings.warn(
+                "Using @context_teardown on regular coroutine functions has been "
+                "deprecated",
+                DeprecationWarning,
+                stacklevel=2,
+            )
             func = async_generator(func)
         else:
-            raise TypeError(f'{callable_name(func)} must be an async generator function')
+            raise TypeError(
+                f"{callable_name(func)} must be an async generator function"
+            )
 
     return wrapper

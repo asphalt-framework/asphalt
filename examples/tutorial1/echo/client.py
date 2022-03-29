@@ -11,13 +11,13 @@ class ClientComponent(CLIApplicationComponent):
         self.message = message
 
     async def run(self, ctx):
-        reader, writer = await open_connection('localhost', 64100)
-        writer.write(self.message.encode() + b'\n')
+        reader, writer = await open_connection("localhost", 64100)
+        writer.write(self.message.encode() + b"\n")
         response = await reader.readline()
         writer.close()
-        print('Server responded:', response.decode().rstrip())
+        print("Server responded:", response.decode().rstrip())
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     component = ClientComponent(sys.argv[1])
     run_application(component)

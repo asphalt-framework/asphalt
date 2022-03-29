@@ -31,11 +31,11 @@ def server_component(event_loop, context):
 
 
 def test_client(event_loop, server_component, context, capsys):
-    client = ClientComponent('Hello!')
+    client = ClientComponent("Hello!")
     event_loop.run_until_complete(client.start(context))
     exc = pytest.raises(SystemExit, event_loop.run_forever)
     assert exc.value.code == 0
 
     # Grab the captured output of sys.stdout and sys.stderr from the capsys fixture
     out, err = capsys.readouterr()
-    assert out == 'Message from client: Hello!\nServer responded: Hello!\n'
+    assert out == "Message from client: Hello!\nServer responded: Hello!\n"

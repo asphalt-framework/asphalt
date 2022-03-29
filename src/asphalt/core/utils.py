@@ -10,8 +10,13 @@ if sys.version_info >= (3, 10):
 else:
     from importlib_metadata import EntryPoint, entry_points
 
-__all__ = ('resolve_reference', 'qualified_name', 'callable_name', 'merge_config',
-           'PluginContainer')
+__all__ = (
+    "resolve_reference",
+    "qualified_name",
+    "callable_name",
+    "merge_config",
+    "PluginContainer",
+)
 
 
 def resolve_reference(ref):
@@ -29,23 +34,24 @@ def resolve_reference(ref):
     :raises LookupError: if the reference could not be resolved
 
     """
-    if not isinstance(ref, str) or ':' not in ref:
+    if not isinstance(ref, str) or ":" not in ref:
         return ref
 
-    modulename, rest = ref.split(':', 1)
+    modulename, rest = ref.split(":", 1)
     try:
         obj = import_module(modulename)
     except ImportError as e:
         raise LookupError(
-            f'error resolving reference {ref}: could not import module') from e
+            f"error resolving reference {ref}: could not import module"
+        ) from e
 
     try:
-        for name in rest.split('.'):
+        for name in rest.split("."):
             obj = getattr(obj, name)
 
         return obj
     except AttributeError:
-        raise LookupError(f'error resolving reference {ref}: error looking up object')
+        raise LookupError(f"error resolving reference {ref}: error looking up object")
 
 
 def qualified_name(obj) -> str:
@@ -58,22 +64,23 @@ def qualified_name(obj) -> str:
     if not isclass(obj):
         obj = type(obj)
 
-    if obj.__module__ == 'builtins':
+    if obj.__module__ == "builtins":
         return obj.__name__
     else:
-        return f'{obj.__module__}.{obj.__qualname__}'
+        return f"{obj.__module__}.{obj.__qualname__}"
 
 
 def callable_name(func: Callable) -> str:
     """Return the qualified name (e.g. package.module.func) for the given callable."""
-    if func.__module__ == 'builtins':
+    if func.__module__ == "builtins":
         return func.__name__
     else:
-        return f'{func.__module__}.{func.__qualname__}'
+        return f"{func.__module__}.{func.__qualname__}"
 
 
-def merge_config(original: Optional[Dict[str, Any]],
-                 overrides: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+def merge_config(
+    original: Optional[Dict[str, Any]], overrides: Optional[Dict[str, Any]]
+) -> Dict[str, Any]:
     """
     Return a copy of the ``original`` configuration dictionary, with overrides from ``overrides``
     applied.
@@ -93,8 +100,8 @@ def merge_config(original: Optional[Dict[str, Any]],
     copied = original.copy() if original else {}
     if overrides:
         for key, value in overrides.items():
-            if '.' in key:
-                key, rest = key.split('.', 1)
+            if "." in key:
+                key, rest = key.split(".", 1)
                 value = {rest: value}
 
             orig_value = copied.get(key)
@@ -115,7 +122,7 @@ class PluginContainer:
         don't point to classes)
     """
 
-    __slots__ = 'namespace', 'base_class', '_entrypoints'
+    __slots__ = "namespace", "base_class", "_entrypoints"
 
     def __init__(self, namespace: str, base_class: type = None) -> None:
         self.namespace = namespace
@@ -138,12 +145,12 @@ class PluginContainer:
         """
         if not isinstance(obj, str):
             return obj
-        if ':' in obj:
+        if ":" in obj:
             return resolve_reference(obj)
 
         value = self._entrypoints.get(obj)
         if value is None:
-            raise LookupError(f'no such entry point in {self.namespace}: {obj}')
+            raise LookupError(f"no such entry point in {self.namespace}: {obj}")
 
         if isinstance(value, EntryPoint):
             value = self._entrypoints[obj] = value.load()
@@ -164,11 +171,14 @@ class PluginContainer:
 
         """
         assert check_argument_types()
-        assert self.base_class, 'base class has not been defined'
+        assert self.base_class, "base class has not been defined"
         plugin_class = self.resolve(type)
         if not issubclass(plugin_class, self.base_class):
-            raise TypeError('{} is not a subclass of {}'.format(
-                qualified_name(plugin_class), qualified_name(self.base_class)))
+            raise TypeError(
+                "{} is not a subclass of {}".format(
+                    qualified_name(plugin_class), qualified_name(self.base_class)
+                )
+            )
 
         return plugin_class(**constructor_kwargs)
 
@@ -193,5 +203,8 @@ class PluginContainer:
         return values
 
     def __repr__(self):
-        return ('{0.__class__.__name__}(namespace={0.namespace!r}, base_class={1})'
-                .format(self, qualified_name(self.base_class)))
+        return (
+            "{0.__class__.__name__}(namespace={0.namespace!r}, base_class={1})".format(
+                self, qualified_name(self.base_class)
+            )
+        )

@@ -13,20 +13,25 @@ from asphalt.core.component import Component, component_types
 from asphalt.core.context import Context
 from asphalt.core.utils import PluginContainer, qualified_name
 
-__all__ = ('run_application',)
+__all__ = ("run_application",)
 
-policies = PluginContainer('asphalt.core.event_loop_policies')
+policies = PluginContainer("asphalt.core.event_loop_policies")
 
 
 def sigterm_handler(logger: Logger, event_loop: AbstractEventLoop) -> None:
     if event_loop.is_running():
-        logger.info('Received SIGTERM')
+        logger.info("Received SIGTERM")
         event_loop.stop()
 
 
-def run_application(component: Union[Component, Dict[str, Any]], *, event_loop_policy: str = None,
-                    max_threads: int = None, logging: Union[Dict[str, Any], int, None] = INFO,
-                    start_timeout: Union[int, float, None] = 10):
+def run_application(
+    component: Union[Component, Dict[str, Any]],
+    *,
+    event_loop_policy: str = None,
+    max_threads: int = None,
+    logging: Union[Dict[str, Any], int, None] = INFO,
+    start_timeout: Union[int, float, None] = 10
+):
     """
     Configure logging and start the given root component in the default asyncio event loop.
 
@@ -71,14 +76,14 @@ def run_application(component: Union[Component, Dict[str, Any]], *, event_loop_p
 
     # Inform the user whether -O or PYTHONOPTIMIZE was set when Python was launched
     logger = getLogger(__name__)
-    logger.info('Running in %s mode', 'development' if __debug__ else 'production')
+    logger.info("Running in %s mode", "development" if __debug__ else "production")
 
     # Switch to an alternate event loop policy if one was provided
     if event_loop_policy:
         create_policy = policies.resolve(event_loop_policy)
         policy = create_policy()
         asyncio.set_event_loop_policy(policy)
-        logger.info('Switched event loop policy to %s', qualified_name(policy))
+        logger.info("Switched event loop policy to %s", qualified_name(policy))
 
     # Assign a new default executor with the given max worker thread limit if one was provided
     event_loop = asyncio.new_event_loop()
@@ -86,13 +91,15 @@ def run_application(component: Union[Component, Dict[str, Any]], *, event_loop_p
     try:
         if max_threads is not None:
             event_loop.set_default_executor(ThreadPoolExecutor(max_threads))
-            logger.info('Installed a new thread pool executor with max_workers=%d', max_threads)
+            logger.info(
+                "Installed a new thread pool executor with max_workers=%d", max_threads
+            )
 
         # Instantiate the root component if a dict was given
         if isinstance(component, dict):
             component = cast(Component, component_types.create_object(**component))
 
-        logger.info('Starting application')
+        logger.info("Starting application")
         context = Context()
         exception: Optional[BaseException] = None
         exit_code = 0
@@ -103,18 +110,20 @@ def run_application(component: Union[Component, Dict[str, Any]], *, event_loop_p
             event_loop.run_until_complete(coro)
         except asyncio.TimeoutError as e:
             exception = e
-            logger.error('Timeout waiting for the root component to start')
+            logger.error("Timeout waiting for the root component to start")
             exit_code = 1
         except Exception as e:
             exception = e
-            logger.exception('Error during application startup')
+            logger.exception("Error during application startup")
             exit_code = 1
         else:
-            logger.info('Application started')
+            logger.info("Application started")
 
             # Add a signal handler to gracefully deal with SIGTERM
             try:
-                event_loop.add_signal_handler(signal.SIGTERM, sigterm_handler, logger, event_loop)
+                event_loop.add_signal_handler(
+                    signal.SIGTERM, sigterm_handler, logger, event_loop
+                )
             except NotImplementedError:
                 pass  # Windows does not support signals very well
 
@@ -127,7 +136,7 @@ def run_application(component: Union[Component, Dict[str, Any]], *, event_loop_p
                 exit_code = e.code
 
         # Close the root context
-        logger.info('Stopping application')
+        logger.info("Stopping application")
         event_loop.run_until_complete(context.close(exception))
 
         # Shut down leftover async generators
@@ -136,7 +145,7 @@ def run_application(component: Union[Component, Dict[str, Any]], *, event_loop_p
         # Finally, close the event loop itself
         event_loop.close()
         asyncio.set_event_loop(None)
-        logger.info('Application stopped')
+        logger.info("Application stopped")
 
     # Shut down the logging system
     shutdown()

@@ -17,15 +17,17 @@ async def context():
 @pytest_asyncio.fixture
 async def special_executor(context):
     executor = ThreadPoolExecutor(1)
-    context.add_resource(executor, 'special', types=[Executor])
+    context.add_resource(executor, "special", types=[Executor])
     context.add_teardown_callback(executor.shutdown)
     return executor
 
 
-@pytest.mark.parametrize('use_resource_name', [False, True], ids=['instance', 'resource_name'])
+@pytest.mark.parametrize(
+    "use_resource_name", [False, True], ids=["instance", "resource_name"]
+)
 @pytest.mark.asyncio
 async def test_executor_special(context, use_resource_name, special_executor):
-    @executor('special' if use_resource_name else special_executor)
+    @executor("special" if use_resource_name else special_executor)
     def check_thread(ctx):
         assert current_thread() is executor_thread
 
@@ -45,10 +47,10 @@ async def test_executor_default(event_loop, context):
 
 @pytest.mark.asyncio
 async def test_executor_worker_thread(event_loop, context, special_executor):
-    @executor('special')
+    @executor("special")
     def runs_in_special_worker(ctx, worker_thread):
         assert current_thread() is worker_thread
-        return 'foo'
+        return "foo"
 
     @executor
     def runs_in_default_worker(ctx):
@@ -59,17 +61,19 @@ async def test_executor_worker_thread(event_loop, context, special_executor):
     event_loop_thread = current_thread()
     special_executor_thread = special_executor.submit(current_thread).result()
     retval = await runs_in_default_worker(context)
-    assert retval == 'foo'
+    assert retval == "foo"
 
 
 @pytest.mark.asyncio
 async def test_executor_missing_context(event_loop, context):
-    @executor('special')
+    @executor("special")
     def runs_in_default_worker():
         pass
 
     with pytest.raises(RuntimeError) as exc:
         await runs_in_default_worker()
 
-    exc.match('the callable needs to be called with a Context as the first or second positional '
-              'argument')
+    exc.match(
+        "the callable needs to be called with a Context as the first or second positional "
+        "argument"
+    )
