@@ -114,7 +114,7 @@ commands = python -m pytest {posargs}
 
 [testenv:docs]
 extras = doc
-commands = python setup.py build_sphinx {posargs}
+commands = sphinx-build docs build/sphinx {posargs}
 usedevelop = true
 
 [testenv:flake8]

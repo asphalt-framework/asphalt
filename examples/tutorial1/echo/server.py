@@ -15,6 +15,7 @@ class ServerComponent(Component):
     async def start(self, ctx):
         await start_server(client_connected, 'localhost', 64100)
 
+
 if __name__ == '__main__':
     component = ServerComponent()
     run_application(component)

@@ -1,10 +1,10 @@
 import asyncio
 
 import pytest
-from asphalt.core import Context
-
 from echo.client import ClientComponent
 from echo.server import ServerComponent
+
+from asphalt.core import Context
 
 
 @pytest.fixture

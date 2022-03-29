@@ -17,6 +17,7 @@ class ClientComponent(CLIApplicationComponent):
         writer.close()
         print('Server responded:', response.decode().rstrip())
 
+
 if __name__ == '__main__':
     component = ClientComponent(sys.argv[1])
     run_application(component)

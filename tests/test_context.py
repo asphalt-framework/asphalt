@@ -438,6 +438,8 @@ class TestContextTeardown:
     ], ids=['no_exception', 'exception'])
     @pytest.mark.asyncio
     async def test_function(self, expected_exc):
+        phase = received_exception = None
+
         @context_teardown
         async def start(ctx: Context):
             nonlocal phase, received_exception
@@ -446,7 +448,6 @@ class TestContextTeardown:
             phase = 'finished'
             received_exception = exc
 
-        phase = received_exception = None
         context = Context()
         await start(context)
         assert phase == 'started'
@@ -460,6 +461,8 @@ class TestContextTeardown:
     ], ids=['no_exception', 'exception'])
     @pytest.mark.asyncio
     async def test_method(self, expected_exc):
+        phase = received_exception = None
+
         class SomeComponent:
             @context_teardown
             async def start(self, ctx: Context):
@@ -469,7 +472,6 @@ class TestContextTeardown:
                 phase = 'finished'
                 received_exception = exc
 
-        phase = received_exception = None
         context = Context()
         await SomeComponent().start(context)
         assert phase == 'started'
@@ -536,6 +538,8 @@ class TestContextFinisher:
     ], ids=['no_exception', 'exception'])
     @pytest.mark.asyncio
     async def test_context_teardown(self, expected_exc):
+        phase = received_exception = None
+
         @context_teardown
         async def start(ctx: Context):
             nonlocal phase, received_exception
@@ -544,7 +548,6 @@ class TestContextFinisher:
             phase = 'finished'
             received_exception = exc
 
-        phase = received_exception = None
         context = Context()
         await start(context)
         assert phase == 'started'

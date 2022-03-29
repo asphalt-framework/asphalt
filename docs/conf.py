@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
-import pkg_resources
+from importlib.metadata import version
+
+from packaging.version import parse
 
 extensions = [
     'sphinx.ext.autodoc',
@@ -15,7 +17,7 @@ project = 'The Asphalt Framework (core)'
 author = 'Alex Grönholm'
 copyright = '2015, ' + author
 
-v = pkg_resources.get_distribution('asphalt').parsed_version
+v = parse(version('asphalt'))
 version = v.base_version
 release = v.public
 

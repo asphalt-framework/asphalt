@@ -2,10 +2,10 @@
 import logging
 from difflib import HtmlDiff
 
-from asphalt.core import CLIApplicationComponent
 from async_generator import aclosing
-
 from webnotifier.detector import ChangeDetectorComponent
+
+from asphalt.core import CLIApplicationComponent
 
 logger = logging.getLogger(__name__)
 
