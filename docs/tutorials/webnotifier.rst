@@ -111,7 +111,7 @@ to the logger::
                             last_modified = resp.headers['date']
                             new_lines = (await resp.text()).split('\n')
                             if old_lines is not None and old_lines != new_lines:
-                                difference = diff.make_file(old_lines, new_lines, context=True)
+                                difference = unified_diff(old_lines, new_lines)
                                 logger.info('Contents changed:\n%s', difference)
 
                             old_lines = new_lines
