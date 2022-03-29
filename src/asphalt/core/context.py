@@ -1,3 +1,15 @@
+from __future__ import annotations
+
+__all__ = (
+    "ResourceEvent",
+    "ResourceConflict",
+    "ResourceNotFound",
+    "TeardownError",
+    "Context",
+    "executor",
+    "context_teardown",
+)
+
 import logging
 import re
 import warnings
@@ -33,16 +45,6 @@ from typeguard import check_argument_types
 from asphalt.core.event import Event, Signal, wait_event
 from asphalt.core.utils import callable_name, qualified_name
 
-__all__ = (
-    "ResourceEvent",
-    "ResourceConflict",
-    "ResourceNotFound",
-    "TeardownError",
-    "Context",
-    "executor",
-    "context_teardown",
-)
-
 logger = logging.getLogger(__name__)
 factory_callback_type = Callable[["Context"], Any]
 resource_name_re = re.compile(r"\w+")
@@ -77,7 +79,7 @@ class ResourceContainer:
         self.context_attr = context_attr
         self.is_factory = is_factory
 
-    def generate_value(self, ctx: "Context"):
+    def generate_value(self, ctx: Context):
         assert self.is_factory, "generate_value() only works for resource factories"
         value = self.value_or_factory(ctx)
 
@@ -122,7 +124,7 @@ class ResourceEvent(Event):
 
     def __init__(
         self,
-        source: "Context",
+        source: Context,
         topic: str,
         types: Tuple[type, ...],
         name: str,
@@ -196,7 +198,7 @@ class Context:
 
     resource_added = Signal(ResourceEvent)
 
-    def __init__(self, parent: "Context" = None) -> None:
+    def __init__(self, parent: Context = None) -> None:
         assert check_argument_types()
         self._parent = parent
         self._loop = getattr(parent, "loop", None)
@@ -222,7 +224,7 @@ class Context:
         raise AttributeError(f"no such context variable: {name}")
 
     @property
-    def context_chain(self) -> List["Context"]:
+    def context_chain(self) -> List[Context]:
         """Return a list of contexts starting from this one, its parent and so on."""
         contexts = []
         ctx: Optional[Context] = self
@@ -241,7 +243,7 @@ class Context:
         return self._loop
 
     @property
-    def parent(self) -> Optional["Context"]:
+    def parent(self) -> Optional[Context]:
         """Return the parent context, or ``None`` if there is no parent."""
         return self._parent
 

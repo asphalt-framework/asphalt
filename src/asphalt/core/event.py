@@ -1,3 +1,7 @@
+from __future__ import annotations
+
+__all__ = ("Event", "Signal", "wait_event", "stream_events")
+
 import logging
 import sys
 import weakref
@@ -29,8 +33,6 @@ if sys.version_info >= (3, 10):
     from contextlib import aclosing
 else:
     from async_generator import aclosing
-
-__all__ = ("Event", "Signal", "wait_event", "stream_events")
 
 logger = logging.getLogger(__name__)
 
@@ -102,9 +104,9 @@ class Signal(Generic[T_Event]):
             assert issubclass(
                 event_class, Event
             ), "event_class must be a subclass of Event"
-            self.bound_signals: MutableMapping[Any, "Signal"] = WeakKeyDictionary()
+            self.bound_signals: MutableMapping[Any, Signal] = WeakKeyDictionary()
 
-    def __get__(self, instance, owner) -> "Signal":
+    def __get__(self, instance, owner) -> Signal:
         if instance is None:
             return self
 

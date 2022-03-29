@@ -1,3 +1,7 @@
+from __future__ import annotations
+
+__all__ = ("run_application",)
+
 import asyncio
 import signal
 import sys
@@ -12,8 +16,6 @@ from typeguard import check_argument_types
 from asphalt.core.component import Component, component_types
 from asphalt.core.context import Context
 from asphalt.core.utils import PluginContainer, qualified_name
-
-__all__ = ("run_application",)
 
 policies = PluginContainer("asphalt.core.event_loop_policies")
 
@@ -30,7 +32,7 @@ def run_application(
     event_loop_policy: str = None,
     max_threads: int = None,
     logging: Union[Dict[str, Any], int, None] = INFO,
-    start_timeout: Union[int, float, None] = 10
+    start_timeout: Union[int, float, None] = 10,
 ):
     """
     Configure logging and start the given root component in the default asyncio event loop.

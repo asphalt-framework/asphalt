@@ -1,14 +1,4 @@
-import sys
-from importlib import import_module
-from inspect import isclass
-from typing import Any, Callable, Dict, List, Optional, Union
-
-from typeguard import check_argument_types
-
-if sys.version_info >= (3, 10):
-    from importlib.metadata import EntryPoint, entry_points
-else:
-    from importlib_metadata import EntryPoint, entry_points
+from __future__ import annotations
 
 __all__ = (
     "resolve_reference",
@@ -17,6 +7,18 @@ __all__ = (
     "merge_config",
     "PluginContainer",
 )
+
+import sys
+from importlib import import_module
+from inspect import isclass
+from typing import Any, Callable, Dict, List, Optional, Type, Union
+
+from typeguard import check_argument_types
+
+if sys.version_info >= (3, 10):
+    from importlib.metadata import EntryPoint, entry_points
+else:
+    from importlib_metadata import EntryPoint, entry_points
 
 
 def resolve_reference(ref):
@@ -157,7 +159,7 @@ class PluginContainer:
 
         return value
 
-    def create_object(self, type: Union[type, str], **constructor_kwargs):
+    def create_object(self, type: Union[Type, str], **constructor_kwargs):
         """
         Instantiate a plugin.
 

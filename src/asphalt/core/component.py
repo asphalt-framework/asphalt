@@ -1,17 +1,19 @@
+from __future__ import annotations
+
+__all__ = ("Component", "ContainerComponent", "CLIApplicationComponent")
+
 import asyncio
 import sys
 from abc import ABCMeta, abstractmethod
 from collections import OrderedDict
 from traceback import print_exception
-from typing import Any, Dict, Optional, Union
+from typing import Any, Dict, Optional, Type, Union
 from warnings import warn
 
 from typeguard import check_argument_types
 
 from asphalt.core.context import Context
 from asphalt.core.utils import PluginContainer, merge_config, qualified_name
-
-__all__ = ("Component", "ContainerComponent", "CLIApplicationComponent")
 
 
 class Component(metaclass=ABCMeta):
@@ -60,7 +62,7 @@ class ContainerComponent(Component):
         self.child_components: OrderedDict[str, Component] = OrderedDict()
         self.component_configs = components or {}
 
-    def add_component(self, alias: str, type: Union[str, type] = None, **config):
+    def add_component(self, alias: str, type: Union[str, Type] = None, **config):
         """
         Add a child component.
 

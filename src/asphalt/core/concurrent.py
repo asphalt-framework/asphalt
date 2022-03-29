@@ -1,3 +1,7 @@
+from __future__ import annotations
+
+__all__ = ("executor",)
+
 import inspect
 from asyncio import get_running_loop
 from concurrent.futures import Executor
@@ -7,8 +11,6 @@ from typing import Awaitable, Callable, TypeVar, Union
 from typeguard import check_argument_types
 
 from asphalt.core import Context
-
-__all__ = ("executor",)
 
 T_Retval = TypeVar("T_Retval")
 WrappedCallable = Callable[..., Awaitable[T_Retval]]
