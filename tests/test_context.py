@@ -5,6 +5,7 @@ from threading import current_thread
 from unittest.mock import patch
 
 import pytest
+import pytest_asyncio
 from async_generator import yield_
 
 from asphalt.core import (
@@ -12,12 +13,12 @@ from asphalt.core import (
 from asphalt.core.context import ResourceContainer, TeardownError
 
 
-@pytest.fixture
+@pytest_asyncio.fixture
 def context():
     return Context()
 
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def special_executor(context):
     executor = ThreadPoolExecutor(1)
     context.add_resource(executor, 'special', types=[Executor])

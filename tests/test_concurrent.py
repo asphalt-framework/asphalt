@@ -2,18 +2,19 @@ from concurrent.futures import Executor, ThreadPoolExecutor
 from threading import current_thread
 
 import pytest
+import pytest_asyncio
 
 from asphalt.core import Context
 from asphalt.core.concurrent import executor
 
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def context():
     async with Context() as ctx:
         yield ctx
 
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def special_executor(context):
     executor = ThreadPoolExecutor(1)
     context.add_resource(executor, 'special', types=[Executor])
