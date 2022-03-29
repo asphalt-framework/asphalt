@@ -99,7 +99,7 @@ show_missing = true
 [tool.tox]
 legacy_tox_ini = """
 [tox]
-envlist = py37, py38, py39, py310, pypy3, flake8, mypy
+envlist = py37, py38, py39, py310, pypy3
 skip_missing_interpreters = true
 isolated_build = true
 
@@ -110,17 +110,4 @@ commands = python -m pytest {posargs}
 [testenv:docs]
 extras = doc
 commands = sphinx-build docs build/sphinx {posargs}
-usedevelop = true
-
-[testenv:flake8]
-basepython = python3
-deps = pyproject-flake8
-commands = pflake8 src tests
-skip_install = true
-
-[testenv:mypy]
-basepython = python3
-deps = mypy
-commands = mypy src
-skip_install = true
 """
