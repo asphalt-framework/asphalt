@@ -10,10 +10,13 @@ __all__ = (
     "executor",
     "context_teardown",
     "current_context",
+    "Dependency",
+    "inject",
 )
 
 import logging
 import re
+import sys
 import warnings
 from asyncio import (
     AbstractEventLoop,
@@ -22,10 +25,18 @@ from asyncio import (
     get_running_loop,
     iscoroutinefunction,
 )
+from collections.abc import Coroutine
 from concurrent.futures import Executor
 from contextvars import ContextVar, Token
+from dataclasses import dataclass, field
 from functools import wraps
-from inspect import getattr_static, isasyncgenfunction, isawaitable
+from inspect import (
+    Parameter,
+    getattr_static,
+    isasyncgenfunction,
+    isawaitable,
+    signature,
+)
 from traceback import format_exception
 from typing import (
     Any,
@@ -49,10 +60,17 @@ from typeguard import check_argument_types
 from asphalt.core.event import Event, Signal, wait_event
 from asphalt.core.utils import callable_name, qualified_name
 
+if sys.version_info >= (3, 10):
+    from typing import ParamSpec
+else:
+    from typing_extensions import ParamSpec
+
 logger = logging.getLogger(__name__)
 factory_callback_type = Callable[["Context"], Any]
 resource_name_re = re.compile(r"\w+")
-T_Resource = TypeVar("T_Resource", covariant=True)
+T_Resource = TypeVar("T_Resource")
+T_Retval = TypeVar("T_Retval")
+P = ParamSpec("P")
 _current_context: ContextVar[Context | None] = ContextVar(
     "_current_context", default=None
 )
@@ -833,3 +851,63 @@ def current_context() -> Context:
         raise NoCurrentContext
 
     return ctx
+
+
+@dataclass
+class Dependency:
+    """
+    Marker for declaring a parameter for dependency injection via :func:`inject`.
+
+    :param name: the resource name (defaults to ``default``)
+    """
+
+    name: str = "default"
+    cls: type = field(init=False)
+
+
+def inject(
+    func: Callable[P, Coroutine[Any, Any, T_Retval]]
+) -> Callable[P, Coroutine[Any, Any, T_Retval]]:
+    """
+    Wrap the given coroutine function for use with dependency injection.
+
+    Parameters with dependencies need to be annotated and have a :class:`Dependency` instance as
+    the default value.
+
+    """
+
+    @wraps(func)
+    async def inject_wrapper(*args, **kwargs) -> T_Retval:
+        ctx = current_context()
+        resources: dict[str, Any] = {}
+        for argname, dependency in injected_resources.items():
+            resource: Any = ctx.require_resource(dependency.cls, dependency.name)
+            if isawaitable(resource):
+                resource = await resource
+
+            resources[argname] = resource
+
+        return await func(*args, **kwargs, **resources)
+
+    if not iscoroutinefunction(func):
+        raise TypeError(f"{callable_name(func)!r} is not a coroutine function")
+
+    sig = signature(func)
+    injected_resources: dict[str, Dependency] = {}
+    for param in sig.parameters.values():
+        if isinstance(param.default, Dependency):
+            if param.kind is Parameter.POSITIONAL_ONLY:
+                raise TypeError(
+                    f"Cannot inject dependency to positional-only parameter {param.name!r}"
+                )
+
+            if param.annotation is Parameter.empty:
+                raise TypeError(
+                    f"Dependency for parameter {param.name!r} of function "
+                    f"{callable_name(func)!r} is missing the type annotation"
+                )
+
+            param.default.cls = param.annotation
+            injected_resources[param.name] = param.default
+
+    return inject_wrapper

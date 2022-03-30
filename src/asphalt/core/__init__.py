@@ -9,6 +9,9 @@ __all__ = (
     "TeardownError",
     "context_teardown",
     "current_context",
+    "NoCurrentContext",
+    "Dependency",
+    "inject",
     "executor",
     "Event",
     "Signal",
@@ -25,6 +28,8 @@ __all__ = (
 from .component import CLIApplicationComponent, Component, ContainerComponent
 from .context import (
     Context,
+    Dependency,
+    NoCurrentContext,
     ResourceConflict,
     ResourceEvent,
     ResourceNotFound,
@@ -32,6 +37,7 @@ from .context import (
     context_teardown,
     current_context,
     executor,
+    inject,
 )
 from .event import Event, Signal, stream_events, wait_event
 from .runner import run_application

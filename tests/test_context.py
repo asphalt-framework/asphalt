@@ -11,18 +11,18 @@ from async_generator import yield_
 
 from asphalt.core import (
     Context,
+    Dependency,
+    NoCurrentContext,
     ResourceConflict,
     ResourceNotFound,
+    TeardownError,
     callable_name,
     context_teardown,
-    executor,
-)
-from asphalt.core.context import (
-    NoCurrentContext,
-    ResourceContainer,
-    TeardownError,
     current_context,
+    executor,
+    inject,
 )
+from asphalt.core.context import ResourceContainer
 
 
 @pytest.fixture
@@ -649,3 +649,45 @@ async def test_context_stack_corruption(event_loop):
         assert current_context() is ctx
 
     pytest.raises(NoCurrentContext, current_context)
+
+
+class TestDependencyInjection:
+    @pytest.mark.asyncio
+    async def test_static_resources(self):
+        @inject
+        async def injected(
+            foo: int, bar: str = Dependency(), *, baz: str = Dependency("alt")
+        ):
+            return foo, bar, baz
+
+        async with Context() as ctx:
+            ctx.add_resource("bar_test")
+            ctx.add_resource("baz_test", "alt")
+            foo, bar, baz = await injected(2)
+
+        assert foo == 2
+        assert bar == "bar_test"
+        assert baz == "baz_test"
+
+    @pytest.mark.asyncio
+    async def test_missing_annotation(self):
+        async def injected(foo: int, bar: str = Dependency(), *, baz=Dependency("alt")):
+            pass
+
+        pytest.raises(TypeError, inject, injected).match(
+            f"Dependency for parameter 'baz' of function "
+            f"'{__name__}.{self.__class__.__name__}.test_missing_annotation.<locals>.injected' is "
+            f"missing the type annotation"
+        )
+
+    @pytest.mark.asyncio
+    async def test_missing_resource(self):
+        @inject
+        async def injected(foo: int, bar: str = Dependency()):
+            pass
+
+        with pytest.raises(ResourceNotFound) as exc:
+            async with Context():
+                await injected(2)
+
+        exc.match("no matching resource was found for type=str name='default'")

@@ -99,6 +99,36 @@ The order of resource lookup is as follows:
    local resource
 #. search for a resource in the parent contexts
 
+Injecting resources to functions
+--------------------------------
+
+A type-safe way to use context resources is to use `dependency injection`_. In Asphalt, this is
+done by adding parameters to a function so that they have the resource type as the type annotation,
+and a :class:`~.context.Dependency` instance as the default value. The function then needs to be
+decorated using :func:`~.context.inject`::
+
+    from asphalt.core import Dependency, inject
+
+    @inject
+    async def some_function(some_arg, some_resource: MyResourceType = Dependency()):
+        ...
+
+To specify a non-default name for the dependency, you can pass that name as an argument to
+:class:`~.context.Dependency`::
+
+    @inject
+    async def some_function(some_arg, some_resource: MyResourceType = Dependency('alternate')):
+        ...
+
+Restrictions:
+
+* The function must be a coroutine function (``async def``)
+* The dependency arguments must not be positional-only arguments
+* The resources (or their relevant factories) must already be present in the context stack when
+  the decorated function is called, or otherwise :exc:`~.context.ResourceNotFound` is raised
+
+.. _dependency injection: https://en.wikipedia.org/wiki/Dependency_injection
+
 Handling resource cleanup
 -------------------------
 
