@@ -1,16 +1,12 @@
-import asyncio
+import re
 import sys
 
-import pytest
+version_re = re.compile(r"_py(\d)(\d)\.py$")
 
 
 def pytest_ignore_collect(path, config):
-    return path.basename.endswith("_py36.py") and sys.version_info < (3, 6)
-
-
-@pytest.fixture
-def event_loop():
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    yield loop
-    loop.close()
+    match = version_re.search(path.basename)
+    if match:
+        version = tuple(int(x) for x in match.groups())
+        if sys.version_info < version:
+            return True
