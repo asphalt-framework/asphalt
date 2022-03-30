@@ -4,10 +4,12 @@ __all__ = (
     "ResourceEvent",
     "ResourceConflict",
     "ResourceNotFound",
+    "NoCurrentContext",
     "TeardownError",
     "Context",
     "executor",
     "context_teardown",
+    "current_context",
 )
 
 import logging
@@ -15,11 +17,13 @@ import re
 import warnings
 from asyncio import (
     AbstractEventLoop,
+    current_task,
     get_event_loop,
     get_running_loop,
     iscoroutinefunction,
 )
 from concurrent.futures import Executor
+from contextvars import ContextVar, Token
 from functools import wraps
 from inspect import getattr_static, isasyncgenfunction, isawaitable
 from traceback import format_exception
@@ -49,6 +53,9 @@ logger = logging.getLogger(__name__)
 factory_callback_type = Callable[["Context"], Any]
 resource_name_re = re.compile(r"\w+")
 T_Resource = TypeVar("T_Resource", covariant=True)
+_current_context: ContextVar[Context | None] = ContextVar(
+    "_current_context", default=None
+)
 
 
 class ResourceContainer:
@@ -181,6 +188,13 @@ class TeardownError(Exception):
         )
 
 
+class NoCurrentContext(Exception):
+    """Raised by :func: `current_context` when there is no active context."""
+
+    def __init__(self):
+        super().__init__("There is no active context")
+
+
 class Context:
     """
     Contexts give request handlers and callbacks access to resources.
@@ -198,10 +212,23 @@ class Context:
 
     resource_added = Signal(ResourceEvent)
 
-    def __init__(self, parent: Context = None) -> None:
+    _loop: AbstractEventLoop | None = None
+    _reset_token: Token
+
+    def __init__(self, parent: Optional[Context] = None) -> None:
         assert check_argument_types()
-        self._parent = parent
-        self._loop = getattr(parent, "loop", None)
+        if parent is None:
+            self._parent = _current_context.get(None)
+        else:
+            warnings.warn(
+                "Explicitly passing the parent context has been deprecated. "
+                "The context stack is now tracked by the means of PEP 555 context "
+                "variables.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            self._parent = parent
+
         self._closed = False
         self._resources: Dict[Tuple[type, str], ResourceContainer] = {}
         self._resource_factories: Dict[Tuple[type, str], ResourceContainer] = {}
@@ -330,10 +357,27 @@ class Context:
 
     async def __aenter__(self):
         self._check_closed()
+        if self._loop is None:
+            self._loop = get_running_loop()
+
+        self._host_task = current_task()
+        self._reset_token = _current_context.set(self)
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
-        await self.close(exc_val)
+        try:
+            await self.close(exc_val)
+        finally:
+            try:
+                _current_context.reset(self._reset_token)
+            except ValueError:
+                warnings.warn(
+                    f"Potential context stack corruption detected. This context "
+                    f"({hex(id(self))}) was entered in task {self._host_task} and exited "
+                    f"in task {current_task()}. If this happened because you entered "
+                    f"the context in an async generator, you should try to defer that to a "
+                    f"regular async function."
+                )
 
     def add_resource(
         self,
@@ -775,3 +819,17 @@ def context_teardown(func: Callable):
             )
 
     return wrapper
+
+
+def current_context() -> Context:
+    """
+    Return the currently active context.
+
+    :raises NoCurrentContext: if there is no active context
+
+    """
+    ctx = _current_context.get()
+    if ctx is None:
+        raise NoCurrentContext
+
+    return ctx

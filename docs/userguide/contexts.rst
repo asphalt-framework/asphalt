@@ -1,6 +1,8 @@
 Working with contexts and resources
 ===================================
 
+.. py:currentmodule:: asphalt.core
+
 Every Asphalt application has at least one context: the root context. The root context is typically
 created by the :func:`~asphalt.core.runner.run_application` function and passed to the root
 component. This context will only be closed when the application is shutting down.
@@ -19,8 +21,22 @@ the application. Short lived subcontexts, on the other hand, usually encompass s
 * running a scheduled task
 * running a test in a test suite
 
-Resources
----------
+Contexts are "activated" by entering them using ``async with Context():``, and exited by leaving
+that block. When entered, the previous active context becomes the parent context of the new one and
+the new context becomes the currently active context. When the ``async with`` block is left, the
+previously active context once again becomes the active context. The currently active context can
+be retrieved using :func:`~.context.current_context`.
+
+.. warning:: Activating contexts in asynchronous generators can lead to corruption of the context
+             stack. This is particularly common in asynchronous pytest fixtures because pytest
+             helper libraries such as pytest-asyncio_ run the async generator using two different
+             tasks. In such cases the workaround is to activate the context in the actual test
+             function.
+
+.. _pytest-asyncio: https://pypi.org/project/pytest-asyncio/
+
+Adding resources to a context
+-----------------------------
 
 The resource system in Asphalt exists for two principal reasons:
 
@@ -43,11 +59,6 @@ provided by asphalt-mailer_. The library has an abstract base class for all mail
 configure mailer services using the ``Mailer`` interface so that components that just need *some*
 was to send email don't have to care what implementation was chosen in the configuration.
 
-.. _asphalt-mailer: https://github.com/asphalt-framework/asphalt-mailer
-
-Adding resources to a context
------------------------------
-
 Resources can be added to a context in two forms: regular resources and resource factories.
 A regular resource can be any arbitrary object. The same object can be added to the context under
 several different types, as long as the type/name combination remains unique within the same
@@ -60,6 +71,8 @@ instead of regular resources:
   * the resource's lifecycle needs to be bound to the local context (example: database
     transactions)
   * the resource requires access to the local context (example: template renderers)
+
+.. _asphalt-mailer: https://github.com/asphalt-framework/asphalt-mailer
 
 Getting resources from a context
 --------------------------------

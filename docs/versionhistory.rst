@@ -6,6 +6,8 @@ This library adheres to `Semantic Versioning 2.0 <http://semver.org/>`_.
 **UNRELEASED**
 
 - Removed all uses of Python 3.5 style ``await yield_()`` from core code and documentation
+- Added tracking of current Asphalt context in a :pep:`555` context variable, available via
+  ``current_context()``
 
 **4.6.0** (2021-12-15)
 

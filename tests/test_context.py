@@ -2,6 +2,7 @@ import asyncio
 from concurrent.futures import Executor, ThreadPoolExecutor
 from itertools import count
 from threading import current_thread
+from typing import AsyncGenerator, AsyncIterator
 from unittest.mock import patch
 
 import pytest
@@ -16,16 +17,21 @@ from asphalt.core import (
     context_teardown,
     executor,
 )
-from asphalt.core.context import ResourceContainer, TeardownError
+from asphalt.core.context import (
+    NoCurrentContext,
+    ResourceContainer,
+    TeardownError,
+    current_context,
+)
 
 
-@pytest_asyncio.fixture
-def context():
+@pytest.fixture
+def context() -> Context:
     return Context()
 
 
 @pytest_asyncio.fixture
-async def special_executor(context):
+async def special_executor(context: Context) -> AsyncIterator[ThreadPoolExecutor]:
     executor = ThreadPoolExecutor(1)
     context.add_resource(executor, "special", types=[Executor])
     yield executor
@@ -74,10 +80,10 @@ class TestContext:
     @pytest.mark.asyncio
     async def test_parent(self):
         """Test that the parent property points to the parent context instance, if any."""
-        parent = Context()
-        child = Context(parent)
-        assert parent.parent is None
-        assert child.parent is parent
+        async with Context() as parent:
+            async with Context() as child:
+                assert parent.parent is None
+                assert child.parent is parent
 
     @pytest.mark.parametrize(
         "exception", [None, Exception("foo")], ids=["noexception", "exception"]
@@ -309,16 +315,16 @@ class TestContext:
 
         """
         context.add_resource_factory(id, int, context_attr="foo")
-        subcontext = Context(context)
-        assert context.foo == id(context)
-        assert subcontext.foo == id(subcontext)
+        async with context, Context() as subcontext:
+            assert context.foo == id(context)
+            assert subcontext.foo == id(subcontext)
 
     @pytest.mark.asyncio
     async def test_getattr_attribute_error(self, context):
-        child_context = Context(context)
-        pytest.raises(AttributeError, getattr, child_context, "foo").match(
-            "no such context variable: foo"
-        )
+        async with context, Context() as child_context:
+            pytest.raises(AttributeError, getattr, child_context, "foo").match(
+                "no such context variable: foo"
+            )
 
     @pytest.mark.asyncio
     async def test_getattr_parent(self, context):
@@ -326,18 +332,18 @@ class TestContext:
         Test that accessing a nonexistent attribute on a context retrieves the value from parent.
 
         """
-        child_context = Context(context)
-        context.a = 2
-        assert child_context.a == 2
+        async with context, Context() as child_context:
+            context.a = 2
+            assert child_context.a == 2
 
     @pytest.mark.asyncio
     async def test_get_resources(self, context):
         context.add_resource(9, "foo")
         context.add_resource_factory(lambda ctx: len(ctx.context_chain), int, "bar")
         context.require_resource(int, "bar")
-        subctx = Context(context)
-        subctx.add_resource(4, "foo")
-        assert subctx.get_resources(int) == {1, 4}
+        async with context, Context() as subctx:
+            subctx.add_resource(4, "foo")
+            assert subctx.get_resources(int) == {1, 4}
 
     @pytest.mark.asyncio
     async def test_require_resource(self, context):
@@ -358,11 +364,11 @@ class TestContext:
         child context.
 
         """
-        child_context = Context(context)
-        task = event_loop.create_task(child_context.request_resource(int))
-        event_loop.call_soon(context.add_resource, 6)
-        resource = await task
-        assert resource == 6
+        async with context, Context() as child_context:
+            task = event_loop.create_task(child_context.request_resource(int))
+            event_loop.call_soon(context.add_resource, 6)
+            resource = await task
+            assert resource == 6
 
     @pytest.mark.asyncio
     async def test_request_resource_factory_context_attr(self, context):
@@ -602,3 +608,44 @@ class TestContextFinisher:
         await context.close(expected_exc)
         assert phase == "finished"
         assert received_exception == expected_exc
+
+
+@pytest.mark.asyncio
+async def test_current_context():
+    pytest.raises(NoCurrentContext, current_context)
+
+    async with Context() as parent_ctx:
+        assert current_context() is parent_ctx
+        async with Context() as child_ctx:
+            assert current_context() is child_ctx
+
+        assert current_context() is parent_ctx
+
+    pytest.raises(NoCurrentContext, current_context)
+
+
+def test_explicit_parent_deprecation():
+    parent_ctx = Context()
+    pytest.warns(DeprecationWarning, Context, parent_ctx)
+
+
+@pytest.mark.asyncio
+async def test_context_stack_corruption(event_loop):
+    async def generator() -> AsyncGenerator:
+        async with Context():
+            yield
+
+    gen = generator()
+    await event_loop.create_task(gen.asend(None))
+    async with Context() as ctx:
+        with pytest.warns(
+            UserWarning, match="Potential context stack corruption detected"
+        ):
+            try:
+                await event_loop.create_task(gen.asend(None))
+            except StopAsyncIteration:
+                pass
+
+        assert current_context() is ctx
+
+    pytest.raises(NoCurrentContext, current_context)

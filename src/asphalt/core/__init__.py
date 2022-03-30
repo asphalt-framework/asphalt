@@ -8,6 +8,7 @@ __all__ = (
     "ResourceNotFound",
     "TeardownError",
     "context_teardown",
+    "current_context",
     "executor",
     "Event",
     "Signal",
@@ -29,6 +30,7 @@ from .context import (
     ResourceNotFound,
     TeardownError,
     context_teardown,
+    current_context,
     executor,
 )
 from .event import Event, Signal, stream_events, wait_event
