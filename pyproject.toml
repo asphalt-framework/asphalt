@@ -73,7 +73,6 @@ version_scheme = "post-release"
 local_scheme = "dirty-tag"
 
 [tool.isort]
-src_paths = ["src"]
 skip_gitignore = true
 profile = "black"
 

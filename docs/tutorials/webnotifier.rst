@@ -197,7 +197,6 @@ class to it::
     import logging
 
     import aiohttp
-
     from asphalt.core import Component, Event, Signal, context_teardown
 
     logger = logging.getLogger(__name__)

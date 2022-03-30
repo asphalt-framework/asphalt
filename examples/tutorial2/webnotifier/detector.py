@@ -1,9 +1,9 @@
 """This is the change detector component for the Asphalt webnotifier tutorial."""
+# isort: off
 import asyncio
 import logging
 
 import aiohttp
-
 from asphalt.core import Component, Event, Signal
 from asphalt.core.context import context_teardown
 

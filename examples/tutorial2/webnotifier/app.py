@@ -1,11 +1,12 @@
 """This is the root component for the Asphalt webnotifier tutorial."""
+# isort: off
 import logging
 from difflib import HtmlDiff
 
 from async_generator import aclosing
-from webnotifier.detector import ChangeDetectorComponent
-
 from asphalt.core import CLIApplicationComponent
+
+from webnotifier.detector import ChangeDetectorComponent
 
 logger = logging.getLogger(__name__)
 
