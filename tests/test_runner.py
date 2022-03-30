@@ -1,6 +1,5 @@
 import asyncio
 import logging
-import platform
 import sys
 from concurrent.futures import ThreadPoolExecutor
 from unittest.mock import patch
@@ -94,14 +93,9 @@ def test_run_max_threads(event_loop, max_threads):
         assert not mock_executor.called
 
 
-@pytest.mark.skipif(
-    platform.python_implementation() != "CPython", reason="uvloop only works on CPython"
-)
-@pytest.mark.skipif(
-    platform.system() == "Windows", reason="uvloop does not work on Windows"
-)
 def test_uvloop_policy(caplog):
     """Test that the runner switches to a different event loop policy when instructed to."""
+    pytest.importorskip("uvloop", reason="uvloop not installed")
     caplog.set_level(logging.INFO)
     component = ShutdownComponent()
     old_policy = asyncio.get_event_loop_policy()
