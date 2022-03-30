@@ -53,7 +53,7 @@ Here are a few examples of services that will likely benefit from resource shari
 
 When you add a resource, you should make sure that the resource is discoverable using any
 abstract interface or base class that it implements. This is so that consumers of the service don't
-have to care if you switch the implementation of another. For example, consider a mailer service,
+have to care if you switch the implementation to another. For example, consider a mailer service,
 provided by asphalt-mailer_. The library has an abstract base class for all mailers,
 ``asphalt.mailer.api.Mailer``. To facilitate this loose coupling of services, it adds all its
 configure mailer services using the ``Mailer`` interface so that components that just need *some*
