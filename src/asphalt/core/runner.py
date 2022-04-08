@@ -14,7 +14,7 @@ from typing import Any, Dict, Optional, Union, cast
 from typeguard import check_argument_types
 
 from asphalt.core.component import Component, component_types
-from asphalt.core.context import Context
+from asphalt.core.context import Context, _current_context
 from asphalt.core.utils import PluginContainer, qualified_name
 
 policies = PluginContainer("asphalt.core.event_loop_policies")
@@ -107,6 +107,7 @@ def run_application(
         exit_code = 0
 
         # Start the root component
+        token = _current_context.set(context)
         try:
             coro = asyncio.wait_for(component.start(context), start_timeout)
             event_loop.run_until_complete(coro)
@@ -136,6 +137,8 @@ def run_application(
                 pass
             except SystemExit as e:
                 exit_code = e.code
+        finally:
+            _current_context.reset(token)
 
         # Close the root context
         logger.info("Stopping application")
