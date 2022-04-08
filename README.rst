@@ -1,5 +1,5 @@
-.. image:: https://github.com/asphalt-framework/asphalt/actions/workflows/codeqa-test.yml/badge.svg
-  :target: https://github.com/asphalt-framework/asphalt/actions/workflows/codeqa-test.yml
+.. image:: https://github.com/asphalt-framework/asphalt/actions/workflows/test.yml/badge.svg
+  :target: https://github.com/asphalt-framework/asphalt/actions/workflows/test.yml
   :alt: Build Status
 .. image:: https://coveralls.io/repos/github/asphalt-framework/asphalt/badge.svg?branch=master
   :target: https://coveralls.io/github/asphalt-framework/asphalt?branch=master
