@@ -22,7 +22,7 @@ class Component(metaclass=ABCMeta):
     __slots__ = ()
 
     @abstractmethod
-    async def start(self, ctx: Context):
+    async def start(self, ctx: Context) -> None:
         """
         Perform any necessary tasks to start the services provided by this component.
 
@@ -62,7 +62,9 @@ class ContainerComponent(Component):
         self.child_components: OrderedDict[str, Component] = OrderedDict()
         self.component_configs = components or {}
 
-    def add_component(self, alias: str, type: Union[str, Type] = None, **config):
+    def add_component(
+        self, alias: str, type: Union[str, Type] = None, **config
+    ) -> None:
         """
         Add a child component.
 
@@ -100,7 +102,7 @@ class ContainerComponent(Component):
         component = component_types.create_object(**config)
         self.child_components[alias] = component
 
-    async def start(self, ctx: Context):
+    async def start(self, ctx: Context) -> None:
         """
         Create child components that have been configured but not yet created and then calls their
         :meth:`~Component.start` methods in separate tasks and waits until they have completed.
@@ -130,7 +132,7 @@ class CLIApplicationComponent(ContainerComponent):
     warning is emitted.
     """
 
-    async def start(self, ctx: Context):
+    async def start(self, ctx: Context) -> None:
         def run_complete(f):
             # If run() raised an exception, print it with a traceback and exit with code 1
             exc = f.exception()
