@@ -9,7 +9,7 @@ using the ``asphalt`` command to run an application with a configuration file.
 Prerequisites
 -------------
 
-Asphalt requires Python 3.5.2 or later. You will also need to have the ``venv`` module installed
+Asphalt requires Python 3.7 or later. You will also need to have the ``venv`` module installed
 for your Python version of choice. It should come with most Python installations, but if it does
 not, you can usually install it with your operating system's package manager (``python3-venv`` is a
 good guess).
@@ -27,7 +27,7 @@ Now, create a project directory and a virtualenv::
 
     mkdir tutorial1
     cd tutorial1
-    python3.5 -m venv tutorialenv
+    python -m venv tutorialenv
     source tutorialenv/bin/activate
 
 On Windows, the last line should be:
