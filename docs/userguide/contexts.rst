@@ -122,8 +122,7 @@ To specify a non-default name for the dependency, you can pass that name as an a
 
 Restrictions:
 
-* The function must be a coroutine function (``async def``)
-* The dependency arguments must not be positional-only arguments
+* The resource arguments must not be positional-only arguments
 * The resources (or their relevant factories) must already be present in the context stack when
   the decorated function is called, or otherwise :exc:`~.context.ResourceNotFound` is raised
 

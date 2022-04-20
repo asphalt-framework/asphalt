@@ -704,6 +704,21 @@ class TestDependencyInjection:
         assert baz == "baz_test"
 
     @pytest.mark.asyncio
+    async def test_sync_injection(self):
+        @inject
+        def injected(foo: int, bar: str = resource(), *, baz: str = resource("alt")):
+            return foo, bar, baz
+
+        async with Context() as ctx:
+            ctx.add_resource("bar_test")
+            ctx.add_resource("baz_test", "alt")
+            foo, bar, baz = injected(2)
+
+        assert foo == 2
+        assert bar == "bar_test"
+        assert baz == "baz_test"
+
+    @pytest.mark.asyncio
     async def test_missing_annotation(self):
         async def injected(foo: int, bar: str = resource(), *, baz=resource("alt")):
             pass

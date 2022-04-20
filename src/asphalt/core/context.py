@@ -55,6 +55,7 @@ from typing import (
     TypeVar,
     Union,
     cast,
+    overload,
 )
 
 import asyncio_extras
@@ -913,9 +914,19 @@ def Dependency(name: str = "default") -> Any:
     return resource(name)
 
 
+@overload
 def inject(
     func: Callable[P, Coroutine[Any, Any, T_Retval]]
 ) -> Callable[P, Coroutine[Any, Any, T_Retval]]:
+    ...
+
+
+@overload
+def inject(func: Callable[P, T_Retval]) -> Callable[P, T_Retval]:
+    ...
+
+
+def inject(func: Callable[P, Any]) -> Callable[P, Any]:
     """
     Wrap the given coroutine function for use with dependency injection.
 
@@ -925,7 +936,17 @@ def inject(
     """
 
     @wraps(func)
-    async def inject_wrapper(*args, **kwargs) -> T_Retval:
+    def sync_wrapper(*args, **kwargs) -> T_Retval:
+        ctx = current_context()
+        resources: dict[str, Any] = {}
+        for argname, dependency in injected_resources.items():
+            resource: Any = ctx.require_resource(dependency.cls, dependency.name)
+            resources[argname] = resource
+
+        return func(*args, **kwargs, **resources)
+
+    @wraps(func)
+    async def async_wrapper(*args, **kwargs) -> T_Retval:
         ctx = current_context()
         resources: dict[str, Any] = {}
         for argname, dependency in injected_resources.items():
@@ -936,9 +957,6 @@ def inject(
             resources[argname] = resource
 
         return await func(*args, **kwargs, **resources)
-
-    if not iscoroutinefunction(func):
-        raise TypeError(f"{callable_name(func)!r} is not a coroutine function")
 
     sig = signature(func)
     injected_resources: dict[str, _Dependency] = {}
@@ -958,4 +976,7 @@ def inject(
             param.default.cls = param.annotation
             injected_resources[param.name] = param.default
 
-    return inject_wrapper
+    if iscoroutinefunction(func):
+        return async_wrapper
+    else:
+        return sync_wrapper

@@ -10,6 +10,7 @@ This library adheres to `Semantic Versioning 2.0 <http://semver.org/>`_.
 - Replaced ``asphalt.core.context.Dependency`` with
   ``asphalt.core.context.resource`` due to issues with strict type checking (the former
   is now deprecated and will be removed in v5.0)
+- Added support for dependency injection on synchronous functions
 
 **4.7.0** (2022-04-08)
 
