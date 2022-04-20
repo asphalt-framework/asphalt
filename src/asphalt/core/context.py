@@ -418,12 +418,14 @@ class Context:
         This will cause a ``resource_added`` event to be dispatched.
 
         :param value: the actual resource value
-        :param name: name of this resource (unique among all its registered types within a single
-            context)
-        :param context_attr: name of the context attribute this resource will be accessible as
-        :param types: type(s) to register the resource as (omit to use the type of ``value``)
-        :raises asphalt.core.context.ResourceConflict: if the resource conflicts with an existing
-            one in any way
+        :param name: name of this resource (unique among all its registered types within
+            a single context)
+        :param context_attr: (deprecated) name of the context attribute this resource
+            will be accessible as
+        :param types: type(s) to register the resource as (omit to use the type of
+            ``value``)
+        :raises asphalt.core.context.ResourceConflict: if the resource conflicts with an
+            existing one in any way
 
         """
         # TODO: re-enable when typeguard properly identifies parametrized types as types
@@ -453,6 +455,7 @@ class Context:
             raise ResourceConflict(
                 f"this context already has an attribute {context_attr!r}"
             )
+
         for resource_type in types:
             if (resource_type, name) in self._resources:
                 raise ResourceConflict(
@@ -465,6 +468,12 @@ class Context:
             self._resources[(type_, name)] = resource
 
         if context_attr:
+            warnings.warn(
+                "context attributes have been deprecated in favor of dependency "
+                "injection",
+                DeprecationWarning,
+                stacklevel=2,
+            )
             setattr(self, context_attr, value)
 
         # Notify listeners that a new resource has been made available
@@ -540,6 +549,12 @@ class Context:
             self._resource_factories[(type_, name)] = resource
 
         if context_attr:
+            warnings.warn(
+                "context attributes have been deprecated in favor of dependency "
+                "injection",
+                DeprecationWarning,
+                stacklevel=2,
+            )
             self._resource_factories_by_context_attr[context_attr] = resource
 
         # Notify listeners that a new resource has been made available

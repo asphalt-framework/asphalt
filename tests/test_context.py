@@ -1,4 +1,5 @@
 import asyncio
+from builtins import DeprecationWarning
 from concurrent.futures import Executor, ThreadPoolExecutor
 from itertools import count
 from threading import current_thread
@@ -176,7 +177,7 @@ class TestContext:
     @pytest.mark.asyncio
     async def test_add_resource(self, context, event_loop, types):
         """Test that a resource is properly added in the context and listeners are notified."""
-        event_loop.call_soon(context.add_resource, 6, "foo", "foo.bar", types)
+        event_loop.call_soon(context.add_resource, 6, "foo", None, types)
         event = await context.resource_added.wait_event()
 
         assert event.resource_types == (int,)
@@ -204,7 +205,9 @@ class TestContext:
     @pytest.mark.asyncio
     async def test_add_resource_context_attr(self, context):
         """Test that when resources are added, they are also set as properties of the context."""
-        context.add_resource(1, context_attr="foo")
+        with pytest.deprecated_call():
+            context.add_resource(1, context_attr="foo")
+
         assert context.foo == 1
 
     def test_add_resource_context_attr_conflict(self, context):
@@ -214,7 +217,7 @@ class TestContext:
 
         """
         context.a = 2
-        with pytest.raises(ResourceConflict) as exc:
+        with pytest.raises(ResourceConflict) as exc, pytest.deprecated_call():
             context.add_resource(2, context_attr="a")
 
         exc.match("this context already has an attribute 'a'")
@@ -263,7 +266,9 @@ class TestContext:
             return next(counter)
 
         counter = count(1)
-        context.add_resource_factory(factory, int, context_attr="foo")
+        with pytest.deprecated_call():
+            context.add_resource_factory(factory, int, context_attr="foo")
+
         assert context.foo == 1
         assert context.foo == 1
         assert context.__dict__["foo"] == 1
@@ -311,8 +316,10 @@ class TestContext:
 
     @pytest.mark.asyncio
     async def test_add_resource_factory_context_attr_conflict(self, context):
-        context.add_resource_factory(lambda ctx: None, str, context_attr="foo")
-        with pytest.raises(ResourceConflict) as exc:
+        with pytest.deprecated_call():
+            context.add_resource_factory(lambda ctx: None, str, context_attr="foo")
+
+        with pytest.raises(ResourceConflict) as exc, pytest.deprecated_call():
             await context.add_resource_factory(
                 lambda ctx: None, str, context_attr="foo"
             )
@@ -336,7 +343,9 @@ class TestContext:
         parent context has one already.
 
         """
-        context.add_resource_factory(id, int, context_attr="foo")
+        with pytest.deprecated_call():
+            context.add_resource_factory(id, int, context_attr="foo")
+
         async with context, Context() as subcontext:
             assert context.foo == id(context)
             assert subcontext.foo == id(subcontext)
@@ -395,7 +404,9 @@ class TestContext:
     @pytest.mark.asyncio
     async def test_request_resource_factory_context_attr(self, context):
         """Test that requesting a factory-generated resource also sets the context variable."""
-        context.add_resource_factory(lambda ctx: 6, int, context_attr="foo")
+        with pytest.deprecated_call():
+            context.add_resource_factory(lambda ctx: 6, int, context_attr="foo")
+
         await context.request_resource(int)
         assert context.__dict__["foo"] == 6
 
