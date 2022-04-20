@@ -3,6 +3,10 @@ Version history
 
 This library adheres to `Semantic Versioning 2.0 <http://semver.org/>`_.
 
+**UNRELEASED**
+
+- ``Context`` now accepts parametrized generic classes as resource types
+
 **4.7.0** (2022-04-08)
 
 - Removed all uses of Python 3.5 style ``await yield_()`` from core code and documentation

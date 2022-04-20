@@ -26,6 +26,7 @@ from asyncio import (
     iscoroutinefunction,
 )
 from collections.abc import Coroutine
+from collections.abc import Sequence as ABCSequence
 from concurrent.futures import Executor
 from contextvars import ContextVar, Token
 from dataclasses import dataclass, field
@@ -35,6 +36,7 @@ from inspect import (
     getattr_static,
     isasyncgenfunction,
     isawaitable,
+    isclass,
     signature,
 )
 from traceback import format_exception
@@ -51,6 +53,7 @@ from typing import (
     Type,
     TypeVar,
     Union,
+    cast,
 )
 
 import asyncio_extras
@@ -64,6 +67,11 @@ if sys.version_info >= (3, 10):
     from typing import ParamSpec
 else:
     from typing_extensions import ParamSpec
+
+if sys.version_info >= (3, 8):
+    from typing import get_origin
+else:
+    from typing_extensions import get_origin
 
 logger = logging.getLogger(__name__)
 factory_callback_type = Callable[["Context"], Any]
@@ -418,11 +426,20 @@ class Context:
             one in any way
 
         """
-        assert check_argument_types()
+        # TODO: re-enable when typeguard properly identifies parametrized types as types
+        # assert check_argument_types()
         self._check_closed()
-        if isinstance(types, type):
-            types = (types,)
-        elif not types:
+        if types:
+            if (
+                isclass(types)
+                or get_origin(types) is not None
+                or not isinstance(types, ABCSequence)
+            ):
+                types = (cast(type, types),)
+
+            if not all(isclass(x) or get_origin(x) is not None for x in types):
+                raise TypeError("types must be a type or sequence of types")
+        else:
             types = (type(value),)
 
         if value is None:
@@ -482,7 +499,8 @@ class Context:
             the given type/name combinations or the given context variable
 
         """
-        assert check_argument_types()
+        # TODO: re-enable when typeguard properly identifies parametrized types as types
+        # assert check_argument_types()
         self._check_closed()
         if not resource_name_re.fullmatch(name):
             raise ValueError(
@@ -538,7 +556,8 @@ class Context:
         :return: the requested resource, or ``None`` if none was available
 
         """
-        assert check_argument_types()
+        # TODO: re-enable when typeguard properly identifies parametrized types as types
+        # assert check_argument_types()
         self._check_closed()
         key = (type, name)
 

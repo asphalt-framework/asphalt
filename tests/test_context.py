@@ -2,7 +2,7 @@ import asyncio
 from concurrent.futures import Executor, ThreadPoolExecutor
 from itertools import count
 from threading import current_thread
-from typing import AsyncGenerator, AsyncIterator
+from typing import AsyncGenerator, AsyncIterator, Dict
 from unittest.mock import patch
 
 import pytest
@@ -224,7 +224,7 @@ class TestContext:
     async def test_add_resource_type_conflict(self, context):
         context.add_resource(5)
         with pytest.raises(ResourceConflict) as exc:
-            await context.add_resource(6)
+            context.add_resource(6)
 
         exc.match(
             "this context already contains a resource of type int using the name 'default'"
@@ -244,6 +244,17 @@ class TestContext:
         )
 
     @pytest.mark.asyncio
+    async def test_add_resource_parametrized_generic_type(self, context):
+        resource = {"a": 1}
+        resource_type = Dict[str, int]
+        context.add_resource(resource, types=[resource_type])
+        assert context.require_resource(resource_type) is resource
+        assert context.get_resource(resource_type) is resource
+        assert await context.request_resource(resource_type) is resource
+        assert context.get_resource(Dict) is None
+        assert context.get_resource(dict) is None
+
+    @pytest.mark.asyncio
     async def test_add_resource_factory(self, context):
         """Test that resources factory callbacks are only called once for each context."""
 
@@ -256,6 +267,17 @@ class TestContext:
         assert context.foo == 1
         assert context.foo == 1
         assert context.__dict__["foo"] == 1
+
+    @pytest.mark.asyncio
+    async def test_add_resource_factory_parametrized_generic_type(self, context):
+        resource = {"a": 1}
+        resource_type = Dict[str, int]
+        context.add_resource_factory(lambda ctx: resource, types=[resource_type])
+        assert context.require_resource(resource_type) is resource
+        assert context.get_resource(resource_type) is resource
+        assert await context.request_resource(resource_type) is resource
+        assert context.get_resource(Dict) is None
+        assert context.get_resource(dict) is None
 
     @pytest.mark.parametrize(
         "name", ["a.b", "a:b", "a b"], ids=["dot", "colon", "space"]
