@@ -10,8 +10,9 @@ __all__ = (
     "executor",
     "context_teardown",
     "current_context",
-    "Dependency",
+    "_Dependency",
     "inject",
+    "resource",
 )
 
 import logging
@@ -888,15 +889,28 @@ def current_context() -> Context:
 
 
 @dataclass
-class Dependency:
+class _Dependency:
+    name: str = "default"
+    cls: type = field(init=False)
+
+
+def resource(name: str = "default") -> Any:
     """
     Marker for declaring a parameter for dependency injection via :func:`inject`.
 
     :param name: the resource name (defaults to ``default``)
-    """
 
-    name: str = "default"
-    cls: type = field(init=False)
+    """
+    return _Dependency(name)
+
+
+def Dependency(name: str = "default") -> Any:
+    warnings.warn(
+        "Dependency() has been deprecated (use resource() instead)",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    return resource(name)
 
 
 def inject(
@@ -927,9 +941,9 @@ def inject(
         raise TypeError(f"{callable_name(func)!r} is not a coroutine function")
 
     sig = signature(func)
-    injected_resources: dict[str, Dependency] = {}
+    injected_resources: dict[str, _Dependency] = {}
     for param in sig.parameters.values():
-        if isinstance(param.default, Dependency):
+        if isinstance(param.default, _Dependency):
             if param.kind is Parameter.POSITIONAL_ONLY:
                 raise TypeError(
                     f"Cannot inject dependency to positional-only parameter {param.name!r}"

@@ -104,20 +104,20 @@ Injecting resources to functions
 
 A type-safe way to use context resources is to use `dependency injection`_. In Asphalt, this is
 done by adding parameters to a function so that they have the resource type as the type annotation,
-and a :class:`~.context.Dependency` instance as the default value. The function then needs to be
+and a :func:`~.context.resource` instance as the default value. The function then needs to be
 decorated using :func:`~.context.inject`::
 
-    from asphalt.core import Dependency, inject
+    from asphalt.core import inject, resource
 
     @inject
-    async def some_function(some_arg, some_resource: MyResourceType = Dependency()):
+    async def some_function(some_arg, some_resource: MyResourceType = resource()):
         ...
 
 To specify a non-default name for the dependency, you can pass that name as an argument to
-:class:`~.context.Dependency`::
+:func:`~.context.resource`::
 
     @inject
-    async def some_function(some_arg, some_resource: MyResourceType = Dependency('alternate')):
+    async def some_function(some_arg, some_resource: MyResourceType = resource('alternate')):
         ...
 
 Restrictions:

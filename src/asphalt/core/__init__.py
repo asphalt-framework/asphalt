@@ -12,6 +12,7 @@ __all__ = (
     "NoCurrentContext",
     "Dependency",
     "inject",
+    "resource",
     "executor",
     "Event",
     "Signal",
@@ -38,6 +39,7 @@ from .context import (
     current_context,
     executor,
     inject,
+    resource,
 )
 from .event import Event, Signal, stream_events, wait_event
 from .runner import run_application

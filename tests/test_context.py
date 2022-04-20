@@ -22,6 +22,7 @@ from asphalt.core import (
     current_context,
     executor,
     inject,
+    resource,
 )
 from asphalt.core.context import ResourceContainer
 
@@ -689,7 +690,7 @@ class TestDependencyInjection:
     async def test_static_resources(self):
         @inject
         async def injected(
-            foo: int, bar: str = Dependency(), *, baz: str = Dependency("alt")
+            foo: int, bar: str = resource(), *, baz: str = resource("alt")
         ):
             return foo, bar, baz
 
@@ -704,7 +705,7 @@ class TestDependencyInjection:
 
     @pytest.mark.asyncio
     async def test_missing_annotation(self):
-        async def injected(foo: int, bar: str = Dependency(), *, baz=Dependency("alt")):
+        async def injected(foo: int, bar: str = resource(), *, baz=resource("alt")):
             pass
 
         pytest.raises(TypeError, inject, injected).match(
@@ -716,7 +717,7 @@ class TestDependencyInjection:
     @pytest.mark.asyncio
     async def test_missing_resource(self):
         @inject
-        async def injected(foo: int, bar: str = Dependency()):
+        async def injected(foo: int, bar: str = resource()):
             pass
 
         with pytest.raises(ResourceNotFound) as exc:
@@ -724,3 +725,10 @@ class TestDependencyInjection:
                 await injected(2)
 
         exc.match("no matching resource was found for type=str name='default'")
+
+
+def test_dependency_deprecated():
+    with pytest.deprecated_call():
+
+        async def foo(res: str = Dependency()):
+            pass
