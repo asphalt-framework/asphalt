@@ -1,7 +1,10 @@
 """This is the change detector component for the Asphalt webnotifier tutorial."""
 # isort: off
+from __future__ import annotations
+
 import asyncio
 import logging
+from typing import Any
 
 import aiohttp
 from asphalt.core import Component, Event, Signal
@@ -20,16 +23,18 @@ class WebPageChangeEvent(Event):
 class Detector:
     changed = Signal(WebPageChangeEvent)
 
-    def __init__(self, url, delay):
+    def __init__(self, url: str, delay: float):
         self.url = url
         self.delay = delay
 
-    async def run(self):
+    async def run(self) -> None:
         async with aiohttp.ClientSession() as session:
             last_modified, old_lines = None, None
             while True:
                 logger.debug("Fetching contents of %s", self.url)
-                headers = {"if-modified-since": last_modified} if last_modified else {}
+                headers: dict[str, Any] = (
+                    {"if-modified-since": last_modified} if last_modified else {}
+                )
                 async with session.get(self.url, headers=headers) as resp:
                     logger.debug("Response status: %d", resp.status)
                     if resp.status == 200:
@@ -51,8 +56,8 @@ class ChangeDetectorComponent(Component):
     @context_teardown
     async def start(self, ctx):
         detector = Detector(self.url, self.delay)
-        ctx.add_resource(detector, context_attr="detector")
-        task = ctx.loop.create_task(detector.run())
+        ctx.add_resource(detector)
+        task = asyncio.create_task(detector.run())
         logging.info(
             'Started web page change detector for url "%s" with a delay of %d seconds',
             self.url,
@@ -64,4 +69,4 @@ class ChangeDetectorComponent(Component):
         # This part is run when the context is finished
         task.cancel()
         await asyncio.gather(task, return_exceptions=True)
-        logging.info("Shut down web page change detector")
+        logger.info("Shut down web page change detector")

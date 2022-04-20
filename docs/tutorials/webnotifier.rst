@@ -32,17 +32,20 @@ Detecting changes in a web page
 The first task is to set up a loop that periodically retrieves the web page. For that, you can
 adapt code from the `aiohttp HTTP client tutorial`_::
 
+    from __future__ import annotations
+
     import asyncio
     import logging
+    from typing import Any
 
     import aiohttp
-    from asphalt.core import CLIApplicationComponent, run_application
+    from asphalt.core import CLIApplicationComponent, Context, run_application
 
     logger = logging.getLogger(__name__)
 
 
     class ApplicationComponent(CLIApplicationComponent):
-        async def run(self, ctx):
+        async def run(self, ctx: Context) -> None:
             async with aiohttp.ClientSession() as session:
                 while True:
                     async with session.get("http://imgur.com") as resp:
@@ -66,11 +69,13 @@ respond with a ``304 Not Modified`` if the contents have not changed since that 
 So, modify the code as follows::
 
     class ApplicationComponent(CLIApplicationComponent):
-        async def run(self, ctx):
+        async def run(self, ctx: Context) -> None:
             last_modified = None
             async with aiohttp.ClientSession() as session:
                 while True:
-                    headers = {"if-modified-since": last_modified} if last_modified else {}
+                    headers: dict[str, Any] = (
+                        {"if-modified-since": last_modified} if last_modified else {}
+                    )
                     async with session.get("http://imgur.com", headers=headers) as resp:
                         logger.debug("Response status: %d", resp.status)
                         if resp.status == 200:
@@ -99,12 +104,14 @@ to the logger::
 
 
     class ApplicationComponent(CLIApplicationComponent):
-        async def run(self, ctx):
+        async def run(self, ctx: Context) -> None:
             async with aiohttp.ClientSession() as session:
                 last_modified, old_lines = None, None
                 while True:
                     logger.debug("Fetching webpage")
-                    headers = {"if-modified-since": last_modified} if last_modified else {}
+                    headers: dict[str, Any] = (
+                        {"if-modified-since": last_modified} if last_modified else {}
+                    )
                     async with session.get("http://imgur.com", headers=headers) as resp:
                         logger.debug("Response status: %d", resp.status)
                         if resp.status == 200:
@@ -136,26 +143,36 @@ add its component to your application somehow. Enter
 :class:`~asphalt.core.component.ContainerComponent`. With that, you can create a hierarchy of
 components where the ``mailer`` component is a child component of your own container component.
 
+To use the mailer resource provided by ``asphalt-mailer``, inject it to the ``run()``
+function as a resource by adding a keyword-only argument, annotated with the type of
+the resource you want to inject (:class:`~asphalt.mailer.api.Mailer`).
+
 And to make the the results look nicer in an email message, you can switch to using
 :class:`difflib.HtmlDiff` to produce the delta output::
 
     from difflib import HtmlDiff
 
+    from asphalt.core import inject, resource
+    from asphalt.mailer.api import Mailer
+
 
     class ApplicationComponent(CLIApplicationComponent):
-        async def start(self, ctx):
+        async def start(self, ctx: Context) -> None:
             self.add_component(
                 "mailer", backend="smtp", host="your.smtp.server.here",
                 message_defaults={"sender": "your@email.here", "to": "your@email.here"})
             await super().start(ctx)
 
-        async def run(self, ctx):
+        @inject
+        async def run(self, ctx: Context, *, mailer: Mailer = resource()) -> None:
             async with aiohttp.ClientSession() as session:
                 last_modified, old_lines = None, None
                 diff = HtmlDiff()
                 while True:
                     logger.debug("Fetching webpage")
-                    headers = {"if-modified-since": last_modified} if last_modified else {}
+                    headers: dict[str, Any] = (
+                        {"if-modified-since": last_modified} if last_modified else {}
+                    )
                     async with session.get("http://imgur.com", headers=headers) as resp:
                         logger.debug("Response status: %d", resp.status)
                         if resp.status == 200:
@@ -163,9 +180,10 @@ And to make the the results look nicer in an email message, you can switch to us
                             new_lines = (await resp.text()).split("\n")
                             if old_lines is not None and old_lines != new_lines:
                                 difference = diff.make_file(old_lines, new_lines, context=True)
-                                await ctx.mailer.create_and_deliver(
-                                    subject="Change detected in %s" % event.source.url,
-                                    html_body=difference)
+                                await mailer.create_and_deliver(
+                                    subject="Change detected in web page",
+                                    html_body=difference
+                                )
                                 logger.info("Sent notification email")
 
                             old_lines = new_lines
@@ -197,7 +215,7 @@ class to it::
     import logging
 
     import aiohttp
-    from asphalt.core import Component, Event, Signal, context_teardown
+    from asphalt.core import Component, Context, Event, Signal, context_teardown
 
     logger = logging.getLogger(__name__)
 
@@ -217,16 +235,18 @@ Next, add another class in the same module that will do the HTTP requests and ch
     class Detector:
         changed = Signal(WebPageChangeEvent)
 
-        def __init__(self, url, delay):
+        def __init__(self, url: str, delay: float):
             self.url = url
             self.delay = delay
 
-        async def run(self):
+        async def run(self) -> None:
             async with aiohttp.ClientSession() as session:
                 last_modified, old_lines = None, None
                 while True:
                     logger.debug("Fetching contents of %s", self.url)
-                    headers = {"if-modified-since": last_modified} if last_modified else {}
+                    headers: dict[str, Any] = (
+                        {"if-modified-since": last_modified} if last_modified else {}
+                    )
                     async with session.get(self.url, headers=headers) as resp:
                         logger.debug("Response status: %d", resp.status)
                         if resp.status == 200:
@@ -248,15 +268,15 @@ Finally, add the component class which will allow you to integrate this function
 Asphalt application::
 
     class ChangeDetectorComponent(Component):
-        def __init__(self, url, delay=10):
+        def __init__(self, url: str, delay: float = 10):
             self.url = url
             self.delay = delay
 
         @context_teardown
-        async def start(self, ctx):
+        async def start(self, ctx: Context) -> None:
             detector = Detector(self.url, self.delay)
-            ctx.add_resource(detector, context_attr='detector')
-            task = ctx.loop.create_task(detector.run())
+            ctx.add_resource(detector)
+            task = asyncio.create_task(detector.run())
             logging.info('Started web page change detector for url "%s" with a delay of %d seconds',
                          self.url, self.delay)
 
@@ -265,7 +285,7 @@ Asphalt application::
             # This part is run when the context is being torn down
             task.cancel()
             await asyncio.gather(task, return_exceptions=True)
-            logging.info("Shut down web page change detector")
+            logger.info("Shut down web page change detector")
 
 The component's ``start()`` method starts the detector's ``run()`` method as a new task, adds
 the detector object as resource and installs an event listener that will shut down the detector
@@ -285,13 +305,24 @@ become somewhat lighter::
                 message_defaults={"sender": "your@email.here", "to": "your@email.here"})
             await super().start(ctx)
 
-        async def run(self, ctx):
+        @inject
+        async def run(
+            self,
+            ctx: Context,
+            *,
+            mailer: Mailer = resource(),
+            detector: Detector = resource(),
+        ):
             diff = HtmlDiff()
-            async with aclosing(ctx.detector.changed.stream_events()) as stream:
+            async with aclosing(detector.changed.stream_events()) as stream:
                 async for event in stream:
-                    difference = diff.make_file(event.old_lines, event.new_lines, context=True)
-                    await ctx.mailer.create_and_deliver(
-                        subject="Change detected in %s" % event.source.url, html_body=difference)
+                    difference = diff.make_file(
+                        event.old_lines, event.new_lines, context=True
+                    )
+                    await mailer.create_and_deliver(
+                        subject=f"Change detected in {event.source.url}",
+                        html_body=difference,
+                    )
                     logger.info("Sent notification email")
 
 The main application component will now use the detector resource added by
