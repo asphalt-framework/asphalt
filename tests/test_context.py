@@ -19,7 +19,6 @@ from asphalt.core import (
     NoCurrentContext,
     ResourceConflict,
     ResourceNotFound,
-    TeardownError,
     callable_name,
     context_teardown,
     current_context,
@@ -29,6 +28,9 @@ from asphalt.core import (
     resource,
 )
 from asphalt.core._context import ResourceContainer
+
+if sys.version_info < (3, 11):
+    from exceptiongroup import ExceptionGroup
 
 
 @pytest.fixture
@@ -126,8 +128,7 @@ class TestContext:
     async def test_teardown_callback_exception(self, context: Context) -> None:
         """
         Test that all callbacks are called even when some teardown callbacks raise
-        exceptions, and that a TeardownError is raised in such a case, containing the
-        exception objects.
+        exceptions, and that those exceptions are reraised in such a case.
 
         """
 
@@ -142,11 +143,9 @@ class TestContext:
         context.add_teardown_callback(callback1)
         context.add_teardown_callback(callback2)
         items: list[int] = []
-        with pytest.raises(TeardownError) as exc:
+        with pytest.raises(ExceptionGroup) as exc:
             await context.close()
 
-        assert "foo" in str(exc.value)
-        assert items == [1, 1]
         assert len(exc.value.exceptions) == 2
 
     @pytest.mark.asyncio

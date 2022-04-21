@@ -214,6 +214,6 @@ value::
             else:
                 db.commit()
 
-If any of the teardown callbacks raises an exception, the cleanup process will still continue, but
-at the end a :exc:`~asphalt.core.context.TeardownError` will be raised. This exception contains all
-the raised exceptions in its ``exceptions`` attribute.
+If any of the teardown callbacks raises an exception, the cleanup process will still
+continue, but all those raised exceptions will be reraised the end inside an
+:exc:`ExceptionGroup` (or :exc:`BaseExceptionGroup`).

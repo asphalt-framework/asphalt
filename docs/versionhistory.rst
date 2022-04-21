@@ -9,6 +9,10 @@ This library adheres to `Semantic Versioning 2.0 <http://semver.org/>`_.
   configuration files are now always parsed in unsafe mode
 - **BACKWARD INCOMPATIBLE** Dropped the ``@executor`` decorator
 - **BACKWARD INCOMPATIBLE** Dropped the ``resolve_reference()`` utility function
+- **BACKWARD INCOMPATIBLE** Dropped the ``TeardownError`` exception in favor of PEP 654
+  exception groups
+- **BACKWARD INCOMPATIBLE** Dropped the ``--unsafe`` switch for ``asphalt run`` –
+  configuration files are now always parsed in unsafe mode
   (use the ``!!python/name`` YAML tag instead and replace ``:`` with ``.`` in the
   reference)
 - **BACKWARD INCOMPATIBLE** Dropped support for context attributes

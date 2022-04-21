@@ -19,7 +19,6 @@ Contexts and resources
 .. autofunction:: context_teardown
 .. autofunction:: inject
 .. autofunction:: resource
-.. autoexception:: TeardownError
 .. autoexception:: NoCurrentContext
 .. autoexception:: ResourceConflict
 .. autoexception:: ResourceNotFound

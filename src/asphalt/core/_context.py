@@ -5,7 +5,6 @@ __all__ = (
     "ResourceConflict",
     "ResourceNotFound",
     "NoCurrentContext",
-    "TeardownError",
     "Context",
     "executor",
     "context_teardown",
@@ -36,7 +35,6 @@ from dataclasses import dataclass, field
 from enum import Enum, auto
 from functools import partial, wraps
 from inspect import Parameter, isasyncgenfunction, isawaitable, isclass, signature
-from traceback import format_exception
 from types import TracebackType
 from typing import (
     Any,
@@ -47,6 +45,8 @@ from typing import (
     TypeVar,
     Union,
     cast,
+    get_args,
+    get_origin,
     get_type_hints,
     overload,
 )
@@ -62,7 +62,8 @@ if sys.version_info >= (3, 10):
 else:
     from typing_extensions import ParamSpec
 
-from typing import get_args, get_origin
+if sys.version_info < (3, 11):
+    from exceptiongroup import BaseExceptionGroup
 
 logger = logging.getLogger(__name__)
 factory_callback_type = Callable[["Context"], Any]
@@ -172,32 +173,6 @@ class ResourceNotFound(LookupError):
         return (
             f"no matching resource was found for type={qualified_name(self.type)} "
             f"name={self.name!r}"
-        )
-
-
-class TeardownError(Exception):
-    """
-    Raised after context teardown when one or more teardown callbacks raised an
-    exception.
-
-    :ivar exceptions: exceptions raised during context teardown, in the order in which
-        they were raised
-    :vartype exceptions: List[Exception]
-    """
-
-    def __init__(self, exceptions: list[Exception]) -> None:
-        super().__init__(exceptions)
-        self.exceptions = exceptions
-
-    def __str__(self):
-        separator = "----------------------------\n"
-        tracebacks = separator.join(
-            "\n".join(format_exception(type(exc), exc, exc.__traceback__))
-            for exc in self.exceptions
-        )
-        return (
-            f"{len(self.exceptions)} exceptions(s) were raised by teardown "
-            f"callbacks:\n{separator}{tracebacks}"
         )
 
 
@@ -319,14 +294,13 @@ class Context:
         before calling any further teardown callbacks.
 
         All callbacks will be processed, even if some of them raise exceptions. If at
-        least one callback raised an error, this method will raise a
-        :exc:`~.TeardownError` at the end.
+        least one callback raised an error, those exceptions are reraised in an
+        exception group at the end.
 
         After this method has been called, resources can no longer be requested or
         published on this context.
 
         :param exception: the exception, if any, that caused this context to be closed
-        :raises .TeardownError: if one or more teardown callbacks raise an exception
 
         """
         self._check_closed()
@@ -347,8 +321,11 @@ class Context:
                     except Exception as e:
                         exceptions.append(e)
 
+            del self._teardown_callbacks
             if exceptions:
-                raise TeardownError(exceptions)
+                raise BaseExceptionGroup(
+                    "Exceptions were raised during context teardown", exceptions
+                )
         finally:
             self._state = ContextState.closed
 
