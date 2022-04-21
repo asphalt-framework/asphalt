@@ -92,7 +92,7 @@ class PluginContainer:
     def __init__(self, namespace: str, base_class: type = None) -> None:
         self.namespace = namespace
         self.base_class = base_class
-        group = entry_points().select(group=namespace)  # type: ignore[attr-defined]
+        group = entry_points(group=namespace)  # type: ignore[attr-defined]
         self._entrypoints = {ep.name: ep for ep in group}
 
     @overload
