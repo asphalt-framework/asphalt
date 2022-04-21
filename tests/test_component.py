@@ -1,13 +1,20 @@
 from __future__ import annotations
 
-import asyncio
-from asyncio import AbstractEventLoop
 from typing import NoReturn
 
+import anyio
 import pytest
 
-from asphalt.core import CLIApplicationComponent, Component, ContainerComponent, Context
+from asphalt.core import (
+    CLIApplicationComponent,
+    Component,
+    ContainerComponent,
+    Context,
+    run_application,
+)
 from asphalt.core._component import component_types
+
+pytestmark = pytest.mark.anyio()
 
 
 class DummyComponent(Component):
@@ -16,7 +23,7 @@ class DummyComponent(Component):
         self.started = False
 
     async def start(self, ctx):
-        await asyncio.sleep(0.1)
+        await anyio.sleep(0.1)
         self.started = True
 
 
@@ -90,67 +97,60 @@ class TestContainerComponent:
         exc = pytest.raises(ValueError, container.add_component, "dummy")
         assert str(exc.value) == 'there is already a child component named "dummy"'
 
-    @pytest.mark.asyncio
     async def test_start(self, container) -> None:
         await container.start(Context())
         assert container.child_components["dummy"].started
 
 
 class TestCLIApplicationComponent:
-    def test_run_return_none(self, event_loop: AbstractEventLoop) -> None:
+    async def test_run_return_none(self) -> None:
         class DummyCLIComponent(CLIApplicationComponent):
             async def run(self, ctx: Context) -> None:
                 pass
 
-        component = DummyCLIComponent()
-        event_loop.run_until_complete(component.start(Context()))
-        exc = pytest.raises(SystemExit, event_loop.run_forever)
-        assert exc.value.code == 0
+        # No exception should be raised here
+        await run_application(DummyCLIComponent())
 
-    def test_run_return_5(self, event_loop: AbstractEventLoop) -> None:
+    async def test_run_return_5(self) -> None:
         class DummyCLIComponent(CLIApplicationComponent):
             async def run(self, ctx: Context) -> int:
                 return 5
 
-        component = DummyCLIComponent()
-        event_loop.run_until_complete(component.start(Context()))
-        exc = pytest.raises(SystemExit, event_loop.run_forever)
+        with pytest.raises(SystemExit) as exc:
+            await run_application(DummyCLIComponent())
+
         assert exc.value.code == 5
 
-    def test_run_return_invalid_value(self, event_loop: AbstractEventLoop) -> None:
+    async def test_run_return_invalid_value(self) -> None:
         class DummyCLIComponent(CLIApplicationComponent):
             async def run(self, ctx: Context) -> int:
                 return 128
 
-        component = DummyCLIComponent()
-        event_loop.run_until_complete(component.start(Context()))
-        with pytest.warns(UserWarning) as record:
-            exc = pytest.raises(SystemExit, event_loop.run_forever)
+        with pytest.raises(SystemExit) as exc:
+            with pytest.warns(UserWarning) as record:
+                await run_application(DummyCLIComponent())
 
         assert exc.value.code == 1
         assert len(record) == 1
         assert str(record[0].message) == "exit code out of range: 128"
 
-    def test_run_return_invalid_type(self, event_loop: AbstractEventLoop) -> None:
+    async def test_run_return_invalid_type(self) -> None:
         class DummyCLIComponent(CLIApplicationComponent):
             async def run(self, ctx: Context) -> int:
                 return "foo"  # type: ignore[return-value]
 
-        component = DummyCLIComponent()
-        event_loop.run_until_complete(component.start(Context()))
-        with pytest.warns(UserWarning) as record:
-            exc = pytest.raises(SystemExit, event_loop.run_forever)
+        with pytest.raises(SystemExit) as exc:
+            with pytest.warns(UserWarning) as record:
+                await run_application(DummyCLIComponent())
 
         assert exc.value.code == 1
         assert len(record) == 1
         assert str(record[0].message) == "run() must return an integer or None, not str"
 
-    def test_run_exception(self, event_loop: AbstractEventLoop) -> None:
+    async def test_run_exception(self) -> None:
         class DummyCLIComponent(CLIApplicationComponent):
             async def run(self, ctx: Context) -> NoReturn:
                 raise Exception("blah")
 
-        component = DummyCLIComponent()
-        event_loop.run_until_complete(component.start(Context()))
-        exc = pytest.raises(SystemExit, event_loop.run_forever)
-        assert exc.value.code == 1
+        with pytest.raises(Exception, match="blah"):
+            await run_application(DummyCLIComponent())

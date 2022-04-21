@@ -2,15 +2,14 @@ from __future__ import annotations
 
 __all__ = ("Component", "ContainerComponent", "CLIApplicationComponent")
 
-import asyncio
-import sys
 from abc import ABCMeta, abstractmethod
-from asyncio import Future
 from collections import OrderedDict
-from traceback import print_exception
-from typing import Any, Optional, Union
+from typing import Any
 from warnings import warn
 
+from anyio import create_task_group
+
+from ._concurrent import start_service_task
 from ._context import Context
 from ._utils import PluginContainer, merge_config, qualified_name
 
@@ -56,12 +55,12 @@ class ContainerComponent(Component):
 
     __slots__ = "child_components", "component_configs"
 
-    def __init__(self, components: dict[str, Optional[dict[str, Any]]] = None) -> None:
+    def __init__(self, components: dict[str, dict[str, Any] | None] = None) -> None:
         self.child_components: OrderedDict[str, Component] = OrderedDict()
         self.component_configs = components or {}
 
     def add_component(
-        self, alias: str, type: Union[str, type] = None, **config
+        self, alias: str, type: str | type | None = None, **config
     ) -> None:
         """
         Add a child component.
@@ -110,9 +109,9 @@ class ContainerComponent(Component):
             if alias not in self.child_components:
                 self.add_component(alias)
 
-        tasks = [component.start(ctx) for component in self.child_components.values()]
-        if tasks:
-            await asyncio.gather(*tasks)
+        async with create_task_group() as tg:
+            for component in self.child_components.values():
+                tg.start_soon(component.start, ctx)
 
 
 class CLIApplicationComponent(ContainerComponent):
@@ -132,39 +131,30 @@ class CLIApplicationComponent(ContainerComponent):
     """
 
     async def start(self, ctx: Context) -> None:
-        def run_complete(f: Future[int | None]) -> None:
-            # If run() raised an exception, print it with a traceback and exit with
-            # code 1
-            exc = f.exception()
-            if exc is not None:
-                print_exception(type(exc), exc, exc.__traceback__)
-                sys.exit(1)
+        async def run() -> None:
+            from ._runner import stop_application
 
-            retval = f.result()
+            retval = await self.run(ctx)
             if isinstance(retval, int):
                 if 0 <= retval <= 127:
-                    sys.exit(retval)
+                    stop_application(retval)
                 else:
                     warn(f"exit code out of range: {retval}")
-                    sys.exit(1)
+                    stop_application(1)
             elif retval is not None:
                 warn(
                     f"run() must return an integer or None, not "
                     f"{qualified_name(retval.__class__)}"
                 )
-                sys.exit(1)
+                stop_application(1)
             else:
-                sys.exit(0)
-
-        def start_run_task() -> None:
-            task = ctx.loop.create_task(self.run(ctx))
-            task.add_done_callback(run_complete)
+                stop_application()
 
         await super().start(ctx)
-        ctx.loop.call_later(0.1, start_run_task)
+        start_service_task(run, "Main task")
 
     @abstractmethod
-    async def run(self, ctx: Context) -> Optional[int]:
+    async def run(self, ctx: Context) -> int | None:
         """
         Run the business logic of the command line tool.
 

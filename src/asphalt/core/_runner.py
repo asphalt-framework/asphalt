@@ -2,39 +2,46 @@ from __future__ import annotations
 
 __all__ = ("run_application",)
 
-import asyncio
 import signal
 import sys
-from asyncio.events import AbstractEventLoop
-from concurrent.futures import ThreadPoolExecutor
-from logging import INFO, Logger, basicConfig, getLogger, shutdown
+from logging import INFO, basicConfig, getLogger
 from logging.config import dictConfig
 from typing import Any, cast
 
+import anyio
+from anyio import (
+    BrokenResourceError,
+    WouldBlock,
+    create_memory_object_stream,
+    create_task_group,
+    to_thread,
+)
+from anyio.abc import TaskGroup, TaskStatus
+from anyio.streams.memory import MemoryObjectSendStream
+
 from ._component import Component, component_types
-from ._context import Context, _current_context
-from ._utils import PluginContainer, qualified_name
-
-policies = PluginContainer("asphalt.core.event_loop_policies")
+from ._context import Context, inject, resource
 
 
-def sigterm_handler(logger: Logger, event_loop: AbstractEventLoop) -> None:
-    if event_loop.is_running():
-        logger.info("Received SIGTERM")
-        event_loop.stop()
+async def handle_signals(*, task_status: TaskStatus) -> None:
+    logger = getLogger(__name__)
+    with anyio.open_signal_receiver(signal.SIGTERM, signal.SIGINT) as signals:
+        task_status.started()
+        async for signum in signals:
+            logger.info("Received %s – terminating application", signum.name)
+            stop_application()
+            return
 
 
-def run_application(
+async def run_application(
     component: Component | dict[str, Any],
     *,
-    event_loop_policy: str | None = None,
     max_threads: int | None = None,
     logging: dict[str, Any] | int | None = INFO,
     start_timeout: int | float | None = 10,
 ) -> None:
     """
-    Configure logging and start the given root component in the default asyncio event
-    loop.
+    Configure logging and start the given component.
 
     Assuming the root component was started successfully, the event loop will continue
     running until the process is terminated.
@@ -56,9 +63,6 @@ def run_application(
 
     :param component: the root component (either a component instance or a configuration
         dictionary where the special ``type`` key is a component class
-    :param event_loop_policy: entry point name (from the
-        ``asphalt.core.event_loop_policies`` namespace) of an alternate event loop
-        policy
     :param max_threads: the maximum number of worker threads in the default thread pool
         executor (the default value depends on the event loop implementation)
     :param logging: a logging configuration dictionary, :ref:`logging level
@@ -77,82 +81,51 @@ def run_application(
     logger = getLogger(__name__)
     logger.info("Running in %s mode", "development" if __debug__ else "production")
 
-    # Switch to an alternate event loop policy if one was provided
-    if event_loop_policy:
-        create_policy = policies.resolve(event_loop_policy)
-        policy = create_policy()
-        asyncio.set_event_loop_policy(policy)
-        logger.info("Switched event loop policy to %s", qualified_name(policy))
+    # Apply the maximum worker thread limit
+    if max_threads is not None:
+        to_thread.current_default_thread_limiter().total_tokens = max_threads
 
-    # Assign a new default executor with the given max worker thread limit if one was
-    # provided
-    event_loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(event_loop)
+    # Instantiate the root component if a dict was given
+    if isinstance(component, dict):
+        component = cast(Component, component_types.create_object(**component))
+
+    logger.info("Starting application")
     try:
-        if max_threads is not None:
-            event_loop.set_default_executor(ThreadPoolExecutor(max_threads))
-            logger.info(
-                "Installed a new thread pool executor with max_workers=%d", max_threads
-            )
-
-        # Instantiate the root component if a dict was given
-        if isinstance(component, dict):
-            component = cast(Component, component_types.create_object(**component))
-
-        logger.info("Starting application")
-        context = Context()
-        exception: BaseException | None = None
-        exit_code = 0
-
-        # Start the root component
-        token = _current_context.set(context)
-        try:
-            coro = asyncio.wait_for(component.start(context), start_timeout)
-            event_loop.run_until_complete(coro)
-        except asyncio.TimeoutError as e:
-            exception = e
-            logger.error("Timeout waiting for the root component to start")
-            exit_code = 1
-        except Exception as e:
-            exception = e
-            logger.exception("Error during application startup")
-            exit_code = 1
-        else:
-            logger.info("Application started")
-
-            # Add a signal handler to gracefully deal with SIGTERM
+        async with Context() as context, create_task_group() as root_tg:
+            send, receive = create_memory_object_stream(1, int)
+            context.add_resource(send, "exit_code_stream")
+            context.add_resource(root_tg, "root_taskgroup", [TaskGroup])
+            await root_tg.start(handle_signals)
             try:
-                event_loop.add_signal_handler(
-                    signal.SIGTERM, sigterm_handler, logger, event_loop
+                with anyio.fail_after(start_timeout):
+                    await component.start(context)
+            except TimeoutError:
+                logger.error(
+                    "Timeout waiting for the root component to start – exiting"
                 )
-            except NotImplementedError:
-                pass  # Windows does not support signals very well
+                raise
+            except Exception:
+                logger.exception("Error during application startup")
+                raise
 
-            # Finally, run the event loop until the process is terminated or Ctrl+C is
-            # pressed
-            try:
-                event_loop.run_forever()
-            except KeyboardInterrupt:
-                pass
-            except SystemExit as e:
-                exit_code = e.code
-        finally:
-            _current_context.reset(token)
-
-        # Close the root context
-        logger.info("Stopping application")
-        event_loop.run_until_complete(context.close(exception))
-
-        # Shut down leftover async generators
-        event_loop.run_until_complete(event_loop.shutdown_asyncgens())
+            logger.info("Application started")
+            exit_code = await receive.receive()
+            if exit_code:
+                sys.exit(exit_code)
+            else:
+                root_tg.cancel_scope.cancel()
     finally:
-        # Finally, close the event loop itself
-        event_loop.close()
-        asyncio.set_event_loop(None)
         logger.info("Application stopped")
 
-    # Shut down the logging system
-    shutdown()
 
-    if exit_code:
-        sys.exit(exit_code)
+@inject
+def stop_application(
+    exit_code: int = 0,
+    *,
+    exit_code_stream: MemoryObjectSendStream = resource("exit_code_stream"),
+) -> None:
+    """Trigger an orderly shutdown of the application."""
+    try:
+        exit_code_stream.send_nowait(exit_code)
+    except (WouldBlock, BrokenResourceError):
+        pass  # Something else already called this

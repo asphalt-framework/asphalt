@@ -5,6 +5,8 @@ This library adheres to `Semantic Versioning 2.0 <http://semver.org/>`_.
 
 **UNRELEASED**
 
+- **BACKWARD INCOMPATIBLE** Asphalt now runs via AnyIO, rather than asyncio, although
+  the asyncio backend is used by default
 - **BACKWARD INCOMPATIBLE** Dropped the ``--unsafe`` switch for ``asphalt run`` –
   configuration files are now always parsed in unsafe mode
 - **BACKWARD INCOMPATIBLE** Dropped the ``@executor`` decorator

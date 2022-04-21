@@ -10,6 +10,12 @@ Components
 .. autoclass:: ContainerComponent
 .. autoclass:: CLIApplicationComponent
 
+Concurrency
+-----------
+
+.. autofunction:: start_background_task
+.. autofunction:: start_service_task
+
 Contexts and resources
 ----------------------
 

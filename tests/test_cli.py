@@ -9,6 +9,8 @@ from click.testing import CliRunner
 
 from asphalt.core import Component, Context, _cli
 
+pytestmark = pytest.mark.anyio()
+
 
 class DummyComponent(Component):
     def __init__(self, dummyval1=None, dummyval2=None):
@@ -24,20 +26,19 @@ def runner() -> CliRunner:
     return CliRunner()
 
 
-@pytest.mark.parametrize("loop", [None, "uvloop"], ids=["default", "override"])
 def test_run(
     runner: CliRunner,
-    loop: str | None,
+    anyio_backend_name: str,
     monkeypatch: MonkeyPatch,
     tmp_path: Path,
-) -> None:
+):
     monkeypatch.setenv("MYENVVAR", "from environment")
     tmp_path = tmp_path.joinpath("tmpfile")
     tmp_path.write_text("Hello, World!")
 
     config = f"""\
 ---
-event_loop_policy: bogus
+backend: {anyio_backend_name}
 component:
   type: !!python/name:{DummyComponent.__module__}.{DummyComponent.__name__}
   dummyval1: testval
@@ -48,10 +49,7 @@ logging:
   version: 1
   disable_existing_loggers: false
 """
-    args = ["test.yml"]
-    if loop:
-        args.extend(["--loop", loop])
-
+    args = ["test.yml", "--backend", anyio_backend_name]
     with runner.isolated_filesystem(), patch(
         "asphalt.core._cli.run_application"
     ) as run_app:
@@ -63,6 +61,7 @@ logging:
         args, kwargs = run_app.call_args
         assert len(args) == 0
         assert kwargs == {
+            "backend": anyio_backend_name,
             "component": {
                 "type": DummyComponent,
                 "dummyval1": "testval",
@@ -70,7 +69,6 @@ logging:
                 "textfileval": "Hello, World!",
                 "binaryfileval": b"Hello, World!",
             },
-            "event_loop_policy": loop or "bogus",
             "logging": {"version": 1, "disable_existing_loggers": False},
         }
 

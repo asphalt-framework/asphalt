@@ -4,11 +4,12 @@ import os
 from pathlib import Path
 from typing import Any
 
+import anyio
 import click
 from ruamel.yaml import YAML, ScalarNode
 from ruamel.yaml.loader import Loader
 
-from ._runner import policies, run_application
+from ._runner import run_application
 from ._utils import merge_config, qualified_name
 
 
@@ -35,10 +36,10 @@ def main() -> None:
 @main.command(help="Read one or more configuration files and start the application.")
 @click.argument("configfile", type=click.File(), nargs=-1, required=True)
 @click.option(
-    "-l",
-    "--loop",
-    type=click.Choice(policies.names),
-    help="alternate event loop policy",
+    "-b",
+    "--backend",
+    type=click.Choice(anyio.get_all_backends()),
+    help="AnyIO backend to use",
 )
 @click.option(
     "-s",
@@ -46,7 +47,7 @@ def main() -> None:
     type=str,
     help="service to run (if the configuration file contains multiple services)",
 )
-def run(configfile, loop: str | None, service: str | None) -> None:
+def run(configfile, backend: str | None, service: str | None) -> None:
     yaml = YAML(typ="unsafe")
     yaml.constructor.add_constructor("!Env", env_constructor)
     yaml.constructor.add_constructor("!TextFile", text_file_constructor)
@@ -60,10 +61,6 @@ def run(configfile, loop: str | None, service: str | None) -> None:
             config_data, dict
         ), "the document root element must be a dictionary"
         config = merge_config(config, config_data)
-
-    # Override the event loop policy if specified
-    if loop:
-        config["event_loop_policy"] = loop
 
     services = config.pop("services", {})
     if not isinstance(services, dict):
@@ -103,4 +100,10 @@ def run(configfile, loop: str | None, service: str | None) -> None:
     config = merge_config(config, service_config)
 
     # Start the application
-    run_application(**config)
+    backend = backend or config.pop("backend", "asyncio")
+    backend_options = config.pop("backend_options", {})
+    anyio.run(
+        lambda: run_application(**config),
+        backend=backend,
+        backend_options=backend_options,
+    )

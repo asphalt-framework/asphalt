@@ -1,14 +1,18 @@
 from __future__ import annotations
 
 import gc
-from asyncio import AbstractEventLoop, Queue, all_tasks, current_task
+from asyncio import Queue, all_tasks, current_task, get_running_loop
+from collections.abc import Callable
 from datetime import datetime, timedelta, timezone
 from typing import NoReturn
 
 import pytest
+from _pytest.logging import LogCaptureFixture
 from async_generator import aclosing
 
 from asphalt.core import Event, Signal, stream_events, wait_event
+
+pytestmark = pytest.mark.anyio()
 
 
 class DummyEvent(Event):
@@ -54,7 +58,6 @@ class TestSignal:
 
         assert EventSource.dummysignal is signal
 
-    @pytest.mark.asyncio
     async def test_disconnect(self, source: DummySource) -> None:
         """
         Test that an event listener no longer receives events after it's been removed.
@@ -87,7 +90,6 @@ class TestSignal:
         """
         source.event_a.disconnect(lambda event: None)
 
-    @pytest.mark.asyncio
     async def test_dispatch_event_coroutine(self, source: DummySource) -> None:
         """Test that a coroutine function can be an event listener."""
 
@@ -102,7 +104,6 @@ class TestSignal:
         assert events[0].args == ("x", "y")
         assert events[0].kwargs == {"a": 1, "b": 2}
 
-    @pytest.mark.asyncio
     async def test_dispatch_raw(self, source: DummySource) -> None:
         """Test that dispatch_raw() correctly dispatches the given event."""
         events: list[DummyEvent] = []
@@ -114,7 +115,7 @@ class TestSignal:
 
     @pytest.mark.asyncio
     async def test_dispatch_log_exceptions(
-        self, event_loop: AbstractEventLoop, source: DummySource, caplog
+        self, source: DummySource, caplog: LogCaptureFixture
     ) -> None:
         """
         Test that listener exceptions are logged and that dispatch() resolves to
@@ -136,7 +137,6 @@ class TestSignal:
         for record in caplog.records:
             assert "Uncaught exception in event listener" in record.message
 
-    @pytest.mark.asyncio
     async def test_dispatch_event_no_listeners(self, source: DummySource) -> None:
         """
         Test that dispatching an event when there are no listeners will still work.
@@ -144,7 +144,6 @@ class TestSignal:
         """
         assert await source.event_a.dispatch()
 
-    @pytest.mark.asyncio
     async def test_dispatch_event_cancel(self, source: DummySource) -> None:
         """
         Test that dispatching an event when there are no listeners will still work.
@@ -156,7 +155,6 @@ class TestSignal:
         task = next(t for t in all_tasks() if t is not current_task())
         await task
 
-    @pytest.mark.asyncio
     async def test_connect_twice(self, source: DummySource) -> None:
         """
         Test that if the same callback is connected twice, the second connect is a
@@ -170,7 +168,6 @@ class TestSignal:
 
         assert len(events) == 1
 
-    @pytest.mark.asyncio
     async def test_dispatch_raw_class_mismatch(self, source: DummySource) -> None:
         """Test that passing an event of the wrong type raises an AssertionError."""
         with pytest.raises(TypeError) as exc:
@@ -178,9 +175,8 @@ class TestSignal:
 
         assert str(exc.value) == "event must be of type test_event.DummyEvent"
 
-    @pytest.mark.asyncio
-    async def test_wait_event(self, source: DummySource, event_loop) -> None:
-        event_loop.call_soon(source.event_a.dispatch)
+    async def test_wait_event(self, source: DummySource) -> None:
+        get_running_loop().call_soon(source.event_a.dispatch)
         received_event = await source.event_a.wait_event()
         assert received_event.topic == "event_a"
 
@@ -189,7 +185,6 @@ class TestSignal:
         [(None, [1, 2, 3]), (lambda event: event.args[0] in (3, None), [3])],
         ids=["nofilter", "filter"],
     )
-    @pytest.mark.asyncio
     async def test_stream_events(
         self, source: DummySource, filter, expected_values
     ) -> None:
@@ -234,7 +229,9 @@ class TestSignal:
     ids=["nofilter", "filter"],
 )
 @pytest.mark.asyncio
-async def test_wait_event(event_loop, filter, expected_value) -> None:
+async def test_wait_event(
+    filter: Callable[[DummyEvent], bool] | None, expected_value: int
+) -> None:
     """
     Test that wait_event returns the first event matched by the filter, or the first
     event if there is no filter.
@@ -242,7 +239,7 @@ async def test_wait_event(event_loop, filter, expected_value) -> None:
     """
     source1 = DummySource()
     for i in range(1, 4):
-        event_loop.call_soon(source1.event_a.dispatch, i)
+        get_running_loop().call_soon(source1.event_a.dispatch, i)
 
     event = await wait_event([source1.event_a], filter)
     assert event.args == (expected_value,)

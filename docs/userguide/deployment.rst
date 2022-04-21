@@ -246,19 +246,14 @@ services are present and no service has been explicitly selected.
 Performance tuning
 ------------------
 
-Asphalt's core code and many third part components employ a number of potentially expensive
-validation steps in its code. The performance hit of these checks is not a concern in development
-and testing, but in a production environment you will probably want to maximize the performance.
+When you want maximum performance, you'll also want to use the fastest available event
+loop implementation. If you're running on the asyncio backend (the default), you can
+get a nice performance boost by enabling uvloop_ (assuming it's installed).
+Add the following piece to your application's configuration:
 
-To do this, you will want to disable Python's debugging mode by either setting the environment
-variable ``PYTHONOPTIMIZE`` to ``1`` or (if applicable) running Python with the ``-O`` switch.
-This has the effect of completely eliminating all ``assert`` statements and blocks starting with
-``if __debug__:`` from the compiled bytecode.
+.. code-block:: yaml
 
-When you want maximum performance, you'll also want to use the fastest available event loop
-implementation. This can be done by specifying the ``event_loop_policy`` option in the
-configuration file or by using the ``-l`` or ``--loop`` switch. The core library has built-in
-support for the uvloop_ event loop implementation, which should provide a nice performance boost
-over the standard library implementation.
+    backend_options:
+        use_uvloop: true
 
 .. _uvloop: http://magic.io/blog/uvloop-make-python-networking-great-again/
