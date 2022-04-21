@@ -35,14 +35,7 @@ from contextvars import ContextVar, Token, copy_context
 from dataclasses import dataclass, field
 from enum import Enum, auto
 from functools import partial, wraps
-from inspect import (
-    Parameter,
-    getattr_static,
-    isasyncgenfunction,
-    isawaitable,
-    isclass,
-    signature,
-)
+from inspect import Parameter, isasyncgenfunction, isawaitable, isclass, signature
 from traceback import format_exception
 from types import TracebackType
 from typing import (
@@ -92,39 +85,31 @@ class ResourceContainer:
     :ivar types: type names the resource was registered with
     :vartype types: Tuple[type, ...]
     :ivar str name: name of the resource
-    :ivar str context_attr: the context attribute of the resource
     :ivar bool is_factory: ``True`` if ``value_or_factory`` if this is a resource
         factory
     """
 
-    __slots__ = "value_or_factory", "types", "name", "context_attr", "is_factory"
+    __slots__ = "value_or_factory", "types", "name", "is_factory"
 
     def __init__(
         self,
         value_or_factory: Any,
         types: tuple[type, ...],
         name: str,
-        context_attr: Optional[str],
         is_factory: bool,
     ) -> None:
         self.value_or_factory = value_or_factory
         self.types = types
         self.name = name
-        self.context_attr = context_attr
         self.is_factory = is_factory
 
     def generate_value(self, ctx: Context) -> Any:
         assert self.is_factory, "generate_value() only works for resource factories"
         value = self.value_or_factory(ctx)
 
-        container = ResourceContainer(
-            value, self.types, self.name, self.context_attr, False
-        )
+        container = ResourceContainer(value, self.types, self.name, False)
         for type_ in self.types:
             ctx._resources[(type_, self.name)] = container
-
-        if self.context_attr:
-            setattr(ctx, self.context_attr, value)
 
         return value
 
@@ -137,7 +122,7 @@ class ResourceContainer:
         )
         return (
             f"{self.__class__.__name__}({value_repr}, types=[{typenames}], "
-            f"name={self.name!r}, context_attr={self.context_attr!r})"
+            f"name={self.name!r})"
         )
 
 
@@ -264,23 +249,7 @@ class Context:
         self._state = ContextState.open
         self._resources: dict[tuple[type, str], ResourceContainer] = {}
         self._resource_factories: dict[tuple[type, str], ResourceContainer] = {}
-        self._resource_factories_by_context_attr: dict[str, ResourceContainer] = {}
         self._teardown_callbacks: list[tuple[Callable, bool]] = []
-
-    def __getattr__(self, name):
-        # First look for a resource factory in the whole context chain
-        for ctx in self.context_chain:
-            factory = ctx._resource_factories_by_context_attr.get(name)
-            if factory:
-                return factory.generate_value(self)
-
-        # When that fails, look directly for an attribute in the parents
-        for ctx in self.context_chain[1:]:
-            value = getattr_static(ctx, name, None)
-            if value is not None:
-                return getattr(ctx, name)
-
-        raise AttributeError(f"no such context variable: {name}")
 
     @property
     def context_chain(self) -> list[Context]:
@@ -432,7 +401,6 @@ class Context:
         self,
         value,
         name: str = "default",
-        context_attr: str | None = None,
         types: type | Sequence[type] = (),
     ) -> None:
         """
@@ -443,8 +411,6 @@ class Context:
         :param value: the actual resource value
         :param name: name of this resource (unique among all its registered types within
             a single context)
-        :param context_attr: (deprecated) name of the context attribute this resource
-            will be accessible as
         :param types: type(s) to register the resource as (omit to use the type of
             ``value``)
         :raises asphalt.core.context.ResourceConflict: if the resource conflicts with an
@@ -472,10 +438,6 @@ class Context:
                 '"name" must be a nonempty string consisting only of alphanumeric '
                 "characters and underscores"
             )
-        if context_attr and getattr_static(self, context_attr, None) is not None:
-            raise ResourceConflict(
-                f"this context already has an attribute {context_attr!r}"
-            )
 
         for resource_type in types:
             if (resource_type, name) in self._resources:
@@ -484,18 +446,9 @@ class Context:
                     f"{qualified_name(resource_type)} using the name {name!r}"
                 )
 
-        resource = ResourceContainer(value, tuple(types), name, context_attr, False)
+        resource = ResourceContainer(value, tuple(types), name, False)
         for type_ in resource.types:
             self._resources[(type_, name)] = resource
-
-        if context_attr:
-            warnings.warn(
-                "context attributes have been deprecated in favor of dependency "
-                "injection",
-                DeprecationWarning,
-                stacklevel=2,
-            )
-            setattr(self, context_attr, value)
 
         # Notify listeners that a new resource has been made available
         self.resource_added.dispatch(types, name, False)
@@ -505,7 +458,6 @@ class Context:
         factory_callback: factory_callback_type,
         types: type | Sequence[type] | None = None,
         name: str = "default",
-        context_attr: str | None = None,
     ) -> None:
         """
         Add a resource factory to this context.
@@ -534,8 +486,6 @@ class Context:
             target context (can be omitted if the factory callable has a return type
             annotation)
         :param name: name of the resource that will be created in the target context
-        :param context_attr: name of the context attribute the created resource will be
-            accessible as
         :raises asphalt.core.context.ResourceConflict: if there is an existing resource
             factory for the given type/name combinations or the given context variable
 
@@ -581,13 +531,6 @@ class Context:
         if None in resource_types:
             raise TypeError("None is not a valid resource type")
 
-        # Check for a conflicting context attribute
-        if context_attr in self._resource_factories_by_context_attr:
-            raise ResourceConflict(
-                f"this context already contains a resource factory for the context "
-                f"attribute {context_attr!r}"
-            )
-
         # Check for conflicts with existing resource factories
         for type_ in resource_types:
             if (type_, name) in self._resource_factories:
@@ -597,20 +540,9 @@ class Context:
                 )
 
         # Add the resource factory to the appropriate lookup tables
-        resource = ResourceContainer(
-            factory_callback, resource_types, name, context_attr, True
-        )
+        resource = ResourceContainer(factory_callback, resource_types, name, True)
         for type_ in resource_types:
             self._resource_factories[(type_, name)] = resource
-
-        if context_attr:
-            warnings.warn(
-                "context attributes have been deprecated in favor of dependency "
-                "injection",
-                DeprecationWarning,
-                stacklevel=2,
-            )
-            self._resource_factories_by_context_attr[context_attr] = resource
 
         # Notify listeners that a new resource has been made available
         self.resource_added.dispatch(resource_types, name, True)
