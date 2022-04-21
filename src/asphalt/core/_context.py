@@ -24,7 +24,6 @@ import warnings
 from asyncio import (
     AbstractEventLoop,
     current_task,
-    get_event_loop,
     get_running_loop,
     iscoroutinefunction,
 )
@@ -329,24 +328,7 @@ class Context:
         finally:
             self._state = ContextState.closed
 
-    def __enter__(self):
-        warnings.warn(
-            "Using Context as a synchronous context manager has been deprecated",
-            DeprecationWarning,
-        )
-        self._check_closed()
-
-        if self._loop is None:
-            with warnings.catch_warnings():
-                warnings.simplefilter("ignore", DeprecationWarning)
-                self._loop = get_event_loop()
-
-        return self
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        self.loop.run_until_complete(self.close(exc_val))
-
-    async def __aenter__(self) -> Context:
+    async def __aenter__(self):
         self._check_closed()
         if self._loop is None:
             self._loop = get_running_loop()

@@ -160,20 +160,8 @@ class TestContext:
 
         exc.match("this context has already been closed")
 
-    def test_contextmanager_exception(self, context, event_loop):
-        close_future = event_loop.create_future()
-        close_future.set_result(None)
-        exception = Exception("foo")
-        with patch.object(context, "close", return_value=close_future):
-            with pytest.raises(Exception) as exc, pytest.deprecated_call():
-                with context:
-                    raise exception
-
-        # close.assert_called_once_with(exception)
-        assert exc.value is exception
-
     @pytest.mark.asyncio
-    async def test_async_contextmanager_exception(self, event_loop, context):
+    async def test_contextmanager_exception(self, event_loop, context):
         """
         Test that "async with context:" calls close() with the exception raised in the
         block.
