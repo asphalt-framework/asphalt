@@ -195,8 +195,9 @@ class TeardownError(Exception):
             "\n".join(format_exception(type(exc), exc, exc.__traceback__))
             for exc in self.exceptions
         )
-        return "{} exceptions(s) were raised by teardown callbacks:\n{}{}".format(
-            len(self.exceptions), separator, tracebacks
+        return (
+            f"{len(self.exceptions)} exceptions(s) were raised by teardown "
+            f"callbacks:\n{separator}{tracebacks}"
         )
 
 
@@ -535,8 +536,8 @@ class Context:
         for type_ in resource_types:
             if (type_, name) in self._resource_factories:
                 raise ResourceConflict(
-                    "this context already contains a resource factory for the "
-                    "type {}".format(qualified_name(type_))
+                    f"this context already contains a resource factory for the "
+                    f"type {qualified_name(type_)}"
                 )
 
         # Add the resource factory to the appropriate lookup tables
@@ -777,8 +778,8 @@ def executor(arg: Union[Executor, str, Callable] = None):
                 ctx = next(arg for arg in args[:2] if isinstance(arg, Context))
             except StopIteration:
                 raise RuntimeError(
-                    "the first positional argument to {}() has to be a Context "
-                    "instance".format(callable_name(func))
+                    f"the first positional argument to {callable_name(func)}() has to "
+                    f"be a Context instance"
                 ) from None
 
             executor = ctx.require_resource(Executor, resource_name)
@@ -853,8 +854,8 @@ def context_teardown(
             ctx = next(arg for arg in args[:2] if isinstance(arg, Context))
         except StopIteration:
             raise RuntimeError(
-                "the first positional argument to {}() has to be a Context "
-                "instance".format(callable_name(func))
+                f"the first positional argument to {callable_name(func)}() has to be "
+                f"a Context instance"
             ) from None
 
         generator = func(*args, **kwargs)
