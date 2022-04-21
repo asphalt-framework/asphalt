@@ -7,8 +7,7 @@ from threading import Thread, current_thread
 import pytest
 import pytest_asyncio
 
-from asphalt.core import Context
-from asphalt.core.concurrent import executor
+from asphalt.core import Context, executor
 
 
 @pytest.fixture

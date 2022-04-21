@@ -68,4 +68,4 @@ class ChangeDetectorComponent(Component):
         # This part is run when the context is finished
         task.cancel()
         await asyncio.gather(task, return_exceptions=True)
-        logging.info("Shut down web page change detector")
+        logger.info("Shut down web page change detector")

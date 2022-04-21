@@ -28,8 +28,11 @@ __all__ = (
     "resolve_reference",
 )
 
-from .component import CLIApplicationComponent, Component, ContainerComponent
-from .context import (
+from typing import Any
+
+from ._component import CLIApplicationComponent, Component, ContainerComponent
+from ._concurrent import executor
+from ._context import (
     Context,
     NoCurrentContext,
     ResourceConflict,
@@ -38,19 +41,25 @@ from .context import (
     TeardownError,
     context_teardown,
     current_context,
-    executor,
     get_resource,
     get_resources,
     inject,
     require_resource,
     resource,
 )
-from .event import Event, Signal, stream_events, wait_event
-from .runner import run_application
-from .utils import (
+from ._event import Event, Signal, stream_events, wait_event
+from ._runner import run_application
+from ._utils import (
     PluginContainer,
     callable_name,
     merge_config,
     qualified_name,
     resolve_reference,
 )
+
+# Re-export imports so they look like they live directly in this package
+key: str
+value: Any
+for key, value in list(locals().items()):
+    if getattr(value, "__module__", "").startswith("asphalt.core."):
+        value.__module__ = __name__

@@ -11,9 +11,9 @@ from logging import INFO, Logger, basicConfig, getLogger, shutdown
 from logging.config import dictConfig
 from typing import Any, cast
 
-from asphalt.core.component import Component, component_types
-from asphalt.core.context import Context, _current_context
-from asphalt.core.utils import PluginContainer, qualified_name
+from ._component import Component, component_types
+from ._context import Context, _current_context
+from ._utils import PluginContainer, qualified_name
 
 policies = PluginContainer("asphalt.core.event_loop_policies")
 

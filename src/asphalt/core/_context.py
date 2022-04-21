@@ -61,8 +61,8 @@ from typing import (
 import asyncio_extras
 from async_generator import async_generator
 
-from asphalt.core.event import Event, Signal, wait_event
-from asphalt.core.utils import callable_name, qualified_name
+from ._event import Event, Signal, wait_event
+from ._utils import callable_name, qualified_name
 
 if sys.version_info >= (3, 10):
     from typing import ParamSpec

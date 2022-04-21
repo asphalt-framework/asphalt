@@ -7,7 +7,7 @@ import pytest
 from _pytest.monkeypatch import MonkeyPatch
 from click.testing import CliRunner
 
-from asphalt.core import Component, Context, cli
+from asphalt.core import Component, Context, _cli
 
 
 class DummyComponent(Component):
@@ -66,10 +66,10 @@ logging:
         args.extend(["--loop", loop])
 
     with runner.isolated_filesystem(), patch(
-        "asphalt.core.cli.run_application"
+        "asphalt.core._cli.run_application"
     ) as run_app:
         Path("test.yml").write_text(config)
-        result = runner.invoke(cli.run, args)
+        result = runner.invoke(_cli.run, args)
 
         assert result.exit_code == 0
         assert run_app.call_count == 1
@@ -109,11 +109,11 @@ component:
 """
 
     with runner.isolated_filesystem(), patch(
-        "asphalt.core.cli.run_application"
+        "asphalt.core._cli.run_application"
     ) as run_app:
         Path("conf1.yml").write_text(config1)
         Path("conf2.yml").write_text(config2)
-        result = runner.invoke(cli.run, ["conf1.yml", "conf2.yml"])
+        result = runner.invoke(_cli.run, ["conf1.yml", "conf2.yml"])
 
         assert result.exit_code == 0
         assert run_app.call_count == 1
@@ -166,10 +166,10 @@ logging:
     @pytest.mark.parametrize("service", ["server", "client"])
     def test_run_service(self, runner: CliRunner, service: str) -> None:
         with runner.isolated_filesystem(), patch(
-            "asphalt.core.cli.run_application"
+            "asphalt.core._cli.run_application"
         ) as run_app:
             self.write_config()
-            result = runner.invoke(cli.run, ["-s", service, "config.yml"])
+            result = runner.invoke(_cli.run, ["-s", service, "config.yml"])
 
             assert result.exit_code == 0
             assert run_app.call_count == 1
@@ -213,10 +213,10 @@ logging:
 
     def test_service_not_found(self, runner: CliRunner) -> None:
         with runner.isolated_filesystem(), patch(
-            "asphalt.core.cli.run_application"
+            "asphalt.core._cli.run_application"
         ) as run_app:
             self.write_config()
-            result = runner.invoke(cli.run, ["-s", "foobar", "config.yml"])
+            result = runner.invoke(_cli.run, ["-s", "foobar", "config.yml"])
 
             assert result.exit_code == 1
             assert run_app.call_count == 0
@@ -224,10 +224,10 @@ logging:
 
     def test_no_service_selected(self, runner: CliRunner) -> None:
         with runner.isolated_filesystem(), patch(
-            "asphalt.core.cli.run_application"
+            "asphalt.core._cli.run_application"
         ) as run_app:
             self.write_config()
-            result = runner.invoke(cli.run, ["config.yml"])
+            result = runner.invoke(_cli.run, ["config.yml"])
 
             assert result.exit_code == 1
             assert run_app.call_count == 0
@@ -238,7 +238,7 @@ logging:
 
     def test_bad_services_type(self, runner: CliRunner) -> None:
         with runner.isolated_filesystem(), patch(
-            "asphalt.core.cli.run_application"
+            "asphalt.core._cli.run_application"
         ) as run_app:
             Path("config.yml").write_text(
                 """\
@@ -249,7 +249,7 @@ logging:
   disable_existing_loggers: false
 """
             )
-            result = runner.invoke(cli.run, ["config.yml"])
+            result = runner.invoke(_cli.run, ["config.yml"])
 
             assert result.exit_code == 1
             assert run_app.call_count == 0
@@ -259,7 +259,7 @@ logging:
 
     def test_no_services_defined(self, runner: CliRunner) -> None:
         with runner.isolated_filesystem(), patch(
-            "asphalt.core.cli.run_application"
+            "asphalt.core._cli.run_application"
         ) as run_app:
             Path("config.yml").write_text(
                 """\
@@ -270,7 +270,7 @@ logging:
   disable_existing_loggers: false
 """
             )
-            result = runner.invoke(cli.run, ["config.yml"])
+            result = runner.invoke(_cli.run, ["config.yml"])
 
             assert result.exit_code == 1
             assert run_app.call_count == 0
@@ -278,7 +278,7 @@ logging:
 
     def test_run_only_service(self, runner) -> None:
         with runner.isolated_filesystem(), patch(
-            "asphalt.core.cli.run_application"
+            "asphalt.core._cli.run_application"
         ) as run_app:
             Path("config.yml").write_text(
                 """\
@@ -292,7 +292,7 @@ logging:
   disable_existing_loggers: false
 """
             )
-            result = runner.invoke(cli.run, ["config.yml"])
+            result = runner.invoke(_cli.run, ["config.yml"])
 
             assert result.exit_code == 0
             assert run_app.call_count == 1
@@ -305,7 +305,7 @@ logging:
 
     def test_run_default_service(self, runner: CliRunner) -> None:
         with runner.isolated_filesystem(), patch(
-            "asphalt.core.cli.run_application"
+            "asphalt.core._cli.run_application"
         ) as run_app:
             Path("config.yml").write_text(
                 """\
@@ -322,7 +322,7 @@ logging:
   disable_existing_loggers: false
 """
             )
-            result = runner.invoke(cli.run, ["config.yml"])
+            result = runner.invoke(_cli.run, ["config.yml"])
 
             assert result.exit_code == 0
             assert run_app.call_count == 1
@@ -337,7 +337,7 @@ logging:
         self, runner: CliRunner, monkeypatch: MonkeyPatch
     ) -> None:
         with runner.isolated_filesystem(), patch(
-            "asphalt.core.cli.run_application"
+            "asphalt.core._cli.run_application"
         ) as run_app:
             Path("config.yml").write_text(
                 """\
@@ -355,7 +355,7 @@ logging:
 """
             )
             monkeypatch.setenv("ASPHALT_SERVICE", "whatever")
-            result = runner.invoke(cli.run, ["config.yml"])
+            result = runner.invoke(_cli.run, ["config.yml"])
 
             assert result.exit_code == 0
             assert run_app.call_count == 1
@@ -370,7 +370,7 @@ logging:
         self, runner: CliRunner, monkeypatch: MonkeyPatch
     ) -> None:
         with runner.isolated_filesystem(), patch(
-            "asphalt.core.cli.run_application"
+            "asphalt.core._cli.run_application"
         ) as run_app:
             Path("config.yml").write_text(
                 """\
@@ -388,7 +388,7 @@ logging:
 """
             )
             monkeypatch.setenv("ASPHALT_SERVICE", "whatever")
-            result = runner.invoke(cli.run, ["-s", "default", "config.yml"])
+            result = runner.invoke(_cli.run, ["-s", "default", "config.yml"])
 
             assert result.exit_code == 0
             assert run_app.call_count == 1

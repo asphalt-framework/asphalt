@@ -8,8 +8,8 @@ import click
 from ruamel.yaml import YAML, ScalarNode
 from ruamel.yaml.loader import Loader
 
-from asphalt.core.runner import policies, run_application
-from asphalt.core.utils import merge_config, qualified_name
+from ._runner import policies, run_application
+from ._utils import merge_config, qualified_name
 
 
 def env_constructor(loader: Loader, node: ScalarNode) -> str | None:

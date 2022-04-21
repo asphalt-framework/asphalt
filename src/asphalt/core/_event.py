@@ -23,7 +23,7 @@ from typing import (
 )
 from weakref import WeakKeyDictionary
 
-from asphalt.core.utils import qualified_name
+from ._utils import qualified_name
 
 if sys.version_info >= (3, 10):
     from contextlib import aclosing

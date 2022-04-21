@@ -14,7 +14,6 @@ Table of contents
 
    tutorials/index
    userguide/index
+   api
    versionhistory
    acknowledgements
-
-* :ref:`API reference <modindex>`

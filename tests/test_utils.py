@@ -8,7 +8,7 @@ from unittest.mock import Mock
 
 import pytest
 
-from asphalt.core.utils import (
+from asphalt.core import (
     PluginContainer,
     callable_name,
     merge_config,
@@ -33,7 +33,7 @@ class DummyPlugin(BaseDummyPlugin):
 
 @pytest.mark.parametrize(
     "inputval",
-    ["asphalt.core.utils:resolve_reference", resolve_reference],
+    ["asphalt.core:resolve_reference", resolve_reference],
     ids=["reference", "object"],
 )
 def test_resolve_reference(inputval: Any) -> None:
@@ -103,7 +103,7 @@ def test_qualified_name(inputval, expected) -> None:
 
 @pytest.mark.parametrize(
     "inputval, expected",
-    [(qualified_name, "asphalt.core.utils.qualified_name"), (len, "len")],
+    [(qualified_name, "asphalt.core.qualified_name"), (len, "len")],
     ids=["python", "builtin"],
 )
 def test_callable_name(inputval: Callable[..., Any], expected: str) -> None:

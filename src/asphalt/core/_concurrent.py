@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-__all__ = ("executor",)
-
 import inspect
 import sys
 from asyncio import get_running_loop
@@ -9,7 +7,7 @@ from concurrent.futures import Executor
 from functools import partial, wraps
 from typing import Awaitable, Callable, TypeVar, overload
 
-from asphalt.core import Context
+from ._context import Context
 
 if sys.version_info >= (3, 10):
     from typing import Concatenate, ParamSpec

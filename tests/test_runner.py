@@ -12,9 +12,8 @@ import pytest
 from _pytest.logging import LogCaptureFixture
 from _pytest.monkeypatch import MonkeyPatch
 
-from asphalt.core.component import CLIApplicationComponent, Component
-from asphalt.core.context import Context
-from asphalt.core.runner import run_application, sigterm_handler
+from asphalt.core import CLIApplicationComponent, Component, Context, run_application
+from asphalt.core._runner import sigterm_handler
 
 
 class ShutdownComponent(Component):
@@ -56,7 +55,7 @@ class DummyCLIApp(CLIApplicationComponent):
 
 @pytest.fixture(autouse=True)
 def prevent_logging_shutdown(monkeypatch: MonkeyPatch) -> None:
-    monkeypatch.setattr("asphalt.core.runner.shutdown", lambda: None)
+    monkeypatch.setattr("asphalt.core._runner.shutdown", lambda: None)
 
 
 def test_sigterm_handler_loop_not_running(event_loop: AbstractEventLoop) -> None:
@@ -71,8 +70,8 @@ def test_sigterm_handler_loop_not_running(event_loop: AbstractEventLoop) -> None
 )
 def test_run_logging_config(event_loop: AbstractEventLoop, logging_config) -> None:
     """Test that logging initialization happens as expected."""
-    with patch("asphalt.core.runner.basicConfig") as basicConfig, patch(
-        "asphalt.core.runner.dictConfig"
+    with patch("asphalt.core._runner.basicConfig") as basicConfig, patch(
+        "asphalt.core._runner.dictConfig"
     ) as dictConfig:
         run_application(ShutdownComponent(), logging=logging_config)
 
@@ -89,7 +88,7 @@ def test_run_max_threads(
 
     """
     component = ShutdownComponent()
-    with patch("asphalt.core.runner.ThreadPoolExecutor") as mock_executor:
+    with patch("asphalt.core._runner.ThreadPoolExecutor") as mock_executor:
         mock_executor.configure_mock(
             side_effect=lambda *args, **kwargs: ThreadPoolExecutor(*args, **kwargs)
         )
@@ -111,7 +110,7 @@ def test_uvloop_policy(caplog: LogCaptureFixture) -> None:
     asyncio.set_event_loop_policy(old_policy)
 
     records = [
-        record for record in caplog.records if record.name == "asphalt.core.runner"
+        record for record in caplog.records if record.name == "asphalt.core._runner"
     ]
     assert len(records) == 6
     assert records[0].message == "Running in development mode"
@@ -136,7 +135,7 @@ def test_run_callbacks(
 
     assert component.teardown_callback_called
     records = [
-        record for record in caplog.records if record.name == "asphalt.core.runner"
+        record for record in caplog.records if record.name == "asphalt.core._runner"
     ]
     assert len(records) == 5
     assert records[0].message == "Running in development mode"
@@ -160,7 +159,7 @@ def test_clean_exit(
     run_application(component)
 
     records = [
-        record for record in caplog.records if record.name == "asphalt.core.runner"
+        record for record in caplog.records if record.name == "asphalt.core._runner"
     ]
     assert len(records) == 5
     assert records[0].message == "Running in development mode"
@@ -184,7 +183,7 @@ def test_run_start_exception(
 
     assert str(component.exception) == "this should crash the application"
     records = [
-        record for record in caplog.records if record.name == "asphalt.core.runner"
+        record for record in caplog.records if record.name == "asphalt.core._runner"
     ]
     assert len(records) == 5
     assert records[0].message == "Running in development mode"
@@ -207,7 +206,7 @@ def test_run_start_timeout(
     pytest.raises(SystemExit, run_application, component, start_timeout=1)
 
     records = [
-        record for record in caplog.records if record.name == "asphalt.core.runner"
+        record for record in caplog.records if record.name == "asphalt.core._runner"
     ]
     assert len(records) == 5
     assert records[0].message == "Running in development mode"
@@ -224,7 +223,7 @@ def test_dict_config(event_loop: AbstractEventLoop, caplog: LogCaptureFixture) -
     run_application(component={"type": component_class})
 
     records = [
-        record for record in caplog.records if record.name == "asphalt.core.runner"
+        record for record in caplog.records if record.name == "asphalt.core._runner"
     ]
     assert len(records) == 5
     assert records[0].message == "Running in development mode"
@@ -244,7 +243,7 @@ def test_run_cli_application(
     assert exc.value.code == 20
 
     records = [
-        record for record in caplog.records if record.name == "asphalt.core.runner"
+        record for record in caplog.records if record.name == "asphalt.core._runner"
     ]
     assert len(records) == 5
     assert records[0].message == "Running in development mode"

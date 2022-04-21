@@ -11,8 +11,8 @@ from traceback import print_exception
 from typing import Any, Optional, Union
 from warnings import warn
 
-from asphalt.core.context import Context
-from asphalt.core.utils import PluginContainer, merge_config, qualified_name
+from ._context import Context
+from ._utils import PluginContainer, merge_config, qualified_name
 
 
 class Component(metaclass=ABCMeta):

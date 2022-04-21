@@ -23,12 +23,12 @@ from asphalt.core import (
     callable_name,
     context_teardown,
     current_context,
-    executor,
     get_resource,
     inject,
+    require_resource,
     resource,
 )
-from asphalt.core.context import ResourceContainer, require_resource
+from asphalt.core._context import ResourceContainer
 
 
 @pytest.fixture
@@ -556,40 +556,6 @@ class TestContext:
         special_executor_thread = special_executor.submit(current_thread).result()
         async with context.threadpool("special"):
             assert current_thread() is special_executor_thread
-
-
-class TestExecutor:
-    @pytest.mark.asyncio
-    async def test_no_arguments(self, context: Context) -> None:
-        @executor
-        def runs_in_default_worker() -> None:
-            assert current_thread() is not event_loop_thread
-
-        event_loop_thread = current_thread()
-        await runs_in_default_worker()
-
-    @pytest.mark.asyncio
-    async def test_named_executor(self, context, special_executor):
-        @executor("special")
-        def runs_in_default_worker(ctx: Context) -> None:
-            assert current_thread() is special_executor_thread
-
-        special_executor_thread = special_executor.submit(current_thread).result()
-        await runs_in_default_worker(context)
-
-    @pytest.mark.asyncio
-    async def test_executor_missing_context(self, event_loop, context):
-        @executor("special")
-        def runs_in_default_worker() -> None:
-            pass
-
-        with pytest.raises(RuntimeError) as exc:
-            await runs_in_default_worker()
-
-        exc.match(
-            r"the first positional argument to %s\(\) has to be a Context instance"
-            % callable_name(runs_in_default_worker)
-        )
 
 
 class TestContextTeardown:

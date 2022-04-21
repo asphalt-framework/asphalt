@@ -5,6 +5,8 @@ This library adheres to `Semantic Versioning 2.0 <http://semver.org/>`_.
 
 **UNRELEASED**
 
+- **BACKWARD INCOMPATIBLE** Moved all exported functions and classes directly to
+  ``asphalt.core`` and made submodules private
 - Dropped support for Python 3.8 and earlier
 - Dropped explicit run-time type checking
 - Dropped the deprecated ``Dependency()`` marker

@@ -6,13 +6,8 @@ from typing import NoReturn
 
 import pytest
 
-from asphalt.core.component import (
-    CLIApplicationComponent,
-    Component,
-    ContainerComponent,
-    component_types,
-)
-from asphalt.core.context import Context
+from asphalt.core import CLIApplicationComponent, Component, ContainerComponent, Context
+from asphalt.core._component import component_types
 
 
 class DummyComponent(Component):
@@ -74,7 +69,7 @@ class TestContainerComponent:
                 "foo",
                 int,
                 TypeError,
-                "int is not a subclass of asphalt.core.component.Component",
+                "int is not a subclass of asphalt.core.Component",
             ),
         ],
         ids=["empty_alias", "bogus_entry_point", "wrong_subclass"],
