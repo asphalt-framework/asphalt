@@ -21,7 +21,6 @@ class ApplicationComponent(CLIApplicationComponent):
     @inject
     async def run(
         self,
-        ctx: Context,
         *,
         mailer: Mailer = resource(),
         detector: Detector = resource(),

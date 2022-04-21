@@ -45,7 +45,7 @@ adapt code from the `aiohttp HTTP client tutorial`_::
 
 
     class ApplicationComponent(CLIApplicationComponent):
-        async def run(self, ctx: Context) -> None:
+        async def run(self) -> None:
             async with aiohttp.ClientSession() as session:
                 while True:
                     async with session.get("http://imgur.com") as resp:
@@ -69,7 +69,7 @@ respond with a ``304 Not Modified`` if the contents have not changed since that 
 So, modify the code as follows::
 
     class ApplicationComponent(CLIApplicationComponent):
-        async def run(self, ctx: Context) -> None:
+        async def run(self) -> None:
             last_modified = None
             async with aiohttp.ClientSession() as session:
                 while True:
@@ -104,7 +104,7 @@ to the logger::
 
 
     class ApplicationComponent(CLIApplicationComponent):
-        async def run(self, ctx: Context) -> None:
+        async def run(self) -> None:
             async with aiohttp.ClientSession() as session:
                 last_modified, old_lines = None, None
                 while True:
@@ -164,7 +164,7 @@ And to make the the results look nicer in an email message, you can switch to us
             await super().start(ctx)
 
         @inject
-        async def run(self, ctx: Context, *, mailer: Mailer = resource()) -> None:
+        async def run(self, *, mailer: Mailer = resource()) -> None:
             async with aiohttp.ClientSession() as session:
                 last_modified, old_lines = None, None
                 diff = HtmlDiff()
@@ -311,7 +311,6 @@ become somewhat lighter::
         @inject
         async def run(
             self,
-            ctx: Context,
             *,
             mailer: Mailer = resource(),
             detector: Detector = resource(),

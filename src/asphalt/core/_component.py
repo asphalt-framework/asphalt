@@ -134,7 +134,7 @@ class CLIApplicationComponent(ContainerComponent):
         async def run() -> None:
             from ._runner import stop_application
 
-            retval = await self.run(ctx)
+            retval = await self.run()
             if isinstance(retval, int):
                 if 0 <= retval <= 127:
                     stop_application(retval)
@@ -154,7 +154,7 @@ class CLIApplicationComponent(ContainerComponent):
         start_service_task(run, "Main task")
 
     @abstractmethod
-    async def run(self, ctx: Context) -> int | None:
+    async def run(self) -> int | None:
         """
         Run the business logic of the command line tool.
 

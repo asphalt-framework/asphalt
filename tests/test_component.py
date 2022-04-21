@@ -105,7 +105,7 @@ class TestContainerComponent:
 class TestCLIApplicationComponent:
     async def test_run_return_none(self) -> None:
         class DummyCLIComponent(CLIApplicationComponent):
-            async def run(self, ctx: Context) -> None:
+            async def run(self) -> None:
                 pass
 
         # No exception should be raised here
@@ -113,7 +113,7 @@ class TestCLIApplicationComponent:
 
     async def test_run_return_5(self) -> None:
         class DummyCLIComponent(CLIApplicationComponent):
-            async def run(self, ctx: Context) -> int:
+            async def run(self) -> int:
                 return 5
 
         with pytest.raises(SystemExit) as exc:
@@ -123,7 +123,7 @@ class TestCLIApplicationComponent:
 
     async def test_run_return_invalid_value(self) -> None:
         class DummyCLIComponent(CLIApplicationComponent):
-            async def run(self, ctx: Context) -> int:
+            async def run(self) -> int:
                 return 128
 
         with pytest.raises(SystemExit) as exc:
@@ -136,7 +136,7 @@ class TestCLIApplicationComponent:
 
     async def test_run_return_invalid_type(self) -> None:
         class DummyCLIComponent(CLIApplicationComponent):
-            async def run(self, ctx: Context) -> int:
+            async def run(self) -> int:
                 return "foo"  # type: ignore[return-value]
 
         with pytest.raises(SystemExit) as exc:
@@ -149,7 +149,7 @@ class TestCLIApplicationComponent:
 
     async def test_run_exception(self) -> None:
         class DummyCLIComponent(CLIApplicationComponent):
-            async def run(self, ctx: Context) -> NoReturn:
+            async def run(self) -> NoReturn:
                 raise Exception("blah")
 
         with pytest.raises(Exception, match="blah"):

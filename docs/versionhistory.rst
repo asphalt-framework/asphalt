@@ -20,6 +20,8 @@ This library adheres to `Semantic Versioning 2.0 <http://semver.org/>`_.
   (use the ``!!python/name`` YAML tag instead and replace ``:`` with ``.`` in the
   reference)
 - **BACKWARD INCOMPATIBLE** Dropped support for context attributes
+- **BACKWARD INCOMPATIBLE** Dropped the ``ctx`` parameter from
+  ``CLIApplicationComponent.run()``
 - **BACKWARD INCOMPATIBLE** Moved all exported functions and classes directly to
   ``asphalt.core`` and made submodules private
 - Dropped support for Python 3.8 and earlier

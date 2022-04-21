@@ -65,7 +65,7 @@ class CrashComponent(Component):
 
 
 class DummyCLIApp(CLIApplicationComponent):
-    async def run(self, ctx: Context) -> int | None:
+    async def run(self) -> int | None:
         return 20
 
 
