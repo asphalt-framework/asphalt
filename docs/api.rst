@@ -44,4 +44,3 @@ Utilities
 .. autofunction:: callable_name
 .. autofunction:: merge_config
 .. autofunction:: qualified_name
-.. autofunction:: resolve_reference

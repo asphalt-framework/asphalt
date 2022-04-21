@@ -58,7 +58,7 @@ You could then write a configuration file like this::
     ---
     max_threads: 20
     component:
-      type: myproject:MyRootComponent
+      type: !!python/name:myproject.MyRootComponent
       data_directory: /some/file/somewhere
       components:
         mailer:
@@ -120,7 +120,7 @@ For example::
 
     ---
     component:
-      type: myproject:MyRootComponent
+      type: !!python/name:myproject.MyRootComponent
       param_from_environment: !Env MY_ENV_VAR
       files:
         - !TextFile /path/to/file.txt
@@ -130,7 +130,7 @@ If a file path contains spaces, you can just quote it::
 
     ---
     component:
-      type: myproject:MyRootComponent
+      type: !!python/name:myproject.MyRootComponent
       param_from_text_file: !TextFile "/path with spaces/to/file.txt"
 
 .. note:: This does **not** allow you to include other YAML documents as part of the configuration,
@@ -201,7 +201,7 @@ allowing the use of YAML references, like so::
       server:
         max_threads: 30
         component:
-          type: myproject.server.ServerComponent
+          type: !!python/name:myproject.server.ServerComponent
           components:
             wamp: &wamp
               host: wamp.example.org
@@ -211,9 +211,10 @@ allowing the use of YAML references, like so::
               auth_secret: serverpass
             mailer:
               backend: smtp
+
       client:
         component:
-          type: myproject.client.ClientComponent
+          type: !!python/name:myproject.client.ClientComponent
           components:
             wamp:
               <<: *wamp

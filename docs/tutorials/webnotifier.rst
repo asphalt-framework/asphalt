@@ -353,7 +353,7 @@ contents:
 
     ---
     component:
-      type: webnotifier.app:ApplicationComponent
+      type: !!python/name:webnotifier.app.ApplicationComponent
       components:
         detector:
           url: http://imgur.com/

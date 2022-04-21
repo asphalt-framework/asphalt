@@ -8,13 +8,7 @@ from unittest.mock import Mock
 
 import pytest
 
-from asphalt.core import (
-    PluginContainer,
-    callable_name,
-    merge_config,
-    qualified_name,
-    resolve_reference,
-)
+from asphalt.core import PluginContainer, callable_name, merge_config, qualified_name
 
 if sys.version_info >= (3, 10):
     from importlib.metadata import EntryPoint
@@ -29,36 +23,6 @@ class BaseDummyPlugin:
 class DummyPlugin(BaseDummyPlugin):
     def __init__(self, **kwargs) -> None:
         self.kwargs = kwargs
-
-
-@pytest.mark.parametrize(
-    "inputval",
-    ["asphalt.core:resolve_reference", resolve_reference],
-    ids=["reference", "object"],
-)
-def test_resolve_reference(inputval: Any) -> None:
-    assert resolve_reference(inputval) is resolve_reference
-
-
-@pytest.mark.parametrize(
-    "inputval, error_type, error_text",
-    [
-        (
-            "x.y:foo",
-            LookupError,
-            "error resolving reference x.y:foo: could not import module",
-        ),
-        (
-            "asphalt.core:foo",
-            LookupError,
-            "error resolving reference asphalt.core:foo: error looking up object",
-        ),
-    ],
-    ids=["module_not_found", "object_not_found"],
-)
-def test_resolve_reference_error(inputval, error_type, error_text) -> None:
-    exc = pytest.raises(error_type, resolve_reference, inputval)
-    assert str(exc.value) == error_text
 
 
 @pytest.mark.parametrize(
@@ -123,8 +87,10 @@ class TestPluginContainer:
 
     @pytest.mark.parametrize(
         "inputvalue",
-        ["dummy", "test_utils:DummyPlugin", DummyPlugin],
-        ids=["entrypoint", "reference", "arbitrary_object"],
+        [
+            pytest.param("dummy", id="entrypoint"),
+            pytest.param(DummyPlugin, id="arbitrary_object"),
+        ],
     )
     def test_resolve(self, container: PluginContainer, inputvalue) -> None:
         assert container.resolve(inputvalue) is DummyPlugin
@@ -138,8 +104,10 @@ class TestPluginContainer:
 
     @pytest.mark.parametrize(
         "argument",
-        [DummyPlugin, "dummy", "test_utils:DummyPlugin"],
-        ids=["explicit_class", "entrypoint", "class_reference"],
+        [
+            pytest.param(DummyPlugin, id="explicit_class"),
+            pytest.param("dummy", id="entrypoint"),
+        ],
     )
     def test_create_object(self, container: PluginContainer, argument) -> None:
         """

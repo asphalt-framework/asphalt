@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 __all__ = (
-    "resolve_reference",
     "qualified_name",
     "callable_name",
     "merge_config",
@@ -10,7 +9,6 @@ __all__ = (
 
 import sys
 from collections.abc import Callable
-from importlib import import_module
 from inspect import isclass
 from typing import Any, TypeVar, overload
 
@@ -22,42 +20,7 @@ else:
 T_Object = TypeVar("T_Object")
 
 
-def resolve_reference(ref: object) -> Any:
-    """
-    Return the object pointed to by ``ref``.
-
-    If ``ref`` is not a string or does not contain ``:``, it is returned as is.
-
-    References must be in the form  <modulename>:<varname> where <modulename> is the fully
-    qualified module name and varname is the path to the variable inside that module.
-
-    For example, "concurrent.futures:Future" would give you the
-    :class:`~concurrent.futures.Future` class.
-
-    :raises LookupError: if the reference could not be resolved
-
-    """
-    if not isinstance(ref, str) or ":" not in ref:
-        return ref
-
-    modulename, rest = ref.split(":", 1)
-    try:
-        obj = import_module(modulename)
-    except ImportError as e:
-        raise LookupError(
-            f"error resolving reference {ref}: could not import module"
-        ) from e
-
-    try:
-        for name in rest.split("."):
-            obj = getattr(obj, name)
-
-        return obj
-    except AttributeError:
-        raise LookupError(f"error resolving reference {ref}: error looking up object")
-
-
-def qualified_name(obj: object) -> str:
+def qualified_name(obj) -> str:
     """
     Return the qualified name (e.g. package.module.Type) for the given object.
 
@@ -140,11 +103,10 @@ class PluginContainer:
 
     def resolve(self, obj: Any) -> Any:
         """
-        Resolve a reference to an entry point or a variable in a module.
+        Resolve a reference to an entry point or.
 
-        If ``obj`` is a ``module:varname`` reference to an object, :func:`resolve_reference` is
-        used to resolve it. If it is a string of any other kind, the named entry point is loaded
-        from this container's namespace. Otherwise, ``obj`` is returned as is.
+        If ``obj`` is a string, the named entry point is loaded from this container's
+        namespace. Otherwise, ``obj`` is returned as is.
 
         :param obj: an entry point identifier, an object reference or an arbitrary object
         :return: the loaded entry point, resolved object or the unchanged input value
@@ -153,8 +115,6 @@ class PluginContainer:
         """
         if not isinstance(obj, str):
             return obj
-        if ":" in obj:
-            return resolve_reference(obj)
 
         value = self._entrypoints.get(obj)
         if value is None:
@@ -172,8 +132,7 @@ class PluginContainer:
         The entry points in this namespace must point to subclasses of the ``base_class`` parameter
         passed to this container.
 
-        :param type: an entry point identifier, a ``module:varname`` reference to a class, or an
-            actual class object
+        :param type: an entry point identifier or an actual class object
         :param constructor_kwargs: keyword arguments passed to the constructor of the plugin class
         :return: the plugin instance
 

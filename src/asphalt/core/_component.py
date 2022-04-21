@@ -80,8 +80,8 @@ class ContainerComponent(Component):
         this method.
 
         :param alias: a name for the component instance, unique within this container
-        :param type: entry point name or :class:`Component` subclass or a ``module:varname``
-            reference to one
+        :param type: name of and entry point in the ``asphalt.components`` namespace or
+            a :class:`Component` subclass
         :param config: keyword arguments passed to the component's constructor
 
         """

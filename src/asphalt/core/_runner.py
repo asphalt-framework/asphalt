@@ -54,10 +54,9 @@ def run_application(
     :class:`~concurrent.futures.ThreadPoolExecutor`.
 
     :param component: the root component (either a component instance or a configuration dictionary
-        where the special ``type`` key is either a component class or a ``module:varname``
-        reference to one)
+        where the special ``type`` key is a component class
     :param event_loop_policy: entry point name (from the ``asphalt.core.event_loop_policies``
-        namespace) of an alternate event loop policy (or a module:varname reference to one)
+        namespace) of an alternate event loop policy
     :param max_threads: the maximum number of worker threads in the default thread pool executor
         (the default value depends on the event loop implementation)
     :param logging: a logging configuration dictionary, :ref:`logging level <python:levels>` or
