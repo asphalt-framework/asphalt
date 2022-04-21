@@ -10,11 +10,6 @@ Components
 .. autoclass:: ContainerComponent
 .. autoclass:: CLIApplicationComponent
 
-Concurrency
------------
-
-.. autofunction:: executor
-
 Contexts and resources
 ----------------------
 

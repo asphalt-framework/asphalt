@@ -15,7 +15,6 @@ __all__ = (
     "NoCurrentContext",
     "inject",
     "resource",
-    "executor",
     "Event",
     "Signal",
     "stream_events",
@@ -31,7 +30,6 @@ __all__ = (
 from typing import Any
 
 from ._component import CLIApplicationComponent, Component, ContainerComponent
-from ._concurrent import executor
 from ._context import (
     Context,
     NoCurrentContext,
