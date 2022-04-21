@@ -33,36 +33,38 @@ def run_application(
     start_timeout: int | float | None = 10,
 ) -> None:
     """
-    Configure logging and start the given root component in the default asyncio event loop.
+    Configure logging and start the given root component in the default asyncio event
+    loop.
 
-    Assuming the root component was started successfully, the event loop will continue running
-    until the process is terminated.
+    Assuming the root component was started successfully, the event loop will continue
+    running until the process is terminated.
 
     Initializes the logging system first based on the value of ``logging``:
-      * If the value is a dictionary, it is passed to :func:`logging.config.dictConfig` as
-        argument.
-      * If the value is an integer, it is passed to :func:`logging.basicConfig` as the logging
-        level.
+      * If the value is a dictionary, it is passed to :func:`logging.config.dictConfig`
+        as argument.
+      * If the value is an integer, it is passed to :func:`logging.basicConfig` as the
+        logging level.
       * If the value is ``None``, logging setup is skipped entirely.
 
-    By default, the logging system is initialized using :func:`~logging.basicConfig` using the
-    ``INFO`` logging level.
+    By default, the logging system is initialized using :func:`~logging.basicConfig`
+    using the ``INFO`` logging level.
 
     The default executor in the event loop is replaced with a new
-    :class:`~concurrent.futures.ThreadPoolExecutor` where the maximum number of threads is set to
-    the value of ``max_threads`` or, if omitted, the default value of
+    :class:`~concurrent.futures.ThreadPoolExecutor` where the maximum number of threads
+    is set to the value of ``max_threads`` or, if omitted, the default value of
     :class:`~concurrent.futures.ThreadPoolExecutor`.
 
-    :param component: the root component (either a component instance or a configuration dictionary
-        where the special ``type`` key is a component class
-    :param event_loop_policy: entry point name (from the ``asphalt.core.event_loop_policies``
-        namespace) of an alternate event loop policy
-    :param max_threads: the maximum number of worker threads in the default thread pool executor
-        (the default value depends on the event loop implementation)
-    :param logging: a logging configuration dictionary, :ref:`logging level <python:levels>` or
-        ``None``
-    :param start_timeout: seconds to wait for the root component (and its subcomponents) to start
-        up before giving up (``None`` = wait forever)
+    :param component: the root component (either a component instance or a configuration
+        dictionary where the special ``type`` key is a component class
+    :param event_loop_policy: entry point name (from the
+        ``asphalt.core.event_loop_policies`` namespace) of an alternate event loop
+        policy
+    :param max_threads: the maximum number of worker threads in the default thread pool
+        executor (the default value depends on the event loop implementation)
+    :param logging: a logging configuration dictionary, :ref:`logging level
+        <python:levels>` or`None``
+    :param start_timeout: seconds to wait for the root component (and its subcomponents)
+        to start up before giving up (``None`` = wait forever)
 
     """
     # Configure the logging system
@@ -82,7 +84,8 @@ def run_application(
         asyncio.set_event_loop_policy(policy)
         logger.info("Switched event loop policy to %s", qualified_name(policy))
 
-    # Assign a new default executor with the given max worker thread limit if one was provided
+    # Assign a new default executor with the given max worker thread limit if one was
+    # provided
     event_loop = asyncio.new_event_loop()
     asyncio.set_event_loop(event_loop)
     try:
@@ -125,7 +128,8 @@ def run_application(
             except NotImplementedError:
                 pass  # Windows does not support signals very well
 
-            # Finally, run the event loop until the process is terminated or Ctrl+C is pressed
+            # Finally, run the event loop until the process is terminated or Ctrl+C is
+            # pressed
             try:
                 event_loop.run_forever()
             except KeyboardInterrupt:

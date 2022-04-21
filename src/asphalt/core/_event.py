@@ -56,15 +56,16 @@ class Event:
     @property
     def utc_timestamp(self) -> datetime:
         """
-        Return a timezone aware :class:`~datetime.datetime` corresponding to the ``time`` variable,
-        using the UTC timezone.
+        Return a timezone aware :class:`~datetime.datetime` corresponding to the
+        ``time`` variable, using the UTC timezone.
 
         """
         return datetime.fromtimestamp(self.time, timezone.utc)
 
     def __repr__(self) -> str:
         return (
-            f"{self.__class__.__name__}(source={self.source!r}, topic={self.topic!r})"
+            f"{self.__class__.__name__}(source={self.source!r}, "
+            f"topic={self.topic!r})"
         )
 
 
@@ -75,12 +76,13 @@ class Signal(Generic[T_Event]):
     """
     Declaration of a signal that can be used to dispatch events.
 
-    This is a descriptor that returns itself on class level attribute access and a bound version of
-    itself on instance level access. Connecting listeners and dispatching events only works with
-    these bound instances.
+    This is a descriptor that returns itself on class level attribute access and a bound
+    version of itself on instance level access. Connecting listeners and dispatching
+    events only works with these bound instances.
 
-    Each signal must be assigned to a class attribute, but only once. The Signal will not function
-    correctly if the same Signal instance is assigned to multiple attributes.
+    Each signal must be assigned to a class attribute, but only once. The Signal will
+    not function correctly if the same Signal instance is assigned to multiple
+    attributes.
 
     :param event_class: an event class
     """
@@ -131,10 +133,11 @@ class Signal(Generic[T_Event]):
 
         Each callable can only be connected once. Duplicate registrations are ignored.
 
-        If you need to pass extra arguments to the callback, you can use :func:`functools.partial`
-        to wrap the callable.
+        If you need to pass extra arguments to the callback, you can use
+        :func:`functools.partial` to wrap the callable.
 
-        :param callback: a callable that will receive an event object as its only argument.
+        :param callback: a callable that will receive an event object as its only
+            argument.
         :return: the value of ``callback`` argument
 
         """
@@ -166,18 +169,19 @@ class Signal(Generic[T_Event]):
         """
         Dispatch the given event object to all listeners.
 
-        Creates a new task in which all listener callbacks are called with the given event as
-        the only argument. Coroutine callbacks are converted to their own respective tasks and
-        waited for concurrently.
+        Creates a new task in which all listener callbacks are called with the given
+        event as the only argument. Coroutine callbacks are converted to their own
+        respective tasks and waited for concurrently.
 
-        Before the dispatching is done, a snapshot of the listeners is taken and the event is only
-        dispatched to those listeners, so adding a listener between the call to this method and the
-        actual dispatching will only affect future calls to this method.
+        Before the dispatching is done, a snapshot of the listeners is taken and the
+        event is only dispatched to those listeners, so adding a listener between the
+        call to this method and the actual dispatching will only affect future calls to
+        this method.
 
         :param event: the event object to dispatch
-        :returns: an awaitable that completes when all the callbacks have been called (and any
-            awaitables waited on) and resolves to ``True`` if there were no exceptions raised by
-            the callbacks, ``False`` otherwise
+        :returns: an awaitable that completes when all the callbacks have been called
+            (and any awaitables waited on) and resolves to ``True`` if there were no
+            exceptions raised by the callbacks, ``False`` otherwise
 
         """
 
@@ -196,8 +200,8 @@ class Signal(Generic[T_Event]):
                     elif isawaitable(retval):
                         awaitables.append(retval)
 
-            # For any callbacks that returned awaitables, wait for their completion and log any
-            # exceptions they raised
+            # For any callbacks that returned awaitables, wait for their completion and
+            # log any exceptions they raised
             if awaitables:
                 done, _ = await wait(awaitables)
                 for f in done:
@@ -228,14 +232,16 @@ class Signal(Generic[T_Event]):
         """
         Create and dispatch an event.
 
-        This method constructs an event object and then passes it to :meth:`dispatch_event` for
-        the actual dispatching.
+        This method constructs an event object and then passes it to
+        :meth:`dispatch_event` for the actual dispatching.
 
-        :param args: positional arguments to the constructor of the associated event class
-        :param kwargs: keyword arguments to the constructor of the associated event class
-        :returns: an awaitable that completes when all the callbacks have been called (and any
-            awaitables waited on) and resolves to ``True`` if there were no exceptions raised by
-            the callbacks, ``False`` otherwise
+        :param args: positional arguments to the constructor of the associated event
+            class
+        :param kwargs: keyword arguments to the constructor of the associated event
+            class
+        :returns: an awaitable that completes when all the callbacks have been called
+            (and any awaitables waited on) and resolves to ``True`` if there were no
+            exceptions raised by the callbacks, ``False`` otherwise
 
         """
         event = self.event_class(self.source(), cast(str, self.topic), *args, **kwargs)
@@ -244,13 +250,20 @@ class Signal(Generic[T_Event]):
     def wait_event(
         self, filter: Callable[[T_Event], bool] = None
     ) -> Awaitable[T_Event]:
-        """Shortcut for calling :func:`wait_event` with this signal in the first argument."""
+        """
+        Shortcut for calling :func:`wait_event` with this signal in the first argument.
+
+        """
         return wait_event([self], filter)
 
     def stream_events(
         self, filter: Callable[[T_Event], bool] = None, *, max_queue_size: int = 0
     ) -> AsyncIterator[T_Event]:
-        """Shortcut for calling :func:`stream_events` with this signal in the first argument."""
+        """
+        Shortcut for calling :func:`stream_events` with this signal in the first
+        argument.
+
+        """
         return stream_events([self], filter, max_queue_size=max_queue_size)
 
 
@@ -267,9 +280,10 @@ def stream_events(
     If no filter function was given, all events are yielded from the generator.
 
     :param signals: the signals to get events from
-    :param filter: a callable that takes an event object as an argument and returns ``True`` if
-        the event should pass, ``False`` if not
-    :param max_queue_size: maximum size of the queue, after which it will start to drop events
+    :param filter: a callable that takes an event object as an argument and returns
+        ``True`` if the event should pass, ``False`` if not
+    :param max_queue_size: maximum size of the queue, after which it will start to
+        drop events
 
     """
     queue: Queue[T_Event] | None
@@ -304,13 +318,14 @@ async def wait_event(
     signals: Sequence[Signal[T_Event]], filter: Callable[[T_Event], bool] = None
 ) -> T_Event:
     """
-    Wait until any of the given signals dispatches an event that satisfies the filter (if any).
+    Wait until any of the given signals dispatches an event that satisfies the filter
+    (if any).
 
     If no filter has been given, the first event dispatched from the signal is returned.
 
     :param signals: the signals to get events from
-    :param filter: a callable that takes an event object as an argument and returns ``True`` if
-        the event should pass, ``False`` if not
+    :param filter: a callable that takes an event object as an argument and returns
+        ``True`` if the event should pass, ``False`` if not
     :return: the event that was dispatched
 
     """

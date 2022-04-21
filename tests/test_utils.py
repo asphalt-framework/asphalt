@@ -111,8 +111,8 @@ class TestPluginContainer:
     )
     def test_create_object(self, container: PluginContainer, argument) -> None:
         """
-        Test that create_object works with all three supported ways of passing a plugin class
-        reference.
+        Test that create_object works with all three supported ways of passing a plugin
+        class reference.
 
         """
         component = container.create_object(argument, a=5, b=2)
@@ -129,8 +129,8 @@ class TestPluginContainer:
 
     def test_all(self, container: PluginContainer) -> None:
         """
-        Test that all() returns the same results before and after the entry points have been
-        loaded.
+        Test that all() returns the same results before and after the entry points have
+        been loaded.
 
         """
         assert container.all() == [DummyPlugin]

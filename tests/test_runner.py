@@ -84,7 +84,8 @@ def test_run_max_threads(
     event_loop: AbstractEventLoop, max_threads: int | None
 ) -> None:
     """
-    Test that a new default executor is installed if and only if the max_threads argument is given.
+    Test that a new default executor is installed if and only if the max_threads
+    argument is given.
 
     """
     component = ShutdownComponent()
@@ -101,7 +102,10 @@ def test_run_max_threads(
 
 
 def test_uvloop_policy(caplog: LogCaptureFixture) -> None:
-    """Test that the runner switches to a different event loop policy when instructed to."""
+    """
+    Test that the runner switches to a different event loop policy when instructed to.
+
+    """
     pytest.importorskip("uvloop", reason="uvloop not installed")
     caplog.set_level(logging.INFO)
     component = ShutdownComponent()
@@ -125,8 +129,8 @@ def test_run_callbacks(
     event_loop: AbstractEventLoop, caplog: LogCaptureFixture
 ) -> None:
     """
-    Test that the teardown callbacks are run when the application is started and shut down properly
-    and that the proper logging messages are emitted.
+    Test that the teardown callbacks are run when the application is started and shut
+    down properly and that the proper logging messages are emitted.
 
     """
     caplog.set_level(logging.INFO)
@@ -150,8 +154,8 @@ def test_clean_exit(
     event_loop: AbstractEventLoop, caplog: LogCaptureFixture, method: str
 ) -> None:
     """
-    Test that when Ctrl+C is pressed during event_loop.run_forever(), run_application() exits
-    cleanly.
+    Test that when Ctrl+C is pressed during event_loop.run_forever(), run_application()
+    exits cleanly.
 
     """
     caplog.set_level(logging.INFO)
@@ -197,8 +201,8 @@ def test_run_start_timeout(
     event_loop: AbstractEventLoop, caplog: LogCaptureFixture
 ) -> None:
     """
-    Test that when the root component takes too long to start up, the runner exits and logs the
-    appropriate error message.
+    Test that when the root component takes too long to start up, the runner exits and
+    logs the appropriate error message.
 
     """
     caplog.set_level(logging.INFO)

@@ -86,7 +86,10 @@ class TestResourceContainer:
 class TestContext:
     @pytest.mark.asyncio
     async def test_parent(self) -> None:
-        """Test that the parent property points to the parent context instance, if any."""
+        """
+        Test that the parent property points to the parent context instance, if any.
+
+        """
         async with Context() as parent:
             async with Context() as child:
                 assert parent.parent is None
@@ -98,7 +101,8 @@ class TestContext:
     @pytest.mark.asyncio
     async def test_close(self, context: Context, exception: Exception | None) -> None:
         """
-        Test that teardown callbacks are called in reverse order when a context is closed.
+        Test that teardown callbacks are called in reverse order when a context is
+        closed.
 
         """
 
@@ -182,7 +186,11 @@ class TestContext:
 
     @pytest.mark.asyncio
     async def test_async_contextmanager_exception(self, event_loop, context):
-        """Test that "async with context:" calls close() with the exception raised in the block."""
+        """
+        Test that "async with context:" calls close() with the exception raised in the
+        block.
+
+        """
         close_future = event_loop.create_future()
         close_future.set_result(None)
         exception = Exception("foo")
@@ -197,7 +205,11 @@ class TestContext:
     @pytest.mark.parametrize("types", [int, (int,), ()], ids=["type", "tuple", "empty"])
     @pytest.mark.asyncio
     async def test_add_resource(self, context, event_loop, types):
-        """Test that a resource is properly added in the context and listeners are notified."""
+        """
+        Test that a resource is properly added in the context and listeners are
+        notified.
+
+        """
         event_loop.call_soon(context.add_resource, 6, "foo", None, types)
         event = await context.resource_added.wait_event()
 
@@ -225,7 +237,11 @@ class TestContext:
 
     @pytest.mark.asyncio
     async def test_add_resource_context_attr(self, context: Context) -> None:
-        """Test that when resources are added, they are also set as properties of the context."""
+        """
+        Test that when resources are added, they are also set as properties of the
+        context.
+
+        """
         with pytest.deprecated_call():
             context.add_resource(1, context_attr="foo")
 
@@ -233,8 +249,8 @@ class TestContext:
 
     def test_add_resource_context_attr_conflict(self, context: Context) -> None:
         """
-        Test that the context won't allow adding a resource with an attribute name that conflicts
-        with an existing attribute.
+        Test that the context won't allow adding a resource with an attribute name that
+        conflicts with an existing attribute.
 
         """
         context.a = 2
@@ -251,7 +267,8 @@ class TestContext:
             context.add_resource(6)
 
         exc.match(
-            "this context already contains a resource of type int using the name 'default'"
+            "this context already contains a resource of type int using the name "
+            "'default'"
         )
 
     @pytest.mark.parametrize(
@@ -263,8 +280,8 @@ class TestContext:
             context.add_resource(1, name)
 
         exc.match(
-            '"name" must be a nonempty string consisting only of alphanumeric characters '
-            "and underscores"
+            '"name" must be a nonempty string consisting only of alphanumeric '
+            "characters and underscores"
         )
 
     @pytest.mark.asyncio
@@ -282,7 +299,10 @@ class TestContext:
 
     @pytest.mark.asyncio
     async def test_add_resource_factory(self, context: Context) -> None:
-        """Test that resources factory callbacks are only called once for each context."""
+        """
+        Test that resources factory callbacks are only called once for each context.
+
+        """
 
         def factory(ctx):
             assert ctx is context
@@ -318,8 +338,8 @@ class TestContext:
             context.add_resource_factory(lambda ctx: 1, int, name)
 
         exc.match(
-            '"name" must be a nonempty string consisting only of alphanumeric characters '
-            "and underscores"
+            '"name" must be a nonempty string consisting only of alphanumeric '
+            "characters and underscores"
         )
 
     @pytest.mark.asyncio
@@ -354,7 +374,8 @@ class TestContext:
             )
 
         exc.match(
-            "this context already contains a resource factory for the context attribute 'foo'"
+            "this context already contains a resource factory for the context "
+            "attribute 'foo'"
         )
 
     @pytest.mark.asyncio
@@ -368,8 +389,8 @@ class TestContext:
     @pytest.mark.asyncio
     async def test_add_resource_factory_no_inherit(self, context: Context) -> None:
         """
-        Test that a subcontext gets its own version of a factory-generated resource even if a
-        parent context has one already.
+        Test that a subcontext gets its own version of a factory-generated resource even
+        if a parent context has one already.
 
         """
         with pytest.deprecated_call():
@@ -428,7 +449,8 @@ class TestContext:
     @pytest.mark.asyncio
     async def test_getattr_parent(self, context: Context) -> None:
         """
-        Test that accessing a nonexistent attribute on a context retrieves the value from parent.
+        Test that accessing a nonexistent attribute on a context retrieves the value
+        from parent.
 
         """
         async with context, Context() as child_context:
@@ -450,7 +472,10 @@ class TestContext:
         assert context.require_resource(int) == 1
 
     def test_require_resource_not_found(self, context: Context) -> None:
-        """Test that ResourceNotFound is raised when a required resource is not found."""
+        """
+        Test that ResourceNotFound is raised when a required resource is not found.
+
+        """
         exc = pytest.raises(ResourceNotFound, context.require_resource, int, "foo")
         exc.match("no matching resource was found for type=int name='foo'")
         assert exc.value.type == int
@@ -459,8 +484,8 @@ class TestContext:
     @pytest.mark.asyncio
     async def test_request_resource_parent_add(self, context, event_loop):
         """
-        Test that adding a resource to the parent context will satisfy a resource request in a
-        child context.
+        Test that adding a resource to the parent context will satisfy a resource
+        request in a child context.
 
         """
         async with context, Context() as child_context:
@@ -473,7 +498,11 @@ class TestContext:
     async def test_request_resource_factory_context_attr(
         self, context: Context
     ) -> None:
-        """Test that requesting a factory-generated resource also sets the context variable."""
+        """
+        Test that requesting a factory-generated resource also sets the context
+        variable.
+
+        """
         with pytest.deprecated_call():
             context.add_resource_factory(lambda ctx: 6, int, context_attr="foo")
 

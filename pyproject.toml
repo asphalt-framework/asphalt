@@ -75,7 +75,7 @@ skip_gitignore = true
 profile = "black"
 
 [tool.flake8]
-max-line-length = 99
+max-line-length = 88
 
 [tool.pytest.ini_options]
 addopts = "-rsx --tb=short"

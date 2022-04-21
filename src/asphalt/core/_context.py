@@ -93,7 +93,8 @@ class ResourceContainer:
     :vartype types: Tuple[type, ...]
     :ivar str name: name of the resource
     :ivar str context_attr: the context attribute of the resource
-    :ivar bool is_factory: ``True`` if ``value_or_factory`` if this is a resource factory
+    :ivar bool is_factory: ``True`` if ``value_or_factory`` if this is a resource
+        factory
     """
 
     __slots__ = "value_or_factory", "types", "name", "context_attr", "is_factory"
@@ -135,10 +136,8 @@ class ResourceContainer:
             else "value=%r" % self.value_or_factory
         )
         return (
-            "{self.__class__.__name__}({value_repr}, types=[{typenames}], name={self.name!r}, "
-            "context_attr={self.context_attr!r})".format(
-                self=self, value_repr=value_repr, typenames=typenames
-            )
+            f"{self.__class__.__name__}({value_repr}, types=[{typenames}], "
+            f"name={self.name!r}, context_attr={self.context_attr!r})"
         )
 
 
@@ -149,8 +148,8 @@ class ResourceEvent(Event):
     :ivar resource_types: types the resource was registered under
     :vartype resource_types: Tuple[type, ...]
     :ivar str name: name of the resource
-    :ivar bool is_factory: ``True`` if a resource factory was added, ``False`` if a regular
-        resource was added
+    :ivar bool is_factory: ``True`` if a resource factory was added, ``False`` if a
+        regular resource was added
     """
 
     __slots__ = "resource_types", "resource_name", "is_factory"
@@ -171,8 +170,8 @@ class ResourceEvent(Event):
 
 class ResourceConflict(Exception):
     """
-    Raised when a new resource that is being published conflicts with an existing resource or
-    context variable.
+    Raised when a new resource that is being published conflicts with an existing
+    resource or context variable.
     """
 
 
@@ -185,17 +184,19 @@ class ResourceNotFound(LookupError):
         self.name = name
 
     def __str__(self):
-        return "no matching resource was found for type={typename} name={self.name!r}".format(
-            self=self, typename=qualified_name(self.type)
+        return (
+            f"no matching resource was found for type={qualified_name(self.type)} "
+            f"name={self.name!r}"
         )
 
 
 class TeardownError(Exception):
     """
-    Raised after context teardown when one or more teardown callbacks raised an exception.
+    Raised after context teardown when one or more teardown callbacks raised an
+    exception.
 
-    :ivar exceptions: exceptions raised during context teardown, in the order in which they were
-        raised
+    :ivar exceptions: exceptions raised during context teardown, in the order in which
+        they were raised
     :vartype exceptions: List[Exception]
     """
 
@@ -231,15 +232,15 @@ class Context:
     """
     Contexts give request handlers and callbacks access to resources.
 
-    Contexts are stacked in a way that accessing an attribute that is not present in the current
-    context causes the attribute to be looked up in the parent instance and so on, until the
-    attribute is found (or :class:`AttributeError` is raised).
+    Contexts are stacked in a way that accessing an attribute that is not present in the
+    current context causes the attribute to be looked up in the parent instance and so
+    on, until the attribute is found (or :class:`AttributeError` is raised).
 
     :param parent: the parent context, if any
 
     :ivar Context parent: the parent context, if any
-    :var Signal resource_added: a signal (:class:`ResourceEvent`) dispatched when a resource
-        has been published in this context
+    :var Signal resource_added: a signal (:class:`ResourceEvent`) dispatched when a
+        resource has been published in this context
     """
 
     resource_added = Signal(ResourceEvent)
@@ -324,16 +325,17 @@ class Context:
         """
         Add a callback to be called when this context closes.
 
-        This is intended for cleanup of resources, and the list of callbacks is processed in the
-        reverse order in which they were added, so the last added callback will be called first.
+        This is intended for cleanup of resources, and the list of callbacks is
+        processed in the reverse order in which they were added, so the last added
+        callback will be called first.
 
-        The callback may return an awaitable. If it does, the awaitable is awaited on before
-        calling any further callbacks.
+        The callback may return an awaitable. If it does, the awaitable is awaited on
+        before calling any further callbacks.
 
-        :param callback: a callable that is called with either no arguments or with the exception
-            that ended this context, based on the value of ``pass_exception``
-        :param pass_exception: ``True`` to pass the callback the exception that ended this context
-            (or ``None`` if the context ended cleanly)
+        :param callback: a callable that is called with either no arguments or with the
+            exception that ended this context, based on the value of ``pass_exception``
+        :param pass_exception: ``True`` to pass the callback the exception that ended
+            this context (or ``None`` if the context ended cleanly)
 
         """
         self._check_closed()
@@ -343,14 +345,15 @@ class Context:
         """
         Close this context and call any necessary resource teardown callbacks.
 
-        If a teardown callback returns an awaitable, the return value is awaited on before calling
-        any further teardown callbacks.
+        If a teardown callback returns an awaitable, the return value is awaited on
+        before calling any further teardown callbacks.
 
-        All callbacks will be processed, even if some of them raise exceptions. If at least one
-        callback raised an error, this method will raise a :exc:`~.TeardownError` at the end.
+        All callbacks will be processed, even if some of them raise exceptions. If at
+        least one callback raised an error, this method will raise a
+        :exc:`~.TeardownError` at the end.
 
-        After this method has been called, resources can no longer be requested or published on
-        this context.
+        After this method has been called, resources can no longer be requested or
+        published on this context.
 
         :param exception: the exception, if any, that caused this context to be closed
         :raises .TeardownError: if one or more teardown callbacks raise an exception
@@ -419,10 +422,10 @@ class Context:
             except ValueError:
                 warnings.warn(
                     f"Potential context stack corruption detected. This context "
-                    f"({hex(id(self))}) was entered in task {self._host_task} and exited "
-                    f"in task {current_task()}. If this happened because you entered "
-                    f"the context in an async generator, you should try to defer that to a "
-                    f"regular async function."
+                    f"({hex(id(self))}) was entered in task {self._host_task} and "
+                    f"exited in task {current_task()}. If this happened because you "
+                    f"entered the context in an async generator, you should try to "
+                    f"defer that to a regular async function."
                 )
 
     def add_resource(
@@ -509,9 +512,10 @@ class Context:
 
         This will cause a ``resource_added`` event to be dispatched.
 
-        A resource factory is a callable that generates a "contextual" resource when it is
-        requested by either using any of the methods :meth:`get_resource`, :meth:`require_resource`
-        or :meth:`request_resource` or its context attribute is accessed.
+        A resource factory is a callable that generates a "contextual" resource when it
+        is requested by either using any of the methods :meth:`get_resource`,
+        :meth:`require_resource` or :meth:`request_resource` or its context attribute is
+        accessed.
 
         The type(s) of the generated resources need to be specified, either by passing
         the ``types`` argument, or by adding a return type annotation to the factory
@@ -520,18 +524,20 @@ class Context:
         (e.g. ``str | int``; requires ``from __future__ import annotations`` on earlier
         than Python 3.10).
 
-        When a new resource is created in this manner, it is always bound to the context through
-        it was requested, regardless of where in the chain the factory itself was added to.
+        When a new resource is created in this manner, it is always bound to the context
+        through it was requested, regardless of where in the chain the factory itself
+        was added to.
 
-        :param factory_callback: a (non-coroutine) callable that takes a context instance as
-            argument and returns the created resource object
-        :param types: one or more types to register the generated resource as on the target context
-            (can be omitted if the factory callable has a return type annotation)
+        :param factory_callback: a (non-coroutine) callable that takes a context
+            instance as argument and returns the created resource object
+        :param types: one or more types to register the generated resource as on the
+            target context (can be omitted if the factory callable has a return type
+            annotation)
         :param name: name of the resource that will be created in the target context
-        :param context_attr: name of the context attribute the created resource will be accessible
-            as
-        :raises asphalt.core.context.ResourceConflict: if there is an existing resource factory for
-            the given type/name combinations or the given context variable
+        :param context_attr: name of the context attribute the created resource will be
+            accessible as
+        :raises asphalt.core.context.ResourceConflict: if there is an existing resource
+            factory for the given type/name combinations or the given context variable
 
         """
         import types as stdlib_types
@@ -578,8 +584,8 @@ class Context:
         # Check for a conflicting context attribute
         if context_attr in self._resource_factories_by_context_attr:
             raise ResourceConflict(
-                f"this context already contains a resource factory for the context attribute "
-                f"{context_attr!r}"
+                f"this context already contains a resource factory for the context "
+                f"attribute {context_attr!r}"
             )
 
         # Check for conflicts with existing resource factories
@@ -667,7 +673,8 @@ class Context:
             if not container.is_factory and type in container.types
         }
 
-        # Next, find all matching resource factories in the context chain and generate resources
+        # Next, find all matching resource factories in the context chain and generate
+        # resources
         resources.update(
             {
                 container.name: container.generate_value(self)
@@ -697,16 +704,18 @@ class Context:
         self, type: type[T_Resource], name: str = "default"
     ) -> T_Resource:
         """
-        Look up a resource in the chain of contexts and raise an exception if it is not found.
+        Look up a resource in the chain of contexts and raise an exception if it is not
+        found.
 
-        This is like :meth:`get_resource` except that instead of returning ``None`` when a resource
-        is not found, it will raise :exc:`~asphalt.core.context.ResourceNotFound`.
+        This is like :meth:`get_resource` except that instead of returning ``None`` when
+        a resource is not found, it will raise
+        :exc:`~asphalt.core.context.ResourceNotFound`.
 
         :param type: type of the requested resource
         :param name: name of the requested resource
         :return: the requested resource
-        :raises asphalt.core.context.ResourceNotFound: if a resource of the given type and name was
-            not found
+        :raises asphalt.core.context.ResourceNotFound: if a resource of the given type
+            and name was not found
 
         """
         resource = self.get_resource(type, name)
@@ -721,8 +730,8 @@ class Context:
         """
         Look up a resource in the chain of contexts.
 
-        This is like :meth:`get_resource` except that if the resource is not already available, it
-        will wait for one to become available.
+        This is like :meth:`get_resource` except that if the resource is not already
+        available, it will wait for one to become available.
 
         :param type: type of the requested resource
         :param name: name of the requested resource
@@ -749,7 +758,8 @@ class Context:
         This method lets you call asynchronous code from a worker thread.
         Do not use it from within the event loop thread.
 
-        If the callable returns an awaitable, it is resolved before returning to the caller.
+        If the callable returns an awaitable, it is resolved before returning to the
+        caller.
 
         :param func: a regular function or a coroutine function
         :param args: positional arguments to call the callable with
@@ -771,8 +781,8 @@ class Context:
 
         :param func: the callable to call
         :param args: positional arguments to call the callable with
-        :param executor: either an :class:`~concurrent.futures.Executor` instance, the resource
-            name of one or ``None`` to use the event loop's default executor
+        :param executor: either an :class:`~concurrent.futures.Executor` instance, the
+            resource name of one or ``None`` to use the event loop's default executor
         :param kwargs: keyword arguments to call the callable with
         :return: an awaitable that resolves to the return value of the call
 
@@ -789,10 +799,11 @@ class Context:
 
     def threadpool(self, executor: Union[Executor, str, None] = None):
         """
-        Return an asynchronous context manager that runs the block in a (thread pool) executor.
+        Return an asynchronous context manager that runs the block in a (thread pool)
+        executor.
 
-        :param executor: either an :class:`~concurrent.futures.Executor` instance, the resource
-            name of one or ``None`` to use the event loop's default executor
+        :param executor: either an :class:`~concurrent.futures.Executor` instance, the
+            resource name of one or ``None`` to use the event loop's default executor
         :return: an asynchronous context manager
 
         """
@@ -820,8 +831,9 @@ def executor(arg: Union[Executor, str, Callable] = None):
         def should_run_in_executor(ctx):
             ...
 
-    :param arg: a callable to decorate, an :class:`~concurrent.futures.Executor` instance, the
-        resource name of one or ``None`` to use the event loop's default executor
+    :param arg: a callable to decorate, an :class:`~concurrent.futures.Executor`
+        instance, the resource name of one or ``None`` to use the event loop's default
+        executor
     :return: the wrapped function
 
     """
@@ -872,12 +884,13 @@ def context_teardown(
     [T_Self, T_Context], Coroutine[Any, Any, None]
 ]:
     """
-    Wrap an async generator function to execute the rest of the function at context teardown.
+    Wrap an async generator function to execute the rest of the function at context
+    teardown.
 
-    This function returns an async function, which, when called, starts the wrapped async
-    generator. The wrapped async function is run until the first ``yield`` statement
-    When the context is being torn down, the exception that ended the context, if any, is sent to
-    the generator.
+    This function returns an async function, which, when called, starts the wrapped
+    async generator. The wrapped async function is run until the first ``yield``
+    statement When the context is being torn down, the exception that ended the context,
+    if any, is sent to the generator.
 
     For example::
 

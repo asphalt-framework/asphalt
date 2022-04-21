@@ -43,7 +43,8 @@ class TestEvent:
 class TestSignal:
     def test_class_attribute_access(self) -> None:
         """
-        Test that accessing the descriptor on the class level returns the same signal instance.
+        Test that accessing the descriptor on the class level returns the same signal
+        instance.
 
         """
         signal = Signal(DummyEvent)
@@ -55,7 +56,10 @@ class TestSignal:
 
     @pytest.mark.asyncio
     async def test_disconnect(self, source: DummySource) -> None:
-        """Test that an event listener no longer receives events after it's been removed."""
+        """
+        Test that an event listener no longer receives events after it's been removed.
+
+        """
         events: list[DummyEvent] = []
         source.event_a.connect(events.append)
         assert await source.event_a.dispatch(1)
@@ -67,13 +71,18 @@ class TestSignal:
         assert events[0].args == (1,)
 
     def test_disconnect_nonexistent_listener(self, source: DummySource) -> None:
-        """Test that attempting to remove a nonexistent event listener will not raise an error."""
+        """
+        Test that attempting to remove a nonexistent event listener will not raise an
+        error.
+
+        """
         source.event_a.connect(lambda event: None)
         source.event_a.disconnect(lambda event: None)
 
     def test_disconnect_no_listeners(self, source: DummySource) -> None:
         """
-        Test that disconnecting a nonexistent listener while listeners is None will still work.
+        Test that disconnecting a nonexistent listener while listeners is None will
+        still work.
 
         """
         source.event_a.disconnect(lambda event: None)
@@ -107,7 +116,11 @@ class TestSignal:
     async def test_dispatch_log_exceptions(
         self, event_loop: AbstractEventLoop, source: DummySource, caplog
     ) -> None:
-        """Test that listener exceptions are logged and that dispatch() resolves to ``False``."""
+        """
+        Test that listener exceptions are logged and that dispatch() resolves to
+        ``False``.
+
+        """
 
         def listener(event) -> NoReturn:
             raise Exception("regular")
@@ -125,12 +138,18 @@ class TestSignal:
 
     @pytest.mark.asyncio
     async def test_dispatch_event_no_listeners(self, source: DummySource) -> None:
-        """Test that dispatching an event when there are no listeners will still work."""
+        """
+        Test that dispatching an event when there are no listeners will still work.
+
+        """
         assert await source.event_a.dispatch()
 
     @pytest.mark.asyncio
     async def test_dispatch_event_cancel(self, source: DummySource) -> None:
-        """Test that dispatching an event when there are no listeners will still work."""
+        """
+        Test that dispatching an event when there are no listeners will still work.
+
+        """
         source.event_a.connect(lambda event: None)
         future = source.event_a.dispatch()
         future.cancel()
@@ -139,7 +158,11 @@ class TestSignal:
 
     @pytest.mark.asyncio
     async def test_connect_twice(self, source: DummySource) -> None:
-        """Test that if the same callback is connected twice, the second connect is a no-op."""
+        """
+        Test that if the same callback is connected twice, the second connect is a
+        no-op.
+
+        """
         events: list[DummyEvent] = []
         source.event_a.connect(events.append)
         source.event_a.connect(events.append)
@@ -187,8 +210,8 @@ class TestSignal:
 
     def test_memory_leak(self) -> None:
         """
-        Test that activating a Signal does not prevent its owner object from being garbage
-        collected.
+        Test that activating a Signal does not prevent its owner object from being
+        garbage collected.
 
         """
 
@@ -213,8 +236,8 @@ class TestSignal:
 @pytest.mark.asyncio
 async def test_wait_event(event_loop, filter, expected_value) -> None:
     """
-    Test that wait_event returns the first event matched by the filter, or the first event if there
-    is no filter.
+    Test that wait_event returns the first event matched by the filter, or the first
+    event if there is no filter.
 
     """
     source1 = DummySource()
@@ -254,7 +277,11 @@ async def test_stream_events(filter, expected_values) -> None:
 
 @pytest.mark.asyncio
 async def test_stream_events_memleak() -> None:
-    """Test that closing but never iterating the event stream will not cause a memory leak."""
+    """
+    Test that closing but never iterating the event stream will not cause a memory
+    leak.
+
+    """
     source = DummySource()
     gc.collect()
     gc.collect()

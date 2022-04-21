@@ -71,7 +71,8 @@ def run(configfile, loop: str | None, service: str | None) -> None:
             f'The "services" key must be a dict, not {qualified_name(services)}'
         )
 
-    # If "component" was defined, use that as the default service if one has not been defined yet
+    # If "component" was defined, use that as the default service if one has not been
+    # defined yet
     if "component" in config:
         component = config.pop("component")
         services.setdefault("default", dict(component=component))
@@ -93,8 +94,9 @@ def run(configfile, loop: str | None, service: str | None) -> None:
         service_config = services["default"]
     else:
         raise click.ClickException(
-            "Multiple services present in configuration file but no default service has been "
-            "defined and no service was explicitly selected with -s / --service"
+            "Multiple services present in configuration file but no default service "
+            "has been defined and no service was explicitly selected with -s / "
+            "--service"
         )
 
     # Merge the service-level configuration with the top level one

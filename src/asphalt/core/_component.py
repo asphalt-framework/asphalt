@@ -32,9 +32,9 @@ class Component(metaclass=ABCMeta):
           * request resources from it asynchronously
             (:meth:`~asphalt.core.context.Context.request_resource`)
 
-        It is advisable for Components to first add all the resources they can to the context
-        before requesting any from it. This will speed up the dependency resolution and prevent
-        deadlocks.
+        It is advisable for Components to first add all the resources they can to the
+        context before requesting any from it. This will speed up the dependency
+        resolution and prevent deadlocks.
 
         :param ctx: the containing context for this component
         """
@@ -44,13 +44,13 @@ class ContainerComponent(Component):
     """
     A component that can contain other components.
 
-    :param components: dictionary of component alias ⭢ component configuration dictionary
-
-    :ivar child_components: dictionary of component alias ⭢ :class:`Component` instance (of child
-        components added with :meth:`add_component`)
+    :param components: dictionary of component alias ⭢ component configuration
+        dictionary
+    :ivar child_components: dictionary of component alias ⭢ :class:`Component` instance
+        (of child components added with :meth:`add_component`)
     :vartype child_components: Dict[str, Component]
-    :ivar component_configs: dictionary of component alias ⭢ externally provided component
-        configuration
+    :ivar component_configs: dictionary of component alias ⭢ externally provided
+        component configuration
     :vartype component_configs: Dict[str, Optional[Dict[str, Any]]]
     """
 
@@ -70,14 +70,14 @@ class ContainerComponent(Component):
 
         If the second argument is omitted, the value of ``alias`` is used as its value.
 
-        The locally given configuration can be overridden by component configuration parameters
-        supplied to the constructor (via the ``components`` argument).
+        The locally given configuration can be overridden by component configuration
+        parameters supplied to the constructor (via the ``components`` argument).
 
-        When configuration values are provided both as keyword arguments to this method and
-        component configuration through the ``components`` constructor argument, the configurations
-        are merged together using :func:`~asphalt.core.util.merge_config` in a way that the
-        configuration values from the ``components`` argument override the keyword arguments to
-        this method.
+        When configuration values are provided both as keyword arguments to this method
+        and component configuration through the ``components`` constructor argument, the
+        configurations are merged together using :func:`~asphalt.core.util.merge_config`
+        in a way that the configuration values from the ``components`` argument override
+        the keyword arguments to this method.
 
         :param alias: a name for the component instance, unique within this container
         :param type: name of and entry point in the ``asphalt.components`` namespace or
@@ -101,8 +101,9 @@ class ContainerComponent(Component):
 
     async def start(self, ctx: Context) -> None:
         """
-        Create child components that have been configured but not yet created and then calls their
-        :meth:`~Component.start` methods in separate tasks and waits until they have completed.
+        Create child components that have been configured but not yet created and then
+        calls their :meth:`~Component.start` methods in separate tasks and waits until
+        they have completed.
 
         """
         for alias in self.component_configs:
@@ -118,20 +119,22 @@ class CLIApplicationComponent(ContainerComponent):
     """
     Specialized subclass of :class:`.ContainerComponent` for command line tools.
 
-    Command line tools and similar applications should use this as their root component and
-    implement their main code in the :meth:`run` method.
+    Command line tools and similar applications should use this as their root component
+    and implement their main code in the :meth:`run` method.
 
     When all the subcomponents have been started, :meth:`run` is started as a new task.
-    When the task is finished, the application will exit using the return value as its exit code.
+    When the task is finished, the application will exit using the return value as its
+    exit code.
 
-    If :meth:`run` raises an exception, a stack trace is printed and the exit code will be set
-    to 1. If the returned exit code is out of range or of the wrong data type, it is set to 1 and a
-    warning is emitted.
+    If :meth:`run` raises an exception, a stack trace is printed and the exit code will
+    be set to 1. If the returned exit code is out of range or of the wrong data type,
+    it is set to 1 and a warning is emitted.
     """
 
     async def start(self, ctx: Context) -> None:
         def run_complete(f: Future[int | None]) -> None:
-            # If run() raised an exception, print it with a traceback and exit with code 1
+            # If run() raised an exception, print it with a traceback and exit with
+            # code 1
             exc = f.exception()
             if exc is not None:
                 print_exception(type(exc), exc, exc.__traceback__)

@@ -219,8 +219,9 @@ logging:
             assert result.exit_code == 1
             assert run_app.call_count == 0
             assert result.output == (
-                "Error: Multiple services present in configuration file but no default service "
-                "has been defined and no service was explicitly selected with -s / --service\n"
+                "Error: Multiple services present in configuration file but no "
+                "default service has been defined and no service was explicitly "
+                "selected with -s / --service\n"
             )
 
     def test_bad_services_type(self, runner: CliRunner) -> None:
