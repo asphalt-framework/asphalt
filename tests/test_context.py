@@ -7,7 +7,7 @@ from concurrent.futures import Executor, ThreadPoolExecutor
 from inspect import isawaitable
 from itertools import count
 from threading import Thread, current_thread
-from typing import AsyncGenerator, AsyncIterator, Dict, NoReturn, Optional, Tuple, Union
+from typing import AsyncGenerator, AsyncIterator, NoReturn, Optional, Union
 from unittest.mock import patch
 
 import pytest
@@ -273,12 +273,12 @@ class TestContext:
         self, context: Context
     ) -> None:
         resource = {"a": 1}
-        resource_type = Dict[str, int]
+        resource_type = dict[str, int]
         context.add_resource(resource, types=[resource_type])
         assert context.require_resource(resource_type) is resource
         assert context.get_resource(resource_type) is resource
         assert await context.request_resource(resource_type) is resource
-        assert context.get_resource(Dict) is None
+        assert context.get_resource(dict) is None
         assert context.get_resource(dict) is None
 
     @pytest.mark.asyncio
@@ -302,12 +302,12 @@ class TestContext:
         self, context: Context
     ) -> None:
         resource = {"a": 1}
-        resource_type = Dict[str, int]
+        resource_type = dict[str, int]
         context.add_resource_factory(lambda ctx: resource, types=[resource_type])
         assert context.require_resource(resource_type) is resource
         assert context.get_resource(resource_type) is resource
         assert await context.request_resource(resource_type) is resource
-        assert context.get_resource(Dict) is None
+        assert context.get_resource(dict) is None
         assert context.get_resource(dict) is None
 
     @pytest.mark.parametrize(
@@ -835,7 +835,7 @@ class TestDependencyInjection:
         @inject
         async def injected(
             foo: int, bar: str = resource(), *, baz: str = resource("alt")
-        ) -> Tuple[int, str, str]:
+        ) -> tuple[int, str, str]:
             return foo, bar, baz
 
         async with Context() as ctx:
@@ -852,7 +852,7 @@ class TestDependencyInjection:
         @inject
         def injected(
             foo: int, bar: str = resource(), *, baz: str = resource("alt")
-        ) -> Tuple[int, str, str]:
+        ) -> tuple[int, str, str]:
             return foo, bar, baz
 
         async with Context() as ctx:
@@ -963,6 +963,14 @@ class TestDependencyInjection:
         exc.match(
             r"Attempted to access an attribute in a resource\(\) marker – did you "
             r"forget to add the @inject decorator\?"
+        )
+
+    def test_posonly_argument(self):
+        def injected(foo: int, bar: str = resource(), /):
+            pass
+
+        pytest.raises(TypeError, inject, injected).match(
+            "Cannot inject dependency to positional-only parameter 'bar'"
         )
 
     def test_no_resources_declared(self) -> None:

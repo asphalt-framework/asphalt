@@ -34,6 +34,7 @@ This library adheres to `Semantic Versioning 2.0 <http://semver.org/>`_.
 
 **4.8.0** (2022-04-28)
 
+- Dropped support for Python 3.8 and earlier
 - ``Context`` now accepts parametrized generic classes as resource types
 - Deprecated context variables in favor of dependency injection
 - Replaced ``asphalt.core.context.Dependency`` with

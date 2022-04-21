@@ -15,17 +15,13 @@ from typing import (
     Awaitable,
     Callable,
     Generic,
-    List,
     MutableMapping,
     Optional,
     Sequence,
-    Type,
     TypeVar,
     cast,
 )
 from weakref import WeakKeyDictionary
-
-from typeguard import check_argument_types
 
 from asphalt.core.utils import qualified_name
 
@@ -93,17 +89,16 @@ class Signal(Generic[T_Event]):
 
     def __init__(
         self,
-        event_class: Type[T_Event],
+        event_class: type[T_Event],
         *,
         source: Any = None,
-        topic: Optional[str] = None,
+        topic: str | None = None,
     ) -> None:
-        assert check_argument_types()
         self.event_class = event_class
         self.topic = topic
         if source is not None:
             self.source = weakref.ref(source)
-            self.listeners: Optional[List[Callable]] = None
+            self.listeners: Optional[list[Callable]] = None
         else:
             assert issubclass(
                 event_class, Event
@@ -143,7 +138,6 @@ class Signal(Generic[T_Event]):
         :return: the value of ``callback`` argument
 
         """
-        assert check_argument_types()
         if self.listeners is None:
             self.listeners = []
         if callback not in self.listeners:
@@ -162,7 +156,6 @@ class Signal(Generic[T_Event]):
         :param callback: the callable to remove
 
         """
-        assert check_argument_types()
         try:
             if self.listeners is not None:
                 self.listeners.remove(callback)
@@ -189,7 +182,7 @@ class Signal(Generic[T_Event]):
         """
 
         async def do_dispatch() -> None:
-            awaitables: List[Awaitable[Any]] = []
+            awaitables: list[Awaitable[Any]] = []
             all_successful = True
             for callback in listeners:
                 try:
@@ -298,7 +291,6 @@ def stream_events(
 
             queue = None
 
-    assert check_argument_types()
     queue = Queue(max_queue_size)
     for signal in signals:
         signal.connect(queue.put_nowait)
@@ -322,8 +314,5 @@ async def wait_event(
     :return: the event that was dispatched
 
     """
-    if sys.version_info >= (3, 5, 3):
-        assert check_argument_types()
-
     async with aclosing(stream_events(signals, filter)) as events:
         return await events.asend(None)

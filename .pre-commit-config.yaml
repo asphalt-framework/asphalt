@@ -19,7 +19,7 @@ repos:
     rev: v2.32.1
     hooks:
       - id: pyupgrade
-        args: [ "--py37-plus", "--keep-runtime-typing" ]
+        args: [ "--py39-plus", "--keep-runtime-typing" ]
 
   - repo: https://github.com/psf/black
     rev: 22.3.0

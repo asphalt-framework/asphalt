@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 
 import click
 from ruamel.yaml import YAML, ScalarNode
@@ -59,7 +59,7 @@ def run(configfile, unsafe: bool, loop: Optional[str], service: Optional[str]) -
     yaml.constructor.add_constructor("!BinaryFile", binary_file_constructor)
 
     # Read the configuration from the supplied YAML files
-    config: Dict[str, Any] = {}
+    config: dict[str, Any] = {}
     for path in configfile:
         config_data = yaml.load(path)
         assert isinstance(
