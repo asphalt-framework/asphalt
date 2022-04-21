@@ -16,7 +16,6 @@ from async_generator import yield_
 
 from asphalt.core import (
     Context,
-    Dependency,
     NoCurrentContext,
     ResourceConflict,
     ResourceNotFound,
@@ -985,10 +984,3 @@ class TestDependencyInjection:
             func = inject(injected)
 
         assert func is injected
-
-
-def test_dependency_deprecated() -> None:
-    with pytest.deprecated_call():
-
-        async def foo(res: str = Dependency()) -> None:
-            pass

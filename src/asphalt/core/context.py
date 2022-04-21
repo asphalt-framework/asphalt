@@ -13,7 +13,6 @@ __all__ = (
     "get_resource",
     "get_resources",
     "require_resource",
-    "_Dependency",
     "inject",
     "resource",
 )
@@ -991,15 +990,6 @@ def resource(name: str = "default") -> Any:
 
     """
     return _Dependency(name)
-
-
-def Dependency(name: str = "default") -> Any:
-    warnings.warn(
-        "Dependency() has been deprecated (use resource() instead)",
-        DeprecationWarning,
-        stacklevel=2,
-    )
-    return resource(name)
 
 
 @overload

@@ -13,7 +13,6 @@ __all__ = (
     "get_resources",
     "require_resource",
     "NoCurrentContext",
-    "Dependency",
     "inject",
     "resource",
     "executor",
@@ -32,7 +31,6 @@ __all__ = (
 from .component import CLIApplicationComponent, Component, ContainerComponent
 from .context import (
     Context,
-    Dependency,
     NoCurrentContext,
     ResourceConflict,
     ResourceEvent,

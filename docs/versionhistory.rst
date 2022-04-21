@@ -3,6 +3,12 @@ Version history
 
 This library adheres to `Semantic Versioning 2.0 <http://semver.org/>`_.
 
+**UNRELEASED**
+
+- Dropped support for Python 3.8 and earlier
+- Dropped explicit run-time type checking
+- Dropped the deprecated ``Dependency()`` marker
+
 **4.9.1** (2022-05-22)
 
 - Fixed type annotation for ``@context_teardown``
