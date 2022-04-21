@@ -5,6 +5,8 @@ This library adheres to `Semantic Versioning 2.0 <http://semver.org/>`_.
 
 **UNRELEASED**
 
+- **BACKWARD INCOMPATIBLE** Dropped the ``--unsafe`` switch for ``asphalt run`` –
+  configuration files are now always parsed in unsafe mode
 - **BACKWARD INCOMPATIBLE** Dropped the ``@executor`` decorator
 - **BACKWARD INCOMPATIBLE** Moved all exported functions and classes directly to
   ``asphalt.core`` and made submodules private

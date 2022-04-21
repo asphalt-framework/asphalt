@@ -25,43 +25,30 @@ def runner() -> CliRunner:
 
 
 @pytest.mark.parametrize("loop", [None, "uvloop"], ids=["default", "override"])
-@pytest.mark.parametrize("unsafe", [False, True], ids=["safe", "unsafe"])
 def test_run(
     runner: CliRunner,
-    unsafe: bool,
     loop: str | None,
     monkeypatch: MonkeyPatch,
     tmp_path: Path,
 ) -> None:
-    if unsafe:
-        component_class = "!!python/name:{0.__module__}.{0.__name__}".format(
-            DummyComponent
-        )
-    else:
-        component_class = "{0.__module__}:{0.__name__}".format(DummyComponent)
-
     monkeypatch.setenv("MYENVVAR", "from environment")
     tmp_path = tmp_path.joinpath("tmpfile")
     tmp_path.write_text("Hello, World!")
 
-    config = """\
+    config = f"""\
 ---
 event_loop_policy: bogus
 component:
-  type: {cls}
+  type: !!python/name:{DummyComponent.__module__}.{DummyComponent.__name__}
   dummyval1: testval
   envval: !Env MYENVVAR
-  textfileval: !TextFile {tmppath}
-  binaryfileval: !BinaryFile {tmppath}
+  textfileval: !TextFile {tmp_path}
+  binaryfileval: !BinaryFile {tmp_path}
 logging:
   version: 1
   disable_existing_loggers: false
-""".format(
-        cls=component_class, tmppath=str(tmp_path)
-    )
+"""
     args = ["test.yml"]
-    if unsafe:
-        args.append("--unsafe")
     if loop:
         args.extend(["--loop", loop])
 
@@ -77,7 +64,7 @@ logging:
         assert len(args) == 0
         assert kwargs == {
             "component": {
-                "type": DummyComponent if unsafe else component_class,
+                "type": DummyComponent,
                 "dummyval1": "testval",
                 "envval": "from environment",
                 "textfileval": "Hello, World!",

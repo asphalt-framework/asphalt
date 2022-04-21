@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 import click
 from ruamel.yaml import YAML, ScalarNode
@@ -35,12 +35,6 @@ def main() -> None:
 @main.command(help="Read one or more configuration files and start the application.")
 @click.argument("configfile", type=click.File(), nargs=-1, required=True)
 @click.option(
-    "--unsafe",
-    is_flag=True,
-    default=False,
-    help="use unsafe mode when loading YAML (enables markup extensions)",
-)
-@click.option(
     "-l",
     "--loop",
     type=click.Choice(policies.names),
@@ -52,8 +46,8 @@ def main() -> None:
     type=str,
     help="service to run (if the configuration file contains multiple services)",
 )
-def run(configfile, unsafe: bool, loop: Optional[str], service: Optional[str]) -> None:
-    yaml = YAML(typ="unsafe" if unsafe else "safe")
+def run(configfile, loop: str | None, service: str | None) -> None:
+    yaml = YAML(typ="unsafe")
     yaml.constructor.add_constructor("!Env", env_constructor)
     yaml.constructor.add_constructor("!TextFile", text_file_constructor)
     yaml.constructor.add_constructor("!BinaryFile", binary_file_constructor)
