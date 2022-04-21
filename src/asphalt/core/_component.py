@@ -145,12 +145,12 @@ class CLIApplicationComponent(ContainerComponent):
                 if 0 <= retval <= 127:
                     sys.exit(retval)
                 else:
-                    warn("exit code out of range: %d" % retval)
+                    warn(f"exit code out of range: {retval}")
                     sys.exit(1)
             elif retval is not None:
                 warn(
-                    "run() must return an integer or None, not %s"
-                    % qualified_name(retval.__class__)
+                    f"run() must return an integer or None, not "
+                    f"{qualified_name(retval.__class__)}"
                 )
                 sys.exit(1)
             else:
