@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-__all__ = ("run_application",)
-
 import signal
 import sys
 from logging import INFO, basicConfig, getLogger
