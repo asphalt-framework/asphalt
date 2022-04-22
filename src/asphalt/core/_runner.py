@@ -28,7 +28,10 @@ async def handle_signals(*, task_status: TaskStatus) -> None:
     with anyio.open_signal_receiver(signal.SIGTERM, signal.SIGINT) as signals:
         task_status.started()
         async for signum in signals:
-            logger.info("Received %s – terminating application", signum.name)
+            logger.info(
+                "Received signal (%s) – terminating application",
+                signal.strsignal(signum),
+            )
             stop_application()
             return
 
@@ -93,8 +96,8 @@ async def run_application(
     try:
         async with Context() as context, create_task_group() as root_tg:
             send, receive = create_memory_object_stream(1, int)
-            context.add_resource(send, "exit_code_stream")
-            context.add_resource(root_tg, "root_taskgroup", [TaskGroup])
+            await context.add_resource(send, "exit_code_stream")
+            await context.add_resource(root_tg, "root_taskgroup", [TaskGroup])
             await root_tg.start(handle_signals)
             try:
                 with anyio.fail_after(start_timeout):

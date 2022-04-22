@@ -40,7 +40,7 @@ class Detector:
                         last_modified = resp.headers["date"]
                         new_lines = (await resp.text()).split("\n")
                         if old_lines is not None and old_lines != new_lines:
-                            self.changed.dispatch(old_lines, new_lines)
+                            await self.changed.dispatch(old_lines, new_lines)
 
                         old_lines = new_lines
 
@@ -55,7 +55,7 @@ class ChangeDetectorComponent(Component):
     @context_teardown
     async def start(self, ctx: Context) -> AsyncIterator[None]:
         detector = Detector(self.url, self.delay)
-        ctx.add_resource(detector)
+        await ctx.add_resource(detector)
         task = asyncio.create_task(detector.run())
         logging.info(
             'Started web page change detector for url "%s" with a delay of %d seconds',

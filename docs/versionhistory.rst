@@ -26,6 +26,13 @@ This library adheres to `Semantic Versioning 2.0 <http://semver.org/>`_.
 - **BACKWARD INCOMPATIBLE** Dropped support for context attributes
 - **BACKWARD INCOMPATIBLE** Dropped the ``ctx`` parameter from
   ``CLIApplicationComponent.run()``
+- **BACKWARD INCOMPATIBLE** Refactored the event system:
+
+  * The ``connect()``, ``disconnect()`` and ``dispatch_raw()`` methods were removed
+  * Event dispatching was changed: the ``dispatch()`` method now accepts only an
+    ``Event`` object and fills in the source, topic and time attributes
+  * The ``Event`` class no longer has an initializer, so subclasses don't have to call
+    ``super().__init__()`` anymore
 - **BACKWARD INCOMPATIBLE** Moved all exported functions and classes directly to
   ``asphalt.core`` and made submodules private
 - Dropped support for Python 3.8 and earlier

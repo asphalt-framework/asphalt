@@ -123,31 +123,21 @@ class ResourceContainer:
         )
 
 
+@dataclass
 class ResourceEvent(Event):
     """
     Dispatched when a resource or resource factory has been added to a context.
 
     :ivar resource_types: types the resource was registered under
-    :vartype resource_types: Tuple[type, ...]
+    :vartype resource_types: tuple[type, ...]
     :ivar str name: name of the resource
     :ivar bool is_factory: ``True`` if a resource factory was added, ``False`` if a
         regular resource was added
     """
 
-    __slots__ = "resource_types", "resource_name", "is_factory"
-
-    def __init__(
-        self,
-        source: Context,
-        topic: str,
-        types: tuple[type, ...],
-        name: str,
-        is_factory: bool,
-    ) -> None:
-        super().__init__(source, topic)
-        self.resource_types = types
-        self.resource_name = name
-        self.is_factory = is_factory
+    resource_types: tuple[type, ...]
+    resource_name: str
+    is_factory: bool
 
 
 class ResourceConflict(Exception):
@@ -342,7 +332,7 @@ class Context:
                     f"defer that to a regular async function."
                 )
 
-    def add_resource(
+    async def add_resource(
         self,
         value,
         name: str = "default",
@@ -363,18 +353,21 @@ class Context:
 
         """
         self._check_closed()
+        types_: tuple[type, ...]
         if types:
             if (
                 isclass(types)
                 or get_origin(types) is not None
                 or not isinstance(types, Sequence)
             ):
-                types = (cast(type, types),)
+                types_ = (cast(type, types),)
+            else:
+                types_ = tuple(types)
 
-            if not all(isclass(x) or get_origin(x) is not None for x in types):
+            if not all(isclass(x) or get_origin(x) is not None for x in types_):
                 raise TypeError("types must be a type or sequence of types")
         else:
-            types = (type(value),)
+            types_ = (type(value),)
 
         if value is None:
             raise ValueError('"value" must not be None')
@@ -384,21 +377,21 @@ class Context:
                 "characters and underscores"
             )
 
-        for resource_type in types:
+        for resource_type in types_:
             if (resource_type, name) in self._resources:
                 raise ResourceConflict(
                     f"this context already contains a resource of type "
                     f"{qualified_name(resource_type)} using the name {name!r}"
                 )
 
-        resource = ResourceContainer(value, tuple(types), name, False)
+        resource = ResourceContainer(value, types_, name, False)
         for type_ in resource.types:
             self._resources[(type_, name)] = resource
 
         # Notify listeners that a new resource has been made available
-        self.resource_added.dispatch(types, name, False)
+        await self.resource_added.dispatch(ResourceEvent(types_, name, False))
 
-    def add_resource_factory(
+    async def add_resource_factory(
         self,
         factory_callback: factory_callback_type,
         types: type | Sequence[type] | None = None,
@@ -490,7 +483,7 @@ class Context:
             self._resource_factories[(type_, name)] = resource
 
         # Notify listeners that a new resource has been made available
-        self.resource_added.dispatch(resource_types, name, True)
+        await self.resource_added.dispatch(ResourceEvent(resource_types, name, True))
 
     def get_resource(
         self, type: type[T_Resource], name: str = "default"
@@ -740,7 +733,7 @@ def require_resource(type: type[T_Resource], name: str = "default") -> T_Resourc
 @dataclass
 class _Dependency:
     name: str = "default"
-    cls: type = field(init=False)
+    cls: type = field(init=False, repr=False)
     optional: bool = field(init=False, default=False)
 
     def __getattr__(self, item):

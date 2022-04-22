@@ -125,10 +125,14 @@ async def test_run_callbacks(caplog):
     [
         pytest.param("stop", None, id="stop"),
         pytest.param(
-            "keyboard", "Received SIGINT – terminating application", id="keyboard"
+            "keyboard",
+            "Received signal (Interrupt) – terminating application",
+            id="keyboard",
         ),
         pytest.param(
-            "sigterm", "Received SIGTERM – terminating application", id="sigterm"
+            "sigterm",
+            "Received signal (Terminated) – terminating application",
+            id="sigterm",
         ),
     ],
 )
