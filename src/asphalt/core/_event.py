@@ -28,7 +28,7 @@ from ._utils import qualified_name
 if sys.version_info >= (3, 10):
     from contextlib import aclosing
 else:
-    from async_generator import aclosing
+    from contextlib2 import aclosing
 
 logger = logging.getLogger(__name__)
 

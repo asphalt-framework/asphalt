@@ -13,6 +13,10 @@ This library adheres to `Semantic Versioning 2.0 <http://semver.org/>`_.
 - **BACKWARD INCOMPATIBLE** Dropped the ``resolve_reference()`` utility function
 - **BACKWARD INCOMPATIBLE** Dropped the ``TeardownError`` exception in favor of PEP 654
   exception groups
+- **BACKWARD INCOMPATIBLE** Dropped all context-bound methods of jumping to and from
+  worker threads (``Context.call_async()``, ``Context.call_in_executor()``,
+  ``Context.threadpool()``)
+- **BACKWARD INCOMPATIBLE** Dropped the ``Context.loop`` attribute
 - **BACKWARD INCOMPATIBLE** Dropped the deprecated ability to use a ``Context`` as a
   synchronous context manager
 - **BACKWARD INCOMPATIBLE** Dropped the ``--unsafe`` switch for ``asphalt run`` –

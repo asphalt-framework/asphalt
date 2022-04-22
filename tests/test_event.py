@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import gc
+import sys
 from asyncio import Queue, all_tasks, current_task, get_running_loop
 from collections.abc import Callable
 from datetime import datetime, timedelta, timezone
@@ -8,9 +9,13 @@ from typing import NoReturn
 
 import pytest
 from _pytest.logging import LogCaptureFixture
-from async_generator import aclosing
 
 from asphalt.core import Event, Signal, stream_events, wait_event
+
+if sys.version_info >= (3, 10):
+    from contextlib import aclosing
+else:
+    from contextlib2 import aclosing
 
 pytestmark = pytest.mark.anyio()
 

@@ -1,26 +1,22 @@
 from __future__ import annotations
 
-import asyncio
 import sys
 from asyncio import get_running_loop
 from collections.abc import Callable
 from concurrent.futures import Executor, ThreadPoolExecutor
 from inspect import isawaitable
 from itertools import count
-from threading import Thread, current_thread
 from typing import AsyncGenerator, AsyncIterator, NoReturn, Optional, Union
 from unittest.mock import patch
 
 import pytest
-import pytest_asyncio
-from async_generator import yield_
+from anyio import to_thread
 
 from asphalt.core import (
     Context,
     NoCurrentContext,
     ResourceConflict,
     ResourceNotFound,
-    callable_name,
     context_teardown,
     current_context,
     get_resource,
@@ -41,7 +37,7 @@ def context() -> Context:
     return Context()
 
 
-@pytest_asyncio.fixture
+@pytest.fixture
 async def special_executor(context: Context) -> AsyncIterator[ThreadPoolExecutor]:
     executor = ThreadPoolExecutor(1)
     context.add_resource(executor, "special", types=[Executor])
@@ -55,7 +51,7 @@ class TestResourceContainer:
         container = ResourceContainer(lambda ctx: "foo", (str,), "default", True)
         context = Context()
         if thread:
-            value = await context.call_in_executor(container.generate_value, context)
+            value = await to_thread.run_sync(container.generate_value, context)
         else:
             value = container.generate_value(context)
 
@@ -399,73 +395,6 @@ class TestContext:
             resource = await task
             assert resource == 6
 
-    async def test_call_async_plain(self, context: Context) -> None:
-        def runs_in_event_loop(worker_thread: Thread, x: int, y: int) -> int:
-            assert current_thread() is not worker_thread
-            return x + y
-
-        def runs_in_worker_thread() -> int:
-            return context.call_async(runs_in_event_loop, current_thread(), 1, y=2)
-
-        assert await context.call_in_executor(runs_in_worker_thread) == 3
-
-    async def test_call_async_coroutine(self, context: Context) -> None:
-        async def runs_in_event_loop(worker_thread: Thread, x: int, y: int) -> int:
-            assert current_thread() is not worker_thread
-            await asyncio.sleep(0.1)
-            return x + y
-
-        def runs_in_worker_thread() -> int:
-            return context.call_async(runs_in_event_loop, current_thread(), 1, y=2)
-
-        assert await context.call_in_executor(runs_in_worker_thread) == 3
-
-    async def test_call_async_exception(self, context: Context) -> None:
-        def runs_in_event_loop() -> NoReturn:
-            raise ValueError("foo")
-
-        with pytest.raises(ValueError) as exc:
-            await context.call_in_executor(context.call_async, runs_in_event_loop)
-
-        assert exc.match("foo")
-
-    async def test_call_in_executor(self, context: Context) -> None:
-        """Test that call_in_executor actually runs the target in a worker thread."""
-        worker_thread = await context.call_in_executor(current_thread)
-        assert worker_thread is not current_thread()
-
-    @pytest.mark.parametrize(
-        "use_resource_name", [True, False], ids=["direct", "resource"]
-    )
-    async def test_call_in_executor_explicit(self, context, use_resource_name):
-        executor = ThreadPoolExecutor(1)
-        context.add_resource(executor, types=[Executor])
-        context.add_teardown_callback(executor.shutdown)
-        executor_arg = "default" if use_resource_name else executor
-        worker_thread = await context.call_in_executor(
-            current_thread, executor=executor_arg
-        )
-        assert worker_thread is not current_thread()
-
-    async def test_call_in_executor_context_preserved(self, context: Context) -> None:
-        """
-        Test that call_in_executor runs the callable in a copy of the current (PEP 567)
-        context.
-        """
-
-        async with Context() as ctx:
-            assert await context.call_in_executor(current_context) is ctx
-
-    async def test_threadpool(self, context: Context) -> None:
-        event_loop_thread = current_thread()
-        async with context.threadpool():
-            assert current_thread() is not event_loop_thread
-
-    async def test_threadpool_named_executor(self, context, special_executor):
-        special_executor_thread = special_executor.submit(current_thread).result()
-        async with context.threadpool("special"):
-            assert current_thread() is special_executor_thread
-
 
 class TestContextTeardown:
     @pytest.mark.parametrize(
@@ -521,21 +450,6 @@ class TestContextTeardown:
             " must be an async generator function"
         )
 
-    async def test_bad_args(self) -> None:
-        with pytest.deprecated_call():
-
-            @context_teardown
-            async def start(ctx: Context) -> None:
-                pass
-
-        with pytest.raises(RuntimeError) as exc:
-            await start(None)
-
-        exc.match(
-            r"the first positional argument to %s\(\) has to be a Context instance"
-            % callable_name(start)
-        )
-
     async def test_exception(self) -> None:
         @context_teardown
         async def start(ctx: Context) -> AsyncIterator[None]:
@@ -547,24 +461,6 @@ class TestContextTeardown:
             await start(context)
 
         exc_info.match("dummy error")
-
-    async def test_missing_yield(self) -> None:
-        with pytest.deprecated_call():
-
-            @context_teardown
-            async def start(ctx: Context) -> None:
-                pass
-
-        await start(Context())
-
-    async def test_py35_generator(self) -> None:
-        with pytest.deprecated_call():
-
-            @context_teardown
-            async def start(ctx: Context) -> None:
-                await yield_()
-
-        await start(Context())
 
     @pytest.mark.parametrize(
         "resource_func",
