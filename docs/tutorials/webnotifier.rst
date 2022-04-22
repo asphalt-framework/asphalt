@@ -14,11 +14,11 @@ Setting up the project structure
 
 As in the previous tutorial, you will need a project directory and a virtual environment. Create a
 directory named ``tutorial2`` and make a new virtual environment inside it. Then activate it and
-use ``pip`` to install the ``asphalt-mailer`` and ``aiohttp`` libraries:
+use ``pip`` to install the ``asphalt-mailer`` and ``httpx`` libraries:
 
 .. code-block:: bash
 
-    pip install asphalt-mailer aiohttp
+    pip install asphalt-mailer httpx
 
 This will also pull in the core Asphalt library as a dependency.
 
@@ -29,16 +29,14 @@ otherwise).
 Detecting changes in a web page
 -------------------------------
 
-The first task is to set up a loop that periodically retrieves the web page. For that, you can
-adapt code from the `aiohttp HTTP client tutorial`_::
+The first task is to set up a loop that periodically retrieves the web page. To that
+end, you need to set up an asynchronous HTTP client using the httpx_ library::
 
-    from __future__ import annotations
-
-    import asyncio
     import logging
     from typing import Any
 
-    import aiohttp
+    import anyio
+    import httpx
     from asphalt.core import CLIApplicationComponent, Context, run_application
 
     logger = logging.getLogger(__name__)
@@ -46,12 +44,12 @@ adapt code from the `aiohttp HTTP client tutorial`_::
 
     class ApplicationComponent(CLIApplicationComponent):
         async def run(self) -> None:
-            async with aiohttp.ClientSession() as session:
+            async with httpx.AsyncClient() as http:
                 while True:
-                    async with session.get("http://imgur.com") as resp:
+                    async with http.get("http://imgur.com") as resp:
                         await resp.text()
 
-                    await asyncio.sleep(10)
+                    await anyio.sleep(10)
 
     if __name__ == "__main__":
         run_application(ApplicationComponent(), logging=logging.DEBUG)
@@ -71,26 +69,26 @@ So, modify the code as follows::
     class ApplicationComponent(CLIApplicationComponent):
         async def run(self) -> None:
             last_modified = None
-            async with aiohttp.ClientSession() as session:
+            async with httpx.AsyncClient() as http:
                 while True:
                     headers: dict[str, Any] = (
                         {"if-modified-since": last_modified} if last_modified else {}
                     )
-                    async with session.get("http://imgur.com", headers=headers) as resp:
+                    async with http.get("http://imgur.com", headers=headers) as resp:
                         logger.debug("Response status: %d", resp.status)
                         if resp.status == 200:
                             last_modified = resp.headers["date"]
                             await resp.text()
                             logger.info("Contents changed")
 
-                    await asyncio.sleep(10)
+                    await anyio.sleep(10)
 
 The code here stores the ``date`` header from the first response and uses it in the
 ``if-modified-since`` header of the next request. A ``200`` response indicates that the web page
 has changed so the last modified date is updated and the contents are retrieved from the response.
 Some logging calls were also sprinkled in the code to give you an idea of what's happening.
 
-.. _aiohttp HTTP client tutorial: http://aiohttp.readthedocs.io/en/stable/client.html
+.. _httpx: https://www.python-httpx.org/async/
 
 Computing the changes between old and new versions
 --------------------------------------------------
@@ -105,14 +103,14 @@ to the logger::
 
     class ApplicationComponent(CLIApplicationComponent):
         async def run(self) -> None:
-            async with aiohttp.ClientSession() as session:
+            async with httpx.AsyncClient() as http:
                 last_modified, old_lines = None, None
                 while True:
                     logger.debug("Fetching webpage")
                     headers: dict[str, Any] = (
                         {"if-modified-since": last_modified} if last_modified else {}
                     )
-                    async with session.get("http://imgur.com", headers=headers) as resp:
+                    async with http.get("http://imgur.com", headers=headers) as resp:
                         logger.debug("Response status: %d", resp.status)
                         if resp.status == 200:
                             last_modified = resp.headers["date"]
@@ -123,7 +121,7 @@ to the logger::
 
                             old_lines = new_lines
 
-                    await asyncio.sleep(10)
+                    await anyio.sleep(10)
 
 This modified code now stores the old and new contents in different variables to enable them to be
 compared. The ``.split("\n")`` is needed because :func:`~difflib.unified_diff` requires the input
@@ -165,7 +163,7 @@ And to make the the results look nicer in an email message, you can switch to us
 
         @inject
         async def run(self, *, mailer: Mailer = resource()) -> None:
-            async with aiohttp.ClientSession() as session:
+            async with httpx.AsyncClient() as http:
                 last_modified, old_lines = None, None
                 diff = HtmlDiff()
                 while True:
@@ -173,7 +171,7 @@ And to make the the results look nicer in an email message, you can switch to us
                     headers: dict[str, Any] = (
                         {"if-modified-since": last_modified} if last_modified else {}
                     )
-                    async with session.get("http://imgur.com", headers=headers) as resp:
+                    async with http.get("http://imgur.com", headers=headers) as resp:
                         logger.debug("Response status: %d", resp.status)
                         if resp.status == 200:
                             last_modified = resp.headers["date"]
@@ -188,7 +186,7 @@ And to make the the results look nicer in an email message, you can switch to us
 
                             old_lines = new_lines
 
-                    await asyncio.sleep(10)
+                    await anyio.sleep(10)
 
 You'll need to replace the ``host``, ``sender`` and ``to`` arguments for the mailer component and
 possibly add the ``username`` and ``password`` arguments if your SMTP server requires
@@ -211,20 +209,19 @@ class.
 Create a new module named ``detector`` in the ``webnotifier`` package. Then, add the change event
 class to it::
 
-    import asyncio
+    from dataclasses import dataclass
     import logging
 
-    import aiohttp
+    import httpx
     from asphalt.core import Component, Event, Signal, context_teardown
 
     logger = logging.getLogger(__name__)
 
 
+    @dataclass
     class WebPageChangeEvent(Event):
-        def __init__(self, source, topic, old_lines, new_lines):
-            super().__init__(source, topic)
-            self.old_lines = old_lines
-            self.new_lines = new_lines
+        old_lines: list[str]
+        new_lines: list[str]
 
 This class defines the type of event that the notifier will emit when the target web page changes.
 The old and new content are stored in the event instance to allow the event listener to generate
@@ -240,24 +237,26 @@ Next, add another class in the same module that will do the HTTP requests and ch
             self.delay = delay
 
         async def run(self) -> None:
-            async with aiohttp.ClientSession() as session:
+            async with aiohttp.ClientSession() as http:
                 last_modified, old_lines = None, None
                 while True:
                     logger.debug("Fetching contents of %s", self.url)
                     headers: dict[str, Any] = (
                         {"if-modified-since": last_modified} if last_modified else {}
                     )
-                    async with session.get(self.url, headers=headers) as resp:
+                    async with http.get(self.url, headers=headers) as resp:
                         logger.debug("Response status: %d", resp.status)
                         if resp.status == 200:
                             last_modified = resp.headers["date"]
                             new_lines = (await resp.text()).split("\n")
                             if old_lines is not None and old_lines != new_lines:
-                                await self.changed.dispatch(old_lines, new_lines)
+                                await self.changed.dispatch(
+                                    WebPageChangeEvent(old_lines, new_lines)
+                                )
 
                             old_lines = new_lines
 
-                    await asyncio.sleep(self.delay)
+                    await anyio.sleep(self.delay)
 
 The constructor arguments allow you to freely specify the parameters for the detection process.
 The class includes a signal named ``changed`` that uses the previously created
@@ -276,7 +275,7 @@ Asphalt application::
         async def start(self, ctx: Context) -> None:
             detector = Detector(self.url, self.delay)
             await ctx.add_resource(detector)
-            task = asyncio.create_task(detector.run())
+            start_service_task(detector.run, "Web page change detector")
             logging.info(
                 'Started web page change detector for url "%s" with a delay of %d seconds',
                 self.url,
@@ -286,9 +285,7 @@ Asphalt application::
             yield
 
             # This part is run when the context is being torn down
-            task.cancel()
-            await asyncio.gather(task, return_exceptions=True)
-            logging.info("Shut down web page change detector")
+            logger.info("Shut down web page change detector")
 
 The component's ``start()`` method starts the detector's ``run()`` method as a new task, adds
 the detector object as resource and installs an event listener that will shut down the detector

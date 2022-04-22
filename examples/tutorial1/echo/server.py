@@ -1,21 +1,34 @@
 """This is the server code for the Asphalt echo server tutorial."""
-from asyncio import StreamReader, StreamWriter, start_server
+from collections.abc import AsyncIterator
 
-from asphalt.core import Component, Context, run_application
+import anyio
+from anyio.abc import SocketStream
+
+from asphalt.core import (
+    Component,
+    Context,
+    context_teardown,
+    run_application,
+    start_service_task,
+)
 
 
-async def client_connected(reader: StreamReader, writer: StreamWriter) -> None:
-    message = await reader.readline()
-    writer.write(message)
-    writer.close()
+async def handle(stream: SocketStream) -> None:
+    message = await stream.receive()
+    await stream.send(message)
     print("Message from client:", message.decode().rstrip())
 
 
 class ServerComponent(Component):
-    async def start(self, ctx: Context) -> None:
-        await start_server(client_connected, "localhost", 64100)
+    @context_teardown
+    async def start(self, ctx: Context) -> AsyncIterator[None]:
+        async with await anyio.create_tcp_listener(
+            local_host="localhost", local_port=64100
+        ) as listener:
+            start_service_task(lambda: listener.serve(handle), "Echo server")
+            yield
 
 
 if __name__ == "__main__":
     component = ServerComponent()
-    run_application(component)
+    anyio.run(run_application, component)
