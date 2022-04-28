@@ -690,7 +690,7 @@ class TestDependencyInjection:
     async def test_static_resources(self):
         @inject
         async def injected(
-            foo: int, bar: str = resource(), *, baz: str = resource("alt")
+            foo: int, bar: "str" = resource(), *, baz: str = resource("alt")
         ):
             return foo, bar, baz
 

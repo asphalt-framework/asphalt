@@ -55,6 +55,7 @@ from typing import (
     TypeVar,
     Union,
     cast,
+    get_type_hints,
     overload,
 )
 
@@ -934,9 +935,21 @@ def inject(func: Callable[P, Any]) -> Callable[P, Any]:
     the default value.
 
     """
+    forward_refs_resolved = False
+
+    def resolve_forward_refs() -> None:
+        nonlocal forward_refs_resolved
+        type_hints = get_type_hints(func)
+        for key, dependency in injected_resources.items():
+            dependency.cls = type_hints[key]
+
+        forward_refs_resolved = True
 
     @wraps(func)
     def sync_wrapper(*args, **kwargs) -> T_Retval:
+        if not forward_refs_resolved:
+            resolve_forward_refs()
+
         ctx = current_context()
         resources: dict[str, Any] = {}
         for argname, dependency in injected_resources.items():
@@ -947,6 +960,9 @@ def inject(func: Callable[P, Any]) -> Callable[P, Any]:
 
     @wraps(func)
     async def async_wrapper(*args, **kwargs) -> T_Retval:
+        if not forward_refs_resolved:
+            resolve_forward_refs()
+
         ctx = current_context()
         resources: dict[str, Any] = {}
         for argname, dependency in injected_resources.items():
@@ -964,7 +980,8 @@ def inject(func: Callable[P, Any]) -> Callable[P, Any]:
         if isinstance(param.default, _Dependency):
             if param.kind is Parameter.POSITIONAL_ONLY:
                 raise TypeError(
-                    f"Cannot inject dependency to positional-only parameter {param.name!r}"
+                    f"Cannot inject dependency to positional-only parameter "
+                    f"{param.name!r}"
                 )
 
             if param.annotation is Parameter.empty:
@@ -973,7 +990,6 @@ def inject(func: Callable[P, Any]) -> Callable[P, Any]:
                     f"{callable_name(func)!r} is missing the type annotation"
                 )
 
-            param.default.cls = param.annotation
             injected_resources[param.name] = param.default
 
     if iscoroutinefunction(func):
