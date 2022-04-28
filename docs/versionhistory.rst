@@ -3,7 +3,7 @@ Version history
 
 This library adheres to `Semantic Versioning 2.0 <http://semver.org/>`_.
 
-**UNRELEASED**
+**4.8.0** (2022-04-28)
 
 - ``Context`` now accepts parametrized generic classes as resource types
 - Deprecated context variables in favor of dependency injection
