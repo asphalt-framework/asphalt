@@ -9,6 +9,8 @@ __all__ = (
     "TeardownError",
     "context_teardown",
     "current_context",
+    "get_resource",
+    "require_resource",
     "NoCurrentContext",
     "Dependency",
     "inject",
@@ -38,7 +40,9 @@ from .context import (
     context_teardown,
     current_context,
     executor,
+    get_resource,
     inject,
+    require_resource,
     resource,
 )
 from .event import Event, Signal, stream_events, wait_event

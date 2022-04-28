@@ -11,6 +11,8 @@ This library adheres to `Semantic Versioning 2.0 <http://semver.org/>`_.
   ``asphalt.core.context.resource`` due to issues with strict type checking (the former
   is now deprecated and will be removed in v5.0)
 - Added support for dependency injection on synchronous functions
+- Added shortcut functions for obtaining resources (``asphalt.core.get_resource()``,
+  ``asphalt.core.require_resource()``)
 - Fixed dependency injection not working with forward references
   (``from __future__ import annotations``)
 

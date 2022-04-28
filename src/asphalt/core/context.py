@@ -10,6 +10,8 @@ __all__ = (
     "executor",
     "context_teardown",
     "current_context",
+    "get_resource",
+    "require_resource",
     "_Dependency",
     "inject",
     "resource",
@@ -888,6 +890,16 @@ def current_context() -> Context:
         raise NoCurrentContext
 
     return ctx
+
+
+def get_resource(type: Type[T_Resource], name: str = "default") -> T_Resource | None:
+    """Shortcut for ``current_context().get_resource(...)."""
+    return current_context().get_resource(type, name)
+
+
+def require_resource(type: Type[T_Resource], name: str = "default") -> T_Resource:
+    """Shortcut for ``current_context().require_resource(...)."""
+    return current_context().require_resource(type, name)
 
 
 @dataclass

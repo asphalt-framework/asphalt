@@ -21,10 +21,11 @@ from asphalt.core import (
     context_teardown,
     current_context,
     executor,
+    get_resource,
     inject,
     resource,
 )
-from asphalt.core.context import ResourceContainer
+from asphalt.core.context import ResourceContainer, require_resource
 
 
 @pytest.fixture
@@ -656,6 +657,22 @@ async def test_current_context():
         assert current_context() is parent_ctx
 
     pytest.raises(NoCurrentContext, current_context)
+
+
+@pytest.mark.asyncio
+async def test_get_resource():
+    async with Context() as ctx:
+        ctx.add_resource("foo")
+        assert get_resource(str) == "foo"
+        assert get_resource(int) is None
+
+
+@pytest.mark.asyncio
+async def test_require_resource():
+    async with Context() as ctx:
+        ctx.add_resource("foo")
+        assert require_resource(str) == "foo"
+        pytest.raises(ResourceNotFound, require_resource, int)
 
 
 def test_explicit_parent_deprecation():
