@@ -63,8 +63,8 @@ doc = [
 ]
 
 [project.entry-points."asphalt.core.event_loop_policies"]
-uvloop = "uvloop:EventLoopPolicy [uvloop]"
-tokio = "tokio:TokioLoopPolicy [tokio]"
+uvloop = "uvloop:EventLoopPolicy"
+tokio = "tokio:TokioLoopPolicy"
 
 [project.scripts]
 asphalt = "asphalt.core.cli:main"
