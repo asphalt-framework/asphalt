@@ -582,7 +582,6 @@ class Context:
         """
         # TODO: re-enable when typeguard properly identifies parametrized types as types
         # assert check_argument_types()
-        self._check_closed()
         key = (type, name)
 
         # First check if there's already a matching resource in this context
@@ -600,6 +599,7 @@ class Context:
             None,
         )
         if resource is not None:
+            self._check_closed()
             return resource.generate_value(self)
 
         # Finally, check parents for a matching resource
@@ -697,6 +697,9 @@ class Context:
         value = self.get_resource(type, name)
         if value is not None:
             return value
+
+        # Stop here before new resources are created
+        self._check_closed()
 
         # Wait until a matching resource or resource factory is available
         signals = [ctx.resource_added for ctx in self.context_chain]

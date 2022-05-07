@@ -2,6 +2,7 @@ import asyncio
 import sys
 from asyncio import CancelledError
 from concurrent.futures import Executor, ThreadPoolExecutor
+from inspect import isawaitable
 from itertools import count
 from threading import current_thread
 from typing import AsyncGenerator, AsyncIterator, Dict
@@ -620,6 +621,54 @@ class TestContextTeardown:
                 await yield_()
 
         await start(Context())
+
+    @pytest.mark.parametrize(
+        "resource_func",
+        [
+            pytest.param(Context.get_resource, id="get_resource"),
+            pytest.param(Context.require_resource, id="require_resource"),
+            pytest.param(Context.request_resource, id="request_resource"),
+        ],
+    )
+    @pytest.mark.asyncio
+    async def test_get_resource_at_teardown(self, resource_func):
+        resource: str
+
+        async def teardown_callback():
+            nonlocal resource
+            resource = resource_func(ctx, str)
+            if isawaitable(resource):
+                resource = await resource
+
+        async with Context() as ctx:
+            ctx.add_resource("blah")
+            ctx.add_teardown_callback(teardown_callback)
+
+        assert resource == "blah"
+
+    @pytest.mark.parametrize(
+        "resource_func",
+        [
+            pytest.param(Context.get_resource, id="get_resource"),
+            pytest.param(Context.require_resource, id="require_resource"),
+            pytest.param(Context.request_resource, id="request_resource"),
+        ],
+    )
+    @pytest.mark.asyncio
+    async def test_generate_resource_at_teardown(self, resource_func):
+        async def teardown_callback():
+            resource = resource_func(ctx, str)
+            if isawaitable(resource):
+                await resource
+
+        with pytest.raises(TeardownError) as exc:
+            async with Context() as ctx:
+                ctx.add_resource_factory(lambda context: "blah", [str])
+                ctx.add_teardown_callback(teardown_callback)
+
+        assert len(exc.value.exceptions) == 1
+        assert isinstance(exc.value.exceptions[0], RuntimeError)
+        assert str(exc.value.exceptions[0]) == "this context has already been closed"
 
 
 class TestContextFinisher:
