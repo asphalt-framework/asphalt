@@ -4,6 +4,8 @@
 .tox
 .coverage
 .cache
+.mypy_cache
+.pytest_cache
 .eggs/
 *.egg-info/
 __pycache__/
@@ -11,3 +13,4 @@ docs/_build/
 dist/
 build/
 virtualenv/
+venv*
