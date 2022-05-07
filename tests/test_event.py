@@ -1,19 +1,11 @@
 import gc
-from asyncio import Queue
+from asyncio import Queue, all_tasks, current_task
 from datetime import datetime, timedelta, timezone
 
 import pytest
 from async_generator import aclosing
 
 from asphalt.core import Event, Signal, stream_events, wait_event
-
-try:
-    from asyncio import all_tasks, current_task
-except ImportError:
-    from asyncio import Task
-
-    all_tasks = Task.all_tasks
-    current_task = Task.current_task
 
 
 class DummyEvent(Event):
