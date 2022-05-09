@@ -120,11 +120,19 @@ To specify a non-default name for the dependency, you can pass that name as an a
     async def some_function(some_arg, some_resource: MyResourceType = resource('alternate')):
         ...
 
+Resources can be declared to be optional too, by using either :data:`~typing.Optional`
+or ``| None`` (Python 3.10+ only)::
+
+    @inject
+    async def some_function(some_arg, some_resource: Optional[MyResourceType] = resource('alternate')):
+        ...  # some_resource will be None if it's not found
+
 Restrictions:
 
 * The resource arguments must not be positional-only arguments
-* The resources (or their relevant factories) must already be present in the context stack when
-  the decorated function is called, or otherwise :exc:`~.context.ResourceNotFound` is raised
+* The resources (or their relevant factories) must already be present in the context
+  stack (unless declared optional) when the decorated function is called, or otherwise
+  :exc:`~.context.ResourceNotFound` is raised
 
 .. _dependency injection: https://en.wikipedia.org/wiki/Dependency_injection
 

@@ -9,6 +9,8 @@ This library adheres to `Semantic Versioning 2.0 <http://semver.org/>`_.
 - Allowed resource retrieval and generation in teardown callbacks until the context has
   been completely closed (this would previously raise
   ``RuntimeError("this context has already been closed")``)
+- Allowed specifying optional dependencies with dependency injection, using either
+  ``Optional[SomeType]`` (all Python versions) or ``SomeType | None`` (Python 3.10+)
 
 **4.8.0** (2022-04-28)
 

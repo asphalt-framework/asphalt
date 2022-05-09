@@ -22,6 +22,7 @@ import asyncio
 import logging
 import re
 import sys
+import types
 import warnings
 from asyncio import (
     AbstractEventLoop,
@@ -79,9 +80,9 @@ else:
     from typing_extensions import ParamSpec
 
 if sys.version_info >= (3, 8):
-    from typing import get_origin
+    from typing import get_args, get_origin
 else:
-    from typing_extensions import get_origin
+    from typing_extensions import get_args, get_origin
 
 logger = logging.getLogger(__name__)
 factory_callback_type = Callable[["Context"], Any]
@@ -928,6 +929,7 @@ def require_resource(type: Type[T_Resource], name: str = "default") -> T_Resourc
 class _Dependency:
     name: str = "default"
     cls: type = field(init=False)
+    optional: bool = field(init=False, default=False)
 
 
 def resource(name: str = "default") -> Any:
@@ -965,8 +967,8 @@ def inject(func: Callable[P, Any]) -> Callable[P, Any]:
     """
     Wrap the given coroutine function for use with dependency injection.
 
-    Parameters with dependencies need to be annotated and have a :class:`Dependency` instance as
-    the default value.
+    Parameters with dependencies need to be annotated and have :func:`resource` as the
+    default value.
 
     """
     forward_refs_resolved = False
@@ -976,6 +978,23 @@ def inject(func: Callable[P, Any]) -> Callable[P, Any]:
         type_hints = get_type_hints(func)
         for key, dependency in injected_resources.items():
             dependency.cls = type_hints[key]
+            origin = get_origin(type_hints[key])
+            if origin is Union or (
+                sys.version_info >= (3, 10) and origin is types.UnionType  # noqa: E721
+            ):
+                args = [
+                    arg
+                    for arg in get_args(dependency.cls)
+                    if arg is not type(None)  # noqa: E721
+                ]
+                if len(args) == 1:
+                    dependency.optional = True
+                    dependency.cls = args[0]
+                else:
+                    raise TypeError(
+                        "Unions are only valid with dependency injection when there "
+                        "are exactly two items and other item is None"
+                    )
 
         forward_refs_resolved = True
 
@@ -987,7 +1006,11 @@ def inject(func: Callable[P, Any]) -> Callable[P, Any]:
         ctx = current_context()
         resources: dict[str, Any] = {}
         for argname, dependency in injected_resources.items():
-            resource: Any = ctx.require_resource(dependency.cls, dependency.name)
+            if dependency.optional:
+                resource = ctx.get_resource(dependency.cls, dependency.name)
+            else:
+                resource = ctx.require_resource(dependency.cls, dependency.name)
+
             resources[argname] = resource
 
         return func(*args, **kwargs, **resources)
@@ -1000,7 +1023,11 @@ def inject(func: Callable[P, Any]) -> Callable[P, Any]:
         ctx = current_context()
         resources: dict[str, Any] = {}
         for argname, dependency in injected_resources.items():
-            resource: Any = ctx.require_resource(dependency.cls, dependency.name)
+            if dependency.optional:
+                resource = ctx.get_resource(dependency.cls, dependency.name)
+            else:
+                resource = ctx.require_resource(dependency.cls, dependency.name)
+
             if isawaitable(resource):
                 resource = await resource
 

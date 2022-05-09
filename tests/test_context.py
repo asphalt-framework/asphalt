@@ -5,7 +5,7 @@ from concurrent.futures import Executor, ThreadPoolExecutor
 from inspect import isawaitable
 from itertools import count
 from threading import current_thread
-from typing import AsyncGenerator, AsyncIterator, Dict
+from typing import AsyncGenerator, AsyncIterator, Dict, Optional
 from unittest.mock import patch
 
 import pytest
@@ -822,6 +822,56 @@ class TestDependencyInjection:
                 await injected(2)
 
         exc.match("no matching resource was found for type=str name='default'")
+
+    @pytest.mark.parametrize(
+        "annotation",
+        [
+            pytest.param(Optional[str], id="optional"),
+            # pytest.param(Union[str, int, None], id="union"),
+            pytest.param(
+                "str | None",
+                id="uniontype.10",
+                marks=[
+                    pytest.mark.skipif(
+                        sys.version_info < (3, 10), reason="Requires Python 3.10+"
+                    )
+                ],
+            ),
+        ],
+    )
+    @pytest.mark.parametrize(
+        "sync",
+        [
+            pytest.param(True, id="sync"),
+            pytest.param(False, id="async"),
+        ],
+    )
+    @pytest.mark.asyncio
+    async def test_inject_optional_resource_async(
+        self, annotation: type, sync: bool
+    ) -> None:
+        if sync:
+
+            @inject
+            def injected(
+                res: annotation = resource(),  # type: ignore[valid-type]
+            ) -> annotation:  # type: ignore[valid-type]
+                return res
+
+        else:
+
+            @inject
+            async def injected(
+                res: annotation = resource(),  # type: ignore[valid-type]
+            ) -> annotation:  # type: ignore[valid-type]
+                return res
+
+        async with Context() as ctx:
+            retval = injected() if sync else (await injected())
+            assert retval is None
+            ctx.add_resource("hello")
+            retval = injected() if sync else (await injected())
+            assert retval == "hello"
 
 
 def test_dependency_deprecated():
