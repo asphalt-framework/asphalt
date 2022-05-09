@@ -36,6 +36,7 @@ from collections.abc import Sequence as ABCSequence
 from concurrent.futures import Executor
 from contextvars import ContextVar, Token, copy_context
 from dataclasses import dataclass, field
+from enum import Enum, auto
 from functools import wraps
 from inspect import (
     Parameter,
@@ -230,6 +231,12 @@ class NoCurrentContext(Exception):
         super().__init__("There is no active context")
 
 
+class ContextState(Enum):
+    open = auto()
+    closing = auto()
+    closed = auto()
+
+
 class Context:
     """
     Contexts give request handlers and callbacks access to resources.
@@ -264,7 +271,7 @@ class Context:
             )
             self._parent = parent
 
-        self._closed = False
+        self._state = ContextState.open
         self._resources: Dict[Tuple[type, str], ResourceContainer] = {}
         self._resource_factories: Dict[Tuple[type, str], ResourceContainer] = {}
         self._resource_factories_by_context_attr: Dict[str, ResourceContainer] = {}
@@ -311,11 +318,15 @@ class Context:
 
     @property
     def closed(self) -> bool:
-        """Return ``True`` if the context has been closed, ``False`` otherwise."""
-        return self._closed
+        """
+        Return ``True`` if the teardown process has at least been initiated, ``False``
+        otherwise.
+
+        """
+        return self._state is not ContextState.open
 
     def _check_closed(self):
-        if self._closed:
+        if self._state is ContextState.closed:
             raise RuntimeError("this context has already been closed")
 
     def add_teardown_callback(
@@ -358,20 +369,27 @@ class Context:
 
         """
         self._check_closed()
-        self._closed = True
+        if self._state is ContextState.closing:
+            raise RuntimeError("this context is already closing")
 
-        exceptions = []
-        for callback, pass_exception in reversed(self._teardown_callbacks):
-            try:
-                retval = callback(exception) if pass_exception else callback()
-                if isawaitable(retval):
-                    await retval
-            except Exception as e:
-                exceptions.append(e)
+        self._state = ContextState.closing
 
-        del self._teardown_callbacks
-        if exceptions:
-            raise TeardownError(exceptions)
+        try:
+            exceptions = []
+            while self._teardown_callbacks:
+                callbacks, self._teardown_callbacks = self._teardown_callbacks, []
+                for callback, pass_exception in reversed(callbacks):
+                    try:
+                        retval = callback(exception) if pass_exception else callback()
+                        if isawaitable(retval):
+                            await retval
+                    except Exception as e:
+                        exceptions.append(e)
+
+            if exceptions:
+                raise TeardownError(exceptions)
+        finally:
+            self._state = ContextState.closed
 
     def __enter__(self):
         warnings.warn(
@@ -582,6 +600,7 @@ class Context:
         """
         # TODO: re-enable when typeguard properly identifies parametrized types as types
         # assert check_argument_types()
+        self._check_closed()
         key = (type, name)
 
         # First check if there's already a matching resource in this context
@@ -599,7 +618,6 @@ class Context:
             None,
         )
         if resource is not None:
-            self._check_closed()
             return resource.generate_value(self)
 
         # Finally, check parents for a matching resource
@@ -697,9 +715,6 @@ class Context:
         value = self.get_resource(type, name)
         if value is not None:
             return value
-
-        # Stop here before new resources are created
-        self._check_closed()
 
         # Wait until a matching resource or resource factory is available
         signals = [ctx.resource_added for ctx in self.context_chain]
@@ -1059,13 +1074,14 @@ def start_background_task(
 
     async def run_task() -> None:
         try:
-            async with Context():
-                await func()
+            try:
+                async with Context():
+                    await func()
+            finally:
+                root_context._teardown_callbacks.remove(teardown_callback)
         except Exception as exc:
-            if exc is not None and propagate_errors:
+            if exc is not None and propagate_errors and not root_context.closed:
                 await root_context.close(exc)
-        finally:
-            root_context._teardown_callbacks.remove(teardown_callback)
 
     # Find the top level context
     root_context = current_context()

@@ -6,8 +6,9 @@ This library adheres to `Semantic Versioning 2.0 <http://semver.org/>`_.
 **UNRELEASED**
 
 - Added the ``start_background_task()`` function
-- Allowed retrieving existing resources from a context in teardown callbacks (this would
-  previously raise ``RuntimeError("this context has already been closed")``)
+- Allowed resource retrieval and generation in teardown callbacks until the context has
+  been completely closed (this would previously raise
+  ``RuntimeError("this context has already been closed")``)
 
 **4.8.0** (2022-04-28)
 

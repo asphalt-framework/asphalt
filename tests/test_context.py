@@ -115,6 +115,20 @@ class TestContext:
         assert called_functions == [(async_callback, exception), (callback, exception)]
 
     @pytest.mark.asyncio
+    async def test_close_while_running_teardown(self, context):
+        """
+        Test that trying to close the context from a teardown callback raises a
+        RuntimeError.
+        """
+
+        async def try_close_context():
+            with pytest.raises(RuntimeError, match="this context is already closing"):
+                await context.close()
+
+        context.add_teardown_callback(try_close_context)
+        await context.close()
+
+    @pytest.mark.asyncio
     async def test_teardown_callback_exception(self, context):
         """
         Test that all callbacks are called even when some teardown callbacks raise exceptions,
@@ -656,19 +670,19 @@ class TestContextTeardown:
     )
     @pytest.mark.asyncio
     async def test_generate_resource_at_teardown(self, resource_func):
+        resource: str
+
         async def teardown_callback():
+            nonlocal resource
             resource = resource_func(ctx, str)
             if isawaitable(resource):
-                await resource
+                resource = await resource
 
-        with pytest.raises(TeardownError) as exc:
-            async with Context() as ctx:
-                ctx.add_resource_factory(lambda context: "blah", [str])
-                ctx.add_teardown_callback(teardown_callback)
+        async with Context() as ctx:
+            ctx.add_resource_factory(lambda context: "blah", [str])
+            ctx.add_teardown_callback(teardown_callback)
 
-        assert len(exc.value.exceptions) == 1
-        assert isinstance(exc.value.exceptions[0], RuntimeError)
-        assert str(exc.value.exceptions[0]) == "this context has already been closed"
+        assert resource == "blah"
 
 
 class TestContextFinisher:
