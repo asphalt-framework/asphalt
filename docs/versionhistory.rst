@@ -5,6 +5,8 @@ This library adheres to `Semantic Versioning 2.0 <http://semver.org/>`_.
 
 **UNRELEASED**
 
+- Added ``asphalt.core.get_resources()`` as a top-level shortcut for
+  ``current_context().get_resources(...)``
 - Allowed resource retrieval and generation in teardown callbacks until the context has
   been completely closed (this would previously raise
   ``RuntimeError("this context has already been closed")``)
