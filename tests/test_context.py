@@ -881,6 +881,32 @@ class TestDependencyInjection:
             retval = injected() if sync else (await injected())
             assert retval == "hello"
 
+    def test_resource_function_not_called(self):
+        async def injected(foo: int, bar: str = resource):
+            pass
+
+        with pytest.raises(TypeError) as exc:
+            inject(injected)
+
+        exc.match(
+            f"Default value for parameter 'bar' of function "
+            f"{__name__}.{self.__class__.__name__}.test_resource_function_not_called"
+            f".<locals>.injected was the 'resource' function – did you forget to add "
+            f"the parentheses at the end\\?"
+        )
+
+    def test_missing_inject(self):
+        def injected(foo: int, bar: str = resource()):
+            bar.lower()
+
+        with pytest.raises(AttributeError) as exc:
+            injected(1)
+
+        exc.match(
+            r"Attempted to access an attribute in a resource\(\) marker – did you "
+            r"forget to add the @inject decorator\?"
+        )
+
 
 def test_dependency_deprecated():
     with pytest.deprecated_call():

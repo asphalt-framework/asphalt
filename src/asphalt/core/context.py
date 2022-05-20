@@ -934,6 +934,12 @@ class _Dependency:
     cls: type = field(init=False)
     optional: bool = field(init=False, default=False)
 
+    def __getattr__(self, item):
+        raise AttributeError(
+            "Attempted to access an attribute in a resource() marker – did you forget "
+            "to add the @inject decorator?"
+        )
+
 
 def resource(name: str = "default") -> Any:
     """
@@ -1058,6 +1064,12 @@ def inject(func: Callable[P, Any]) -> Callable[P, Any]:
                 )
 
             injected_resources[param.name] = param.default
+        elif param.default is resource:
+            raise TypeError(
+                f"Default value for parameter {param.name!r} of function "
+                f"{callable_name(func)} was the 'resource' function – did you forget "
+                f"to add the parentheses at the end?"
+            )
 
     if iscoroutinefunction(func):
         return async_wrapper

@@ -15,6 +15,8 @@ This library adheres to `Semantic Versioning 2.0 <http://semver.org/>`_.
 - ``Context.call_in_executor()`` now copies the current `PEP 567`_ context to the worker
   thread, allowing operations that require the "current context" to be present (e.g.
   dependency injection)
+- Raise better errors when the developer forgets to call ``resource()`` or forgets to
+  add the ``@inject`` decorator
 
 .. _PEP 567: https://peps.python.org/pep-0567/
 
