@@ -7,8 +7,7 @@ import logging
 from typing import Any
 
 import aiohttp
-from asphalt.core import Component, Event, Signal
-from asphalt.core.context import context_teardown
+from asphalt.core import Component, Event, Signal, start_background_task
 
 logger = logging.getLogger(__name__)
 
@@ -53,20 +52,12 @@ class ChangeDetectorComponent(Component):
         self.url = url
         self.delay = delay
 
-    @context_teardown
     async def start(self, ctx):
         detector = Detector(self.url, self.delay)
         ctx.add_resource(detector)
-        task = asyncio.create_task(detector.run())
+        start_background_task(detector.run)
         logging.info(
             'Started web page change detector for url "%s" with a delay of %d seconds',
             self.url,
             self.delay,
         )
-
-        yield
-
-        # This part is run when the context is finished
-        task.cancel()
-        await asyncio.gather(task, return_exceptions=True)
-        logger.info("Shut down web page change detector")

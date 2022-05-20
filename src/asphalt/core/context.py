@@ -781,6 +781,82 @@ class Context:
 
         return asyncio_extras.threadpool(executor)
 
+    def start_background_task(
+        self,
+        func: Callable[[], Coroutine[Any, Any, Any]],
+        *,
+        name: str | None = None,
+        grace_period: float = 0,
+        propagate_errors: bool = True,
+    ) -> None:
+        """
+        Start a background task which is tied to the lifespan of this context.
+
+        If the context is closed before the task finishes, the context will wait up to
+        ``grace_period`` seconds for the task to complete before cancelling the task.
+        If the task gets cancelled, it will still be awaited on. If the task finishes
+        on its own before the context is closed, none of the above applies.
+
+        If the context is closed due to an exception, all background tasks are cancelled
+        immediately (but still awaited on).
+
+        To pass arguments to the callable, use either a ``lambda`` or
+        :func:`~functools.partial`.
+
+        :param func: a callable returning a coroutine object
+        :param name: a descriptive name for the task
+        :param grace_period: seconds to wait for the task to finish at context shutdown
+            before cancelling it
+        :param propagate_errors: if ``True`` and the task raises an exception, close the
+            context with that exception
+        """
+
+        async def finalize_task(exception: BaseException | None) -> None:
+            nonlocal grace_period
+
+            # Cancel the task if the root context closed with an exception
+            if exception is not None:
+                grace_period = 0
+
+            try:
+                async with timeout(grace_period):
+                    await task
+            except (CancelledError, asyncio.TimeoutError):
+                pass
+
+        async def run_task() -> None:
+            try:
+                try:
+                    async with Context():
+                        await func()
+                finally:
+                    if self._state is ContextState.open:
+                        self._teardown_callbacks.remove(teardown_callback)
+            except Exception as exc:
+                if exc is not None and propagate_errors and not self.closed:
+                    logger.exception("Background task (%s) crashed", name)
+                    await self.close(exc)
+
+                raise
+
+        self._check_closed()
+        if not isinstance(grace_period, (int, float)) or grace_period < 0:
+            raise ValueError("grace_period must be a number higher or equal to 0")
+
+        # Create a contextvar context (not Asphalt context) where this context
+        # is the current context
+        context = copy_context()
+        context.run(_current_context.set, self)
+
+        # Task names are only supported on Python 3.8+
+        name = name or f"Asphalt task: {callable_name(func)}()"
+        kwargs: dict[str, Any] = {"name": name} if sys.version_info >= (3, 8) else {}
+        task = context.run(
+            asyncio.create_task, run_task(), **kwargs  # type: ignore[arg-type]
+        )
+        teardown_callback = (finalize_task, True)
+        self._teardown_callbacks.append(teardown_callback)
+
 
 def executor(arg: Union[Executor, str, Callable] = None):
     """
@@ -1069,68 +1145,22 @@ def start_background_task(
     """
     Start a background task which is tied to the lifespan of the root context.
 
-    If the root context is closed before the task finishes, the context will wait up to
-    ``grace_period`` seconds for the task to complete before cancelling the task.
-    If the task gets cancelled, it will still be awaited on. If the task finishes
-    on its own before the context is closed, none of the above applies.
+    .. seealso:: :meth:`Context.start_background_task`
 
-    If the root context is closed due to an exception, all background tasks are
-    automatically cancelled.
-
-    :param coro: a coroutine object
+    :param func: a callable returning a coroutine object
     :param name: a descriptive name for the task
     :param grace_period: seconds to wait for the task to finish at context shutdown
         before cancelling it
     :param propagate_errors: if ``True`` and the task raises an error, close the
         root context
-
     """
 
-    async def finalize_task(exception: BaseException | None) -> None:
-        nonlocal grace_period
-
-        # Cancel the task if the root context closed with an exception
-        if exception is not None:
-            grace_period = 0
-
-        try:
-            async with timeout(grace_period):
-                await task
-        except (CancelledError, asyncio.TimeoutError):
-            pass
-
-    async def run_task() -> None:
-        try:
-            try:
-                async with Context():
-                    await func()
-            finally:
-                root_context._teardown_callbacks.remove(teardown_callback)
-        except Exception as exc:
-            if exc is not None and propagate_errors and not root_context.closed:
-                await root_context.close(exc)
-
-    # Find the top level context
+    # Find the root context
     root_context = current_context()
     while root_context.parent is not None:
         root_context = root_context.parent
 
-    root_context._check_closed()
-    if not isinstance(grace_period, (int, float)) or grace_period < 0:
-        raise ValueError("grace_period must be a number higher or equal to 0")
-
-    # Create a contextvar context (not Asphalt context) where the root Asphalt context
-    # is the current context
-    context = copy_context()
-    context.run(_current_context.set, root_context)
-
-    # Task names are only supported on Python 3.8+
-    kwargs: dict[str, Any] = {}
-    if sys.version_info >= (3, 8):
-        kwargs["name"] = name or f"Asphalt task: {callable_name(func)}()"
-
-    task = context.run(
-        asyncio.create_task, run_task(), **kwargs  # type: ignore[arg-type]
+    # Start the background task in the root context
+    root_context.start_background_task(
+        func, name=name, grace_period=grace_period, propagate_errors=propagate_errors
     )
-    teardown_callback = (finalize_task, True)
-    root_context._teardown_callbacks.append(teardown_callback)
