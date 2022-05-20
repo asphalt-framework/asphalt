@@ -38,7 +38,7 @@ from concurrent.futures import Executor
 from contextvars import ContextVar, Token, copy_context
 from dataclasses import dataclass, field
 from enum import Enum, auto
-from functools import wraps
+from functools import partial, wraps
 from inspect import (
     Parameter,
     getattr_static,
@@ -764,7 +764,8 @@ class Context:
         if self._loop is None:
             self._loop = get_running_loop()
 
-        return asyncio_extras.call_in_executor(func, *args, executor=executor, **kwargs)
+        callback = partial(copy_context().run, func, *args, **kwargs)
+        return self._loop.run_in_executor(executor, callback)
 
     def threadpool(self, executor: Union[Executor, str] = None):
         """

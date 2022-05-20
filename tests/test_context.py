@@ -485,6 +485,16 @@ class TestContext:
         assert worker_thread is not current_thread()
 
     @pytest.mark.asyncio
+    async def test_call_in_executor_context_preserved(self, context):
+        """
+        Test that call_in_executor runs the callable in a copy of the current (PEP 567)
+        context.
+        """
+
+        async with Context() as ctx:
+            assert await context.call_in_executor(current_context) is ctx
+
+    @pytest.mark.asyncio
     async def test_threadpool(self, context):
         event_loop_thread = current_thread()
         async with context.threadpool():
