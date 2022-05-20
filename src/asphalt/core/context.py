@@ -971,7 +971,13 @@ def inject(func: Callable[P, Any]) -> Callable[P, Any]:
     Wrap the given coroutine function for use with dependency injection.
 
     Parameters with dependencies need to be annotated and have :func:`resource` as the
-    default value.
+    default value. When the wrapped function is called, values for such parameters will
+    be automatically filled in by calling :func:`require_resource` using the parameter's
+    type annotation and the resource name passed to :func:`resource` (or ``"default"``)
+    as the arguments.
+
+    Any forward references among the type annotations are resolved on the first call to
+    the wrapped function.
 
     """
     forward_refs_resolved = False
