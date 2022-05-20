@@ -1,10 +1,10 @@
 """This is the server code for the Asphalt echo server tutorial."""
-from asyncio import start_server
+from asyncio import StreamReader, StreamWriter, start_server
 
-from asphalt.core import Component, run_application
+from asphalt.core import Component, Context, run_application
 
 
-async def client_connected(reader, writer):
+async def client_connected(reader: StreamReader, writer: StreamWriter) -> None:
     message = await reader.readline()
     writer.write(message)
     writer.close()
@@ -12,7 +12,7 @@ async def client_connected(reader, writer):
 
 
 class ServerComponent(Component):
-    async def start(self, ctx):
+    async def start(self, ctx: Context) -> None:
         await start_server(client_connected, "localhost", 64100)
 
 

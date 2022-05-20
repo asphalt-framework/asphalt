@@ -27,7 +27,7 @@ def binary_file_constructor(loader, node):
 
 
 @click.group()
-def main():
+def main() -> None:
     pass  # pragma: no cover
 
 
@@ -51,7 +51,7 @@ def main():
     type=str,
     help="service to run (if the configuration file contains multiple services)",
 )
-def run(configfile, unsafe: bool, loop: Optional[str], service: Optional[str]):
+def run(configfile, unsafe: bool, loop: Optional[str], service: Optional[str]) -> None:
     yaml = YAML(typ="unsafe" if unsafe else "safe")
     yaml.constructor.add_constructor("!Env", env_constructor)
     yaml.constructor.add_constructor("!TextFile", text_file_constructor)

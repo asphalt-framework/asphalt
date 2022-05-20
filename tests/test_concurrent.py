@@ -1,5 +1,8 @@
+from __future__ import annotations
+
+from asyncio import AbstractEventLoop
 from concurrent.futures import Executor, ThreadPoolExecutor
-from threading import current_thread
+from threading import Thread, current_thread
 
 import pytest
 import pytest_asyncio
@@ -25,9 +28,11 @@ async def special_executor(context: Context) -> ThreadPoolExecutor:
     "use_resource_name", [False, True], ids=["instance", "resource_name"]
 )
 @pytest.mark.asyncio
-async def test_executor_special(context, use_resource_name, special_executor):
+async def test_executor_special(
+    context: Context, use_resource_name: bool, special_executor: ThreadPoolExecutor
+) -> None:
     @executor("special" if use_resource_name else special_executor)
-    def check_thread(ctx):
+    def check_thread(ctx: Context) -> None:
         assert current_thread() is executor_thread
 
     async with context:
@@ -36,9 +41,11 @@ async def test_executor_special(context, use_resource_name, special_executor):
 
 
 @pytest.mark.asyncio
-async def test_executor_default(event_loop, context):
+async def test_executor_default(
+    event_loop: AbstractEventLoop, context: Context
+) -> None:
     @executor
-    def check_thread(ctx):
+    def check_thread(ctx: Context) -> None:
         assert current_thread() is not event_loop_thread
 
     async with context:
@@ -47,14 +54,18 @@ async def test_executor_default(event_loop, context):
 
 
 @pytest.mark.asyncio
-async def test_executor_worker_thread(event_loop, context, special_executor):
+async def test_executor_worker_thread(
+    event_loop: AbstractEventLoop,
+    context: Context,
+    special_executor: ThreadPoolExecutor,
+) -> None:
     @executor("special")
-    def runs_in_special_worker(ctx, worker_thread):
+    def runs_in_special_worker(ctx: Context, worker_thread: Thread) -> str:
         assert current_thread() is worker_thread
         return "foo"
 
     @executor
-    def runs_in_default_worker(ctx):
+    def runs_in_default_worker(ctx: Context) -> str:
         assert current_thread() is not event_loop_thread
         assert current_thread() is not special_executor_thread
         return runs_in_special_worker(ctx, current_thread())
@@ -67,16 +78,15 @@ async def test_executor_worker_thread(event_loop, context, special_executor):
 
 
 @pytest.mark.asyncio
-async def test_executor_missing_context(event_loop, context):
+async def test_executor_missing_context(
+    event_loop: AbstractEventLoop, context: Context
+) -> None:
     @executor("special")
-    def runs_in_default_worker():
+    def runs_in_default_worker() -> None:
         pass
 
     async with context:
-        with pytest.raises(RuntimeError) as exc:
+        with pytest.raises(TypeError) as exc:
             await runs_in_default_worker()
 
-    exc.match(
-        "the callable needs to be called with a Context as the first or second positional "
-        "argument"
-    )
+    exc.match(r".*?\(\) missing 1 required positional argument: 'ctx'")

@@ -64,11 +64,11 @@ Creating the first component
 
 Now, let's write some code! Create a file named ``server.py`` in the ``echo`` package directory::
 
-    from asphalt.core import Component, run_application
+    from asphalt.core import Component, Context, run_application
 
 
     class ServerComponent(Component):
-        async def start(self, ctx):
+        async def start(self, ctx: Context) -> None:
             print('Hello, world!')
 
     if __name__ == '__main__':
@@ -102,7 +102,7 @@ For this purpose, the :func:`asyncio.start_server` function is a logical choice:
     from asphalt.core import Component, run_application
 
 
-    async def client_connected(reader, writer):
+    async def client_connected(reader: StreamReader, writer: StreamWriter) -> None:
         message = await reader.readline()
         writer.write(message)
         writer.close()
@@ -110,7 +110,7 @@ For this purpose, the :func:`asyncio.start_server` function is a logical choice:
 
 
     class ServerComponent(Component):
-        async def start(self, ctx):
+        async def start(self, ctx: Context) -> None:
             await start_server(client_connected, 'localhost', 64100)
 
     if __name__ == '__main__':
@@ -158,7 +158,7 @@ Create the file ``client.py`` file in the ``echo`` package directory as follows:
     import sys
     from asyncio import open_connection
 
-    from asphalt.core import CLIApplicationComponent, run_application
+    from asphalt.core import CLIApplicationComponent, Context, run_application
 
 
     class ClientComponent(CLIApplicationComponent):
@@ -166,7 +166,7 @@ Create the file ``client.py`` file in the ``echo`` package directory as follows:
             super().__init__()
             self.message = message
 
-        async def run(self, ctx):
+        async def run(self, ctx: Context) -> None:
             reader, writer = await open_connection('localhost', 64100)
             writer.write(self.message.encode() + b'\n')
             response = await reader.readline()

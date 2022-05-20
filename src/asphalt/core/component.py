@@ -156,7 +156,7 @@ class CLIApplicationComponent(ContainerComponent):
             else:
                 sys.exit(0)
 
-        def start_run_task():
+        def start_run_task() -> None:
             task = ctx.loop.create_task(self.run(ctx))
             task.add_done_callback(run_complete)
 

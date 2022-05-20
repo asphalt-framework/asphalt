@@ -19,6 +19,9 @@ This library adheres to `Semantic Versioning 2.0 <http://semver.org/>`_.
   add the ``@inject`` decorator
 - Raise a ``UserWarning`` when ``@inject`` is used on a function that has no
   ``resource()`` declarations
+- Fixed ``@inject`` not resolving forward references in type annotations in locally
+  defined functions
+- Improved type annotations
 
 .. _PEP 567: https://peps.python.org/pep-0567/
 

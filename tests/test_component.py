@@ -1,4 +1,8 @@
+from __future__ import annotations
+
 import asyncio
+from asyncio import AbstractEventLoop
+from typing import NoReturn
 
 import pytest
 
@@ -28,10 +32,10 @@ def monkeypatch_plugins(monkeypatch):
 
 class TestContainerComponent:
     @pytest.fixture
-    def container(self):
+    def container(self) -> ContainerComponent:
         return ContainerComponent({"dummy": {"a": 1, "c": 3}})
 
-    def test_add_component(self, container):
+    def test_add_component(self, container: ContainerComponent) -> None:
         """
         Test that add_component works with an without an entry point and that external
         configuration overriddes directly supplied configuration values.
@@ -44,7 +48,7 @@ class TestContainerComponent:
         assert isinstance(component, DummyComponent)
         assert component.kwargs == {"a": 1, "b": 2, "c": 3}
 
-    def test_add_component_with_type(self):
+    def test_add_component_with_type(self) -> None:
         """
         Test that add_component works with a `type` specified in a
         configuration overriddes directly supplied configuration values.
@@ -75,25 +79,32 @@ class TestContainerComponent:
         ],
         ids=["empty_alias", "bogus_entry_point", "wrong_subclass"],
     )
-    def test_add_component_errors(self, container, alias, cls, exc_cls, message):
+    def test_add_component_errors(
+        self,
+        container: ContainerComponent,
+        alias: str,
+        cls: type | None,
+        exc_cls: type[Exception],
+        message: str,
+    ) -> None:
         exc = pytest.raises(exc_cls, container.add_component, alias, cls)
         assert str(exc.value) == message
 
-    def test_add_duplicate_component(self, container):
+    def test_add_duplicate_component(self, container) -> None:
         container.add_component("dummy")
         exc = pytest.raises(ValueError, container.add_component, "dummy")
         assert str(exc.value) == 'there is already a child component named "dummy"'
 
     @pytest.mark.asyncio
-    async def test_start(self, container):
+    async def test_start(self, container) -> None:
         await container.start(Context())
         assert container.child_components["dummy"].started
 
 
 class TestCLIApplicationComponent:
-    def test_run_return_none(self, event_loop):
+    def test_run_return_none(self, event_loop: AbstractEventLoop) -> None:
         class DummyCLIComponent(CLIApplicationComponent):
-            async def run(self, ctx: Context):
+            async def run(self, ctx: Context) -> None:
                 pass
 
         component = DummyCLIComponent()
@@ -101,9 +112,9 @@ class TestCLIApplicationComponent:
         exc = pytest.raises(SystemExit, event_loop.run_forever)
         assert exc.value.code == 0
 
-    def test_run_return_5(self, event_loop):
+    def test_run_return_5(self, event_loop: AbstractEventLoop) -> None:
         class DummyCLIComponent(CLIApplicationComponent):
-            async def run(self, ctx: Context):
+            async def run(self, ctx: Context) -> int:
                 return 5
 
         component = DummyCLIComponent()
@@ -111,9 +122,9 @@ class TestCLIApplicationComponent:
         exc = pytest.raises(SystemExit, event_loop.run_forever)
         assert exc.value.code == 5
 
-    def test_run_return_invalid_value(self, event_loop):
+    def test_run_return_invalid_value(self, event_loop: AbstractEventLoop) -> None:
         class DummyCLIComponent(CLIApplicationComponent):
-            async def run(self, ctx: Context):
+            async def run(self, ctx: Context) -> int:
                 return 128
 
         component = DummyCLIComponent()
@@ -125,10 +136,10 @@ class TestCLIApplicationComponent:
         assert len(record) == 1
         assert str(record[0].message) == "exit code out of range: 128"
 
-    def test_run_return_invalid_type(self, event_loop):
+    def test_run_return_invalid_type(self, event_loop: AbstractEventLoop) -> None:
         class DummyCLIComponent(CLIApplicationComponent):
-            async def run(self, ctx: Context):
-                return "foo"
+            async def run(self, ctx: Context) -> int:
+                return "foo"  # type: ignore[return-value]
 
         component = DummyCLIComponent()
         event_loop.run_until_complete(component.start(Context()))
@@ -139,9 +150,9 @@ class TestCLIApplicationComponent:
         assert len(record) == 1
         assert str(record[0].message) == "run() must return an integer or None, not str"
 
-    def test_run_exception(self, event_loop):
+    def test_run_exception(self, event_loop: AbstractEventLoop) -> None:
         class DummyCLIComponent(CLIApplicationComponent):
-            async def run(self, ctx: Context):
+            async def run(self, ctx: Context) -> NoReturn:
                 raise Exception("blah")
 
         component = DummyCLIComponent()

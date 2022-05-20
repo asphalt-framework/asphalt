@@ -159,7 +159,7 @@ class PluginContainer:
 
         return value
 
-    def create_object(self, type: Union[Type, str], **constructor_kwargs):
+    def create_object(self, type: Union[Type, str], **constructor_kwargs) -> Any:
         """
         Instantiate a plugin.
 

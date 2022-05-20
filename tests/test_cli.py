@@ -1,7 +1,10 @@
+from __future__ import annotations
+
 from pathlib import Path
 from unittest.mock import patch
 
 import pytest
+from _pytest.monkeypatch import MonkeyPatch
 from click.testing import CliRunner
 
 from asphalt.core import Component, Context, cli
@@ -12,18 +15,24 @@ class DummyComponent(Component):
         self.dummyval1 = dummyval1
         self.dummyval2 = dummyval2
 
-    def start(self, ctx: Context):
+    def start(self, ctx: Context) -> None:
         pass
 
 
 @pytest.fixture
-def runner():
+def runner() -> CliRunner:
     return CliRunner()
 
 
 @pytest.mark.parametrize("loop", [None, "uvloop"], ids=["default", "override"])
 @pytest.mark.parametrize("unsafe", [False, True], ids=["safe", "unsafe"])
-def test_run(runner, unsafe, loop, monkeypatch, tmp_path):
+def test_run(
+    runner: CliRunner,
+    unsafe: bool,
+    loop: str | None,
+    monkeypatch: MonkeyPatch,
+    tmp_path: Path,
+) -> None:
     if unsafe:
         component_class = "!!python/name:{0.__module__}.{0.__name__}".format(
             DummyComponent
@@ -79,7 +88,7 @@ logging:
         }
 
 
-def test_run_multiple_configs(runner):
+def test_run_multiple_configs(runner: CliRunner) -> None:
     component_class = "{0.__module__}:{0.__name__}".format(DummyComponent)
     config1 = """\
 ---
@@ -121,7 +130,7 @@ component:
 
 
 class TestServices:
-    def write_config(self):
+    def write_config(self) -> None:
         Path("config.yml").write_text(
             """\
 ---
@@ -155,7 +164,7 @@ logging:
         )
 
     @pytest.mark.parametrize("service", ["server", "client"])
-    def test_run_service(self, runner, service):
+    def test_run_service(self, runner: CliRunner, service: str) -> None:
         with runner.isolated_filesystem(), patch(
             "asphalt.core.cli.run_application"
         ) as run_app:
@@ -202,7 +211,7 @@ logging:
                     "logging": {"version": 1, "disable_existing_loggers": False},
                 }
 
-    def test_service_not_found(self, runner):
+    def test_service_not_found(self, runner: CliRunner) -> None:
         with runner.isolated_filesystem(), patch(
             "asphalt.core.cli.run_application"
         ) as run_app:
@@ -213,7 +222,7 @@ logging:
             assert run_app.call_count == 0
             assert result.output == "Error: Service 'foobar' has not been defined\n"
 
-    def test_no_service_selected(self, runner):
+    def test_no_service_selected(self, runner: CliRunner) -> None:
         with runner.isolated_filesystem(), patch(
             "asphalt.core.cli.run_application"
         ) as run_app:
@@ -227,7 +236,7 @@ logging:
                 "has been defined and no service was explicitly selected with -s / --service\n"
             )
 
-    def test_bad_services_type(self, runner):
+    def test_bad_services_type(self, runner: CliRunner) -> None:
         with runner.isolated_filesystem(), patch(
             "asphalt.core.cli.run_application"
         ) as run_app:
@@ -248,7 +257,7 @@ logging:
                 result.output == 'Error: The "services" key must be a dict, not str\n'
             )
 
-    def test_no_services_defined(self, runner):
+    def test_no_services_defined(self, runner: CliRunner) -> None:
         with runner.isolated_filesystem(), patch(
             "asphalt.core.cli.run_application"
         ) as run_app:
@@ -267,7 +276,7 @@ logging:
             assert run_app.call_count == 0
             assert result.output == "Error: No services have been defined\n"
 
-    def test_run_only_service(self, runner):
+    def test_run_only_service(self, runner) -> None:
         with runner.isolated_filesystem(), patch(
             "asphalt.core.cli.run_application"
         ) as run_app:
@@ -294,7 +303,7 @@ logging:
                 "logging": {"version": 1, "disable_existing_loggers": False},
             }
 
-    def test_run_default_service(self, runner):
+    def test_run_default_service(self, runner: CliRunner) -> None:
         with runner.isolated_filesystem(), patch(
             "asphalt.core.cli.run_application"
         ) as run_app:
@@ -324,7 +333,9 @@ logging:
                 "logging": {"version": 1, "disable_existing_loggers": False},
             }
 
-    def test_service_env_variable(self, runner, monkeypatch):
+    def test_service_env_variable(
+        self, runner: CliRunner, monkeypatch: MonkeyPatch
+    ) -> None:
         with runner.isolated_filesystem(), patch(
             "asphalt.core.cli.run_application"
         ) as run_app:
@@ -355,7 +366,9 @@ logging:
                 "logging": {"version": 1, "disable_existing_loggers": False},
             }
 
-    def test_service_env_variable_override(self, runner, monkeypatch):
+    def test_service_env_variable_override(
+        self, runner: CliRunner, monkeypatch: MonkeyPatch
+    ) -> None:
         with runner.isolated_filesystem(), patch(
             "asphalt.core.cli.run_application"
         ) as run_app:

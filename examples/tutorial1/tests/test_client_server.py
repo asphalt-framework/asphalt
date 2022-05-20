@@ -1,5 +1,8 @@
 # isort: off
+from asyncio import AbstractEventLoop
+
 import pytest
+from _pytest.capture import CaptureFixture
 
 from asphalt.core import Context
 
@@ -7,8 +10,10 @@ from echo.client import ClientComponent
 from echo.server import ServerComponent
 
 
-def test_client_and_server(event_loop, capsys):
-    async def run():
+def test_client_and_server(
+    event_loop: AbstractEventLoop, capsys: CaptureFixture
+) -> None:
+    async def run() -> None:
         async with Context() as ctx:
             server = ServerComponent()
             await server.start(ctx)

@@ -46,8 +46,10 @@ from inspect import (
     signature,
 )
 from traceback import format_exception
+from types import TracebackType
 from typing import (
     Any,
+    AsyncGenerator,
     Awaitable,
     Callable,
     Dict,
@@ -86,6 +88,7 @@ factory_callback_type = Callable[["Context"], Any]
 resource_name_re = re.compile(r"\w+")
 T_Resource = TypeVar("T_Resource")
 T_Retval = TypeVar("T_Retval")
+T_Context = TypeVar("T_Context", bound="Context")
 P = ParamSpec("P")
 _current_context: ContextVar[Context | None] = ContextVar(
     "_current_context", default=None
@@ -225,7 +228,7 @@ class TeardownError(Exception):
 class NoCurrentContext(Exception):
     """Raised by :func: `current_context` when there is no active context."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__("There is no active context")
 
 
@@ -323,7 +326,7 @@ class Context:
         """
         return self._state is not ContextState.open
 
-    def _check_closed(self):
+    def _check_closed(self) -> None:
         if self._state is ContextState.closed:
             raise RuntimeError("this context has already been closed")
 
@@ -406,7 +409,7 @@ class Context:
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.loop.run_until_complete(self.close(exc_val))
 
-    async def __aenter__(self):
+    async def __aenter__(self) -> Context:
         self._check_closed()
         if self._loop is None:
             self._loop = get_running_loop()
@@ -415,7 +418,12 @@ class Context:
         self._reset_token = _current_context.set(self)
         return self
 
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException],
+        exc_val: BaseException,
+        exc_tb: TracebackType,
+    ) -> None:
         try:
             await self.close(exc_val)
         finally:
@@ -722,7 +730,7 @@ class Context:
         )
         return self.require_resource(type, name)
 
-    def call_async(self, func: Callable, *args, **kwargs):
+    def call_async(self, func: Callable[..., T_Retval], *args, **kwargs) -> T_Retval:
         """
         Call the given callable in the event loop thread.
 
@@ -740,8 +748,12 @@ class Context:
         return asyncio_extras.call_async(self.loop, func, *args, **kwargs)
 
     def call_in_executor(
-        self, func: Callable, *args, executor: Union[Executor, str] = None, **kwargs
-    ) -> Awaitable:
+        self,
+        func: Callable[..., T_Retval],
+        *args,
+        executor: Union[Executor, str] = None,
+        **kwargs,
+    ) -> Awaitable[T_Retval]:
         """
         Call the given callable in an executor.
 
@@ -761,10 +773,10 @@ class Context:
         if self._loop is None:
             self._loop = get_running_loop()
 
-        callback = partial(copy_context().run, func, *args, **kwargs)
+        callback: partial[T_Retval] = partial(copy_context().run, func, *args, **kwargs)
         return self._loop.run_in_executor(executor, callback)
 
-    def threadpool(self, executor: Union[Executor, str] = None):
+    def threadpool(self, executor: Union[Executor, str, None] = None):
         """
         Return an asynchronous context manager that runs the block in a (thread pool) executor.
 
@@ -829,7 +841,9 @@ def executor(arg: Union[Executor, str, Callable] = None):
     return asyncio_extras.threadpool(arg)
 
 
-def context_teardown(func: Callable):
+def context_teardown(
+    func: Callable[[T_Context], AsyncGenerator[None, Exception | None]]
+) -> Callable[[T_Context], Coroutine]:
     """
     Wrap an async generator function to execute the rest of the function at context teardown.
 
@@ -987,10 +1001,11 @@ def inject(func: Callable[P, Any]) -> Callable[P, Any]:
 
     """
     forward_refs_resolved = False
+    local_names = sys._getframe(1).f_locals if "<locals>" in func.__qualname__ else {}
 
     def resolve_forward_refs() -> None:
-        nonlocal forward_refs_resolved
-        type_hints = get_type_hints(func)
+        nonlocal forward_refs_resolved, local_names
+        type_hints = get_type_hints(func, localns=local_names)
         for key, dependency in injected_resources.items():
             dependency.cls = type_hints[key]
             origin = get_origin(type_hints[key])
@@ -1011,6 +1026,7 @@ def inject(func: Callable[P, Any]) -> Callable[P, Any]:
                         "are exactly two items and other item is None"
                     )
 
+        del local_names
         forward_refs_resolved = True
 
     @wraps(func)

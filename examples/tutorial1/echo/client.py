@@ -2,7 +2,7 @@
 import sys
 from asyncio import open_connection
 
-from asphalt.core import CLIApplicationComponent, run_application
+from asphalt.core import CLIApplicationComponent, Context, run_application
 
 
 class ClientComponent(CLIApplicationComponent):
@@ -10,7 +10,7 @@ class ClientComponent(CLIApplicationComponent):
         super().__init__()
         self.message = message
 
-    async def run(self, ctx):
+    async def run(self, ctx: Context) -> None:
         reader, writer = await open_connection("localhost", 64100)
         writer.write(self.message.encode() + b"\n")
         response = await reader.readline()

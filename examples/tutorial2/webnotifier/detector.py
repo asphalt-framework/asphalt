@@ -4,10 +4,10 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import Any
+from typing import Any, AsyncIterator
 
 import aiohttp
-from asphalt.core import Component, Event, Signal, context_teardown
+from asphalt.core import Component, Event, Signal, context_teardown, Context
 
 logger = logging.getLogger(__name__)
 
@@ -53,7 +53,7 @@ class ChangeDetectorComponent(Component):
         self.delay = delay
 
     @context_teardown
-    async def start(self, ctx):
+    async def start(self, ctx: Context) -> AsyncIterator[None]:
         detector = Detector(self.url, self.delay)
         ctx.add_resource(detector)
         task = asyncio.create_task(detector.run())

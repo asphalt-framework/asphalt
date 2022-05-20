@@ -52,7 +52,7 @@ class Event:
 
     __slots__ = "source", "topic", "time"
 
-    def __init__(self, source, topic: str, time: float = None) -> None:
+    def __init__(self, source: Any, topic: str, time: float | None = None) -> None:
         self.source = source
         self.topic = topic
         self.time = time or stdlib_time()
@@ -66,9 +66,9 @@ class Event:
         """
         return datetime.fromtimestamp(self.time, timezone.utc)
 
-    def __repr__(self):
-        return "{self.__class__.__name__}(source={self.source!r}, topic={self.topic!r})".format(
-            self=self
+    def __repr__(self) -> str:
+        return (
+            f"{self.__class__.__name__}(source={self.source!r}, topic={self.topic!r})"
         )
 
 
@@ -92,7 +92,11 @@ class Signal(Generic[T_Event]):
     __slots__ = "event_class", "topic", "source", "listeners", "bound_signals"
 
     def __init__(
-        self, event_class: Type[T_Event], *, source: Any = None, topic: str = None
+        self,
+        event_class: Type[T_Event],
+        *,
+        source: Any = None,
+        topic: Optional[str] = None,
     ) -> None:
         assert check_argument_types()
         self.event_class = event_class
@@ -252,7 +256,7 @@ class Signal(Generic[T_Event]):
 
     def stream_events(
         self, filter: Callable[[Event], bool] = None, *, max_queue_size: int = 0
-    ):
+    ) -> AsyncIterator[T_Event]:
         """Shortcut for calling :func:`stream_events` with this signal in the first argument."""
         return stream_events([self], filter, max_queue_size=max_queue_size)
 
@@ -275,17 +279,18 @@ def stream_events(
     :param max_queue_size: maximum size of the queue, after which it will start to drop events
 
     """
+    queue: Queue[T_Event] | None
 
-    async def streamer():
+    async def streamer() -> AsyncIterator[T_Event]:
         try:
-            while True:
+            while queue is not None:
                 event = await queue.get()
                 if filter is None or filter(event):
                     yield event
         finally:
             cleanup()
 
-    def cleanup():
+    def cleanup() -> None:
         nonlocal queue
         if queue is not None:
             for signal in signals:
@@ -294,7 +299,7 @@ def stream_events(
             queue = None
 
     assert check_argument_types()
-    queue: Queue[T_Event] = Queue(max_queue_size)
+    queue = Queue(max_queue_size)
     for signal in signals:
         signal.connect(queue.put_nowait)
 
@@ -304,7 +309,7 @@ def stream_events(
 
 
 async def wait_event(
-    signals: Sequence["Signal[T_Event]"], filter: Callable[[T_Event], bool] = None
+    signals: Sequence[Signal[T_Event]], filter: Callable[[T_Event], bool] = None
 ) -> T_Event:
     """
     Wait until any of the given signals dispatches an event that satisfies the filter (if any).

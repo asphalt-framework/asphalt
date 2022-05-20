@@ -1,10 +1,13 @@
+from __future__ import annotations
+
 import asyncio
 import sys
+from collections.abc import Callable
 from concurrent.futures import Executor, ThreadPoolExecutor
 from inspect import isawaitable
 from itertools import count
-from threading import current_thread
-from typing import AsyncGenerator, AsyncIterator, Dict, Optional
+from threading import Thread, current_thread
+from typing import AsyncGenerator, AsyncIterator, Dict, NoReturn, Optional, Tuple
 from unittest.mock import patch
 
 import pytest
@@ -48,7 +51,7 @@ class TestResourceContainer:
         "context_attr", [None, "attrname"], ids=["no_attr", "has_attr"]
     )
     @pytest.mark.asyncio
-    async def test_generate_value(self, thread, context_attr):
+    async def test_generate_value(self, thread: bool, context_attr: str | None) -> None:
         container = ResourceContainer(
             lambda ctx: "foo", (str,), "default", context_attr, True
         )
@@ -63,26 +66,27 @@ class TestResourceContainer:
         if context_attr:
             assert getattr(context, context_attr) == "foo"
 
-    def test_repr(self):
+    def test_repr(self) -> None:
         container = ResourceContainer("foo", (str,), "default", "attrname", False)
         assert repr(container) == (
             "ResourceContainer(value='foo', types=[str], name='default', "
             "context_attr='attrname')"
         )
 
-    def test_repr_factory(self):
+    def test_repr_factory(self) -> None:
         container = ResourceContainer(
             lambda ctx: "foo", (str,), "default", "attrname", True
         )
         assert repr(container) == (
-            "ResourceContainer(factory=test_context.TestResourceContainer.test_repr_factory."
-            "<locals>.<lambda>, types=[str], name='default', context_attr='attrname')"
+            "ResourceContainer(factory=test_context.TestResourceContainer"
+            ".test_repr_factory.<locals>.<lambda>, types=[str], name='default', "
+            "context_attr='attrname')"
         )
 
 
 class TestContext:
     @pytest.mark.asyncio
-    async def test_parent(self):
+    async def test_parent(self) -> None:
         """Test that the parent property points to the parent context instance, if any."""
         async with Context() as parent:
             async with Context() as child:
@@ -93,7 +97,7 @@ class TestContext:
         "exception", [None, Exception("foo")], ids=["noexception", "exception"]
     )
     @pytest.mark.asyncio
-    async def test_close(self, context, exception):
+    async def test_close(self, context: Context, exception: Exception | None) -> None:
         """
         Test that teardown callbacks are called in reverse order when a context is closed.
 
@@ -105,7 +109,7 @@ class TestContext:
         async def async_callback(exception=None):
             called_functions.append((async_callback, exception))
 
-        called_functions = []
+        called_functions: list[tuple[Callable, BaseException | None]] = []
         context.add_teardown_callback(callback, pass_exception=True)
         context.add_teardown_callback(async_callback, pass_exception=True)
         await context.close(exception)
@@ -113,13 +117,13 @@ class TestContext:
         assert called_functions == [(async_callback, exception), (callback, exception)]
 
     @pytest.mark.asyncio
-    async def test_close_while_running_teardown(self, context):
+    async def test_close_while_running_teardown(self, context: Context) -> None:
         """
         Test that trying to close the context from a teardown callback raises a
         RuntimeError.
         """
 
-        async def try_close_context():
+        async def try_close_context() -> None:
             with pytest.raises(RuntimeError, match="this context is already closing"):
                 await context.close()
 
@@ -129,15 +133,16 @@ class TestContext:
     @pytest.mark.asyncio
     async def test_teardown_callback_exception(self, context):
         """
-        Test that all callbacks are called even when some teardown callbacks raise exceptions,
-        and that a TeardownError is raised in such a case, containing the exception objects.
+        Test that all callbacks are called even when some teardown callbacks raise
+        exceptions, and that a TeardownError is raised in such a case, containing the
+        exception objects.
 
         """
 
-        def callback1():
+        def callback1() -> None:
             items.append(1)
 
-        def callback2():
+        def callback2() -> NoReturn:
             raise Exception("foo")
 
         context.add_teardown_callback(callback1)
@@ -429,11 +434,11 @@ class TestContext:
 
     @pytest.mark.asyncio
     async def test_call_async_plain(self, context):
-        def runs_in_event_loop(worker_thread, x, y):
+        def runs_in_event_loop(worker_thread: Thread, x: int, y: int) -> int:
             assert current_thread() is not worker_thread
             return x + y
 
-        def runs_in_worker_thread():
+        def runs_in_worker_thread() -> int:
             worker_thread = current_thread()
             return context.call_async(runs_in_event_loop, worker_thread, 1, y=2)
 
@@ -446,7 +451,7 @@ class TestContext:
             await asyncio.sleep(0.1)
             return x + y
 
-        def runs_in_worker_thread():
+        def runs_in_worker_thread() -> int:
             worker_thread = current_thread()
             return context.call_async(runs_in_event_loop, worker_thread, 1, y=2)
 
@@ -454,7 +459,7 @@ class TestContext:
 
     @pytest.mark.asyncio
     async def test_call_async_exception(self, context):
-        def runs_in_event_loop():
+        def runs_in_event_loop() -> NoReturn:
             raise ValueError("foo")
 
         with pytest.raises(ValueError) as exc:
@@ -509,7 +514,7 @@ class TestExecutor:
     @pytest.mark.asyncio
     async def test_no_arguments(self, context):
         @executor
-        def runs_in_default_worker():
+        def runs_in_default_worker() -> None:
             assert current_thread() is not event_loop_thread
 
         event_loop_thread = current_thread()
@@ -518,7 +523,7 @@ class TestExecutor:
     @pytest.mark.asyncio
     async def test_named_executor(self, context, special_executor):
         @executor("special")
-        def runs_in_default_worker(ctx):
+        def runs_in_default_worker(ctx: Context) -> None:
             assert current_thread() is special_executor_thread
 
         special_executor_thread = special_executor.submit(current_thread).result()
@@ -527,7 +532,7 @@ class TestExecutor:
     @pytest.mark.asyncio
     async def test_executor_missing_context(self, event_loop, context):
         @executor("special")
-        def runs_in_default_worker():
+        def runs_in_default_worker() -> None:
             pass
 
         with pytest.raises(RuntimeError) as exc:
@@ -544,11 +549,11 @@ class TestContextTeardown:
         "expected_exc", [None, Exception("foo")], ids=["no_exception", "exception"]
     )
     @pytest.mark.asyncio
-    async def test_function(self, expected_exc):
+    async def test_function(self, expected_exc: Exception | None) -> None:
         phase = received_exception = None
 
         @context_teardown
-        async def start(ctx: Context):
+        async def start(ctx: Context) -> AsyncIterator[None]:
             nonlocal phase, received_exception
             phase = "started"
             exc = yield
@@ -567,12 +572,12 @@ class TestContextTeardown:
         "expected_exc", [None, Exception("foo")], ids=["no_exception", "exception"]
     )
     @pytest.mark.asyncio
-    async def test_method(self, expected_exc):
+    async def test_method(self, expected_exc: Exception | None) -> None:
         phase = received_exception = None
 
         class SomeComponent:
             @context_teardown
-            async def start(self, ctx: Context):
+            async def start(self, ctx: Context) -> AsyncIterator[None]:
                 nonlocal phase, received_exception
                 phase = "started"
                 exc = yield
@@ -587,8 +592,8 @@ class TestContextTeardown:
         assert phase == "finished"
         assert received_exception == expected_exc
 
-    def test_plain_function(self):
-        def start(ctx):
+    def test_plain_function(self) -> None:
+        def start(ctx) -> None:
             pass
 
         pytest.raises(TypeError, context_teardown, start).match(
@@ -596,11 +601,11 @@ class TestContextTeardown:
         )
 
     @pytest.mark.asyncio
-    async def test_bad_args(self):
+    async def test_bad_args(self) -> None:
         with pytest.deprecated_call():
 
             @context_teardown
-            async def start(ctx):
+            async def start(ctx: Context) -> None:
                 pass
 
         with pytest.raises(RuntimeError) as exc:
@@ -612,9 +617,9 @@ class TestContextTeardown:
         )
 
     @pytest.mark.asyncio
-    async def test_exception(self):
+    async def test_exception(self) -> None:
         @context_teardown
-        async def start(ctx):
+        async def start(ctx: Context) -> AsyncIterator[None]:
             raise Exception("dummy error")
             yield
 
@@ -625,21 +630,21 @@ class TestContextTeardown:
         exc_info.match("dummy error")
 
     @pytest.mark.asyncio
-    async def test_missing_yield(self):
+    async def test_missing_yield(self) -> None:
         with pytest.deprecated_call():
 
             @context_teardown
-            async def start(ctx: Context):
+            async def start(ctx: Context) -> None:
                 pass
 
         await start(Context())
 
     @pytest.mark.asyncio
-    async def test_py35_generator(self):
+    async def test_py35_generator(self) -> None:
         with pytest.deprecated_call():
 
             @context_teardown
-            async def start(ctx: Context):
+            async def start(ctx: Context) -> None:
                 await yield_()
 
         await start(Context())
@@ -656,7 +661,7 @@ class TestContextTeardown:
     async def test_get_resource_at_teardown(self, resource_func):
         resource: str
 
-        async def teardown_callback():
+        async def teardown_callback() -> None:
             nonlocal resource
             resource = resource_func(ctx, str)
             if isawaitable(resource):
@@ -680,7 +685,7 @@ class TestContextTeardown:
     async def test_generate_resource_at_teardown(self, resource_func):
         resource: str
 
-        async def teardown_callback():
+        async def teardown_callback() -> None:
             nonlocal resource
             resource = resource_func(ctx, str)
             if isawaitable(resource):
@@ -698,11 +703,11 @@ class TestContextFinisher:
         "expected_exc", [None, Exception("foo")], ids=["no_exception", "exception"]
     )
     @pytest.mark.asyncio
-    async def test_context_teardown(self, expected_exc):
+    async def test_context_teardown(self, expected_exc: Exception | None) -> None:
         phase = received_exception = None
 
         @context_teardown
-        async def start(ctx: Context):
+        async def start(ctx: Context) -> AsyncIterator[None]:
             nonlocal phase, received_exception
             phase = "started"
             exc = yield
@@ -719,7 +724,7 @@ class TestContextFinisher:
 
 
 @pytest.mark.asyncio
-async def test_current_context():
+async def test_current_context() -> None:
     pytest.raises(NoCurrentContext, current_context)
 
     async with Context() as parent_ctx:
@@ -733,7 +738,7 @@ async def test_current_context():
 
 
 @pytest.mark.asyncio
-async def test_get_resource():
+async def test_get_resource() -> None:
     async with Context() as ctx:
         ctx.add_resource("foo")
         assert get_resource(str) == "foo"
@@ -741,14 +746,14 @@ async def test_get_resource():
 
 
 @pytest.mark.asyncio
-async def test_require_resource():
+async def test_require_resource() -> None:
     async with Context() as ctx:
         ctx.add_resource("foo")
         assert require_resource(str) == "foo"
         pytest.raises(ResourceNotFound, require_resource, int)
 
 
-def test_explicit_parent_deprecation():
+def test_explicit_parent_deprecation() -> None:
     parent_ctx = Context()
     pytest.warns(DeprecationWarning, Context, parent_ctx)
 
@@ -777,11 +782,11 @@ async def test_context_stack_corruption(event_loop):
 
 class TestDependencyInjection:
     @pytest.mark.asyncio
-    async def test_static_resources(self):
+    async def test_static_resources(self) -> None:
         @inject
         async def injected(
-            foo: int, bar: "str" = resource(), *, baz: str = resource("alt")
-        ):
+            foo: int, bar: str = resource(), *, baz: str = resource("alt")
+        ) -> Tuple[int, str, str]:
             return foo, bar, baz
 
         async with Context() as ctx:
@@ -794,9 +799,11 @@ class TestDependencyInjection:
         assert baz == "baz_test"
 
     @pytest.mark.asyncio
-    async def test_sync_injection(self):
+    async def test_sync_injection(self) -> None:
         @inject
-        def injected(foo: int, bar: str = resource(), *, baz: str = resource("alt")):
+        def injected(
+            foo: int, bar: str = resource(), *, baz: str = resource("alt")
+        ) -> Tuple[int, str, str]:
             return foo, bar, baz
 
         async with Context() as ctx:
@@ -809,20 +816,22 @@ class TestDependencyInjection:
         assert baz == "baz_test"
 
     @pytest.mark.asyncio
-    async def test_missing_annotation(self):
-        async def injected(foo: int, bar: str = resource(), *, baz=resource("alt")):
+    async def test_missing_annotation(self) -> None:
+        async def injected(
+            foo: int, bar: str = resource(), *, baz=resource("alt")
+        ) -> None:
             pass
 
         pytest.raises(TypeError, inject, injected).match(
             f"Dependency for parameter 'baz' of function "
-            f"'{__name__}.{self.__class__.__name__}.test_missing_annotation.<locals>.injected' is "
-            f"missing the type annotation"
+            f"'{__name__}.{self.__class__.__name__}.test_missing_annotation.<locals>"
+            f".injected' is missing the type annotation"
         )
 
     @pytest.mark.asyncio
-    async def test_missing_resource(self):
+    async def test_missing_resource(self) -> None:
         @inject
-        async def injected(foo: int, bar: str = resource()):
+        async def injected(foo: int, bar: str = resource()) -> None:
             pass
 
         with pytest.raises(ResourceNotFound) as exc:
@@ -881,8 +890,8 @@ class TestDependencyInjection:
             retval = injected() if sync else (await injected())
             assert retval == "hello"
 
-    def test_resource_function_not_called(self):
-        async def injected(foo: int, bar: str = resource):
+    def test_resource_function_not_called(self) -> None:
+        async def injected(foo: int, bar: str = resource) -> None:
             pass
 
         with pytest.raises(TypeError) as exc:
@@ -895,8 +904,8 @@ class TestDependencyInjection:
             f"the parentheses at the end\\?"
         )
 
-    def test_missing_inject(self):
-        def injected(foo: int, bar: str = resource()):
+    def test_missing_inject(self) -> None:
+        def injected(foo: int, bar: str = resource()) -> None:
             bar.lower()
 
         with pytest.raises(AttributeError) as exc:
@@ -907,8 +916,8 @@ class TestDependencyInjection:
             r"forget to add the @inject decorator\?"
         )
 
-    def test_no_resources_declared(self):
-        def injected(foo: int):
+    def test_no_resources_declared(self) -> None:
+        def injected(foo: int) -> None:
             pass
 
         match = (
@@ -921,8 +930,8 @@ class TestDependencyInjection:
         assert func is injected
 
 
-def test_dependency_deprecated():
+def test_dependency_deprecated() -> None:
     with pytest.deprecated_call():
 
-        async def foo(res: str = Dependency()):
+        async def foo(res: str = Dependency()) -> None:
             pass

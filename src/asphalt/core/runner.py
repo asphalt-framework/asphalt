@@ -33,7 +33,7 @@ def run_application(
     max_threads: int = None,
     logging: Union[Dict[str, Any], int, None] = INFO,
     start_timeout: Union[int, float, None] = 10,
-):
+) -> None:
     """
     Configure logging and start the given root component in the default asyncio event loop.
 

@@ -273,7 +273,7 @@ Asphalt application::
             self.delay = delay
 
         @context_teardown
-        async def start(self, ctx):
+        async def start(self, ctx: Context) -> None:
             detector = Detector(self.url, self.delay)
             ctx.add_resource(detector, context_attr='detector')
             task = asyncio.create_task(detector.run())
@@ -301,7 +301,7 @@ become somewhat lighter::
 
 
     class ApplicationComponent(CLIApplicationComponent):
-        async def start(self, ctx):
+        async def start(self, ctx: Context) -> None:
             self.add_component("detector", ChangeDetectorComponent, url="http://imgur.com")
             self.add_component(
                 "mailer", backend="smtp", host="your.smtp.server.here",

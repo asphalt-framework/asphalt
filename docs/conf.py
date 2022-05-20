@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-from importlib.metadata import version
+import importlib.metadata
 
 from packaging.version import parse
 
@@ -17,7 +17,7 @@ project = "The Asphalt Framework (core)"
 author = "Alex Grönholm"
 copyright = "2015, " + author
 
-v = parse(version("asphalt"))
+v = parse(importlib.metadata.version("asphalt"))
 version = v.base_version
 release = v.public
 

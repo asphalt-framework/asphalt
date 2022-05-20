@@ -1,10 +1,16 @@
+from __future__ import annotations
+
 import asyncio
 import logging
 import sys
+from asyncio import AbstractEventLoop
 from concurrent.futures import ThreadPoolExecutor
+from typing import NoReturn
 from unittest.mock import patch
 
 import pytest
+from _pytest.logging import LogCaptureFixture
+from _pytest.monkeypatch import MonkeyPatch
 
 from asphalt.core.component import CLIApplicationComponent, Component
 from asphalt.core.context import Context
@@ -17,14 +23,14 @@ class ShutdownComponent(Component):
         self.teardown_callback_called = False
         self.exception = None
 
-    def teardown_callback(self, exception):
+    def teardown_callback(self, exception) -> None:
         self.teardown_callback_called = True
         self.exception = exception
 
-    def press_ctrl_c(self):
+    def press_ctrl_c(self) -> NoReturn:
         raise KeyboardInterrupt
 
-    async def start(self, ctx: Context):
+    async def start(self, ctx: Context) -> None:
         ctx.add_teardown_callback(self.teardown_callback, pass_exception=True)
 
         if self.method == "stop":
@@ -44,16 +50,16 @@ class ShutdownComponent(Component):
 
 
 class DummyCLIApp(CLIApplicationComponent):
-    async def run(self, ctx: Context):
+    async def run(self, ctx: Context) -> int:
         return 20
 
 
 @pytest.fixture(autouse=True)
-def prevent_logging_shutdown(monkeypatch):
+def prevent_logging_shutdown(monkeypatch: MonkeyPatch) -> None:
     monkeypatch.setattr("asphalt.core.runner.shutdown", lambda: None)
 
 
-def test_sigterm_handler_loop_not_running(event_loop):
+def test_sigterm_handler_loop_not_running(event_loop: AbstractEventLoop) -> None:
     """Test that the SIGTERM handler does nothing if the event loop is not running."""
     sigterm_handler(logging.getLogger(__name__), event_loop)
 
@@ -63,7 +69,7 @@ def test_sigterm_handler_loop_not_running(event_loop):
     [None, logging.INFO, {"version": 1, "loggers": {"asphalt": {"level": "INFO"}}}],
     ids=["disabled", "loglevel", "dictconfig"],
 )
-def test_run_logging_config(event_loop, logging_config):
+def test_run_logging_config(event_loop: AbstractEventLoop, logging_config) -> None:
     """Test that logging initialization happens as expected."""
     with patch("asphalt.core.runner.basicConfig") as basicConfig, patch(
         "asphalt.core.runner.dictConfig"
@@ -75,7 +81,9 @@ def test_run_logging_config(event_loop, logging_config):
 
 
 @pytest.mark.parametrize("max_threads", [None, 3])
-def test_run_max_threads(event_loop, max_threads):
+def test_run_max_threads(
+    event_loop: AbstractEventLoop, max_threads: int | None
+) -> None:
     """
     Test that a new default executor is installed if and only if the max_threads argument is given.
 
@@ -93,7 +101,7 @@ def test_run_max_threads(event_loop, max_threads):
         assert not mock_executor.called
 
 
-def test_uvloop_policy(caplog):
+def test_uvloop_policy(caplog: LogCaptureFixture) -> None:
     """Test that the runner switches to a different event loop policy when instructed to."""
     pytest.importorskip("uvloop", reason="uvloop not installed")
     caplog.set_level(logging.INFO)
@@ -114,7 +122,9 @@ def test_uvloop_policy(caplog):
     assert records[5].message == "Application stopped"
 
 
-def test_run_callbacks(event_loop, caplog):
+def test_run_callbacks(
+    event_loop: AbstractEventLoop, caplog: LogCaptureFixture
+) -> None:
     """
     Test that the teardown callbacks are run when the application is started and shut down properly
     and that the proper logging messages are emitted.
@@ -137,7 +147,9 @@ def test_run_callbacks(event_loop, caplog):
 
 
 @pytest.mark.parametrize("method", ["exit", "keyboard", "sigterm"])
-def test_clean_exit(event_loop, caplog, method):
+def test_clean_exit(
+    event_loop: AbstractEventLoop, caplog: LogCaptureFixture, method: str
+) -> None:
     """
     Test that when Ctrl+C is pressed during event_loop.run_forever(), run_application() exits
     cleanly.
@@ -158,7 +170,9 @@ def test_clean_exit(event_loop, caplog, method):
     assert records[4].message == "Application stopped"
 
 
-def test_run_start_exception(event_loop, caplog):
+def test_run_start_exception(
+    event_loop: AbstractEventLoop, caplog: LogCaptureFixture
+) -> None:
     """
     Test that an exception caught during the application initialization is put into the
     application context and made available to teardown callbacks.
@@ -180,7 +194,9 @@ def test_run_start_exception(event_loop, caplog):
     assert records[4].message == "Application stopped"
 
 
-def test_run_start_timeout(event_loop, caplog):
+def test_run_start_timeout(
+    event_loop: AbstractEventLoop, caplog: LogCaptureFixture
+) -> None:
     """
     Test that when the root component takes too long to start up, the runner exits and logs the
     appropriate error message.
@@ -201,7 +217,7 @@ def test_run_start_timeout(event_loop, caplog):
     assert records[4].message == "Application stopped"
 
 
-def test_dict_config(event_loop, caplog):
+def test_dict_config(event_loop: AbstractEventLoop, caplog: LogCaptureFixture) -> None:
     """Test that component configuration passed as a dictionary works."""
     caplog.set_level(logging.INFO)
     component_class = "{0.__module__}:{0.__name__}".format(ShutdownComponent)
@@ -218,7 +234,9 @@ def test_dict_config(event_loop, caplog):
     assert records[4].message == "Application stopped"
 
 
-def test_run_cli_application(event_loop, caplog):
+def test_run_cli_application(
+    event_loop: AbstractEventLoop, caplog: LogCaptureFixture
+) -> None:
     caplog.set_level(logging.INFO)
     with pytest.raises(SystemExit) as exc:
         run_application(DummyCLIApp())

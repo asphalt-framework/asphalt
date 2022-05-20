@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 
 class ApplicationComponent(CLIApplicationComponent):
-    async def start(self, ctx):
+    async def start(self, ctx: Context) -> None:
         self.add_component("detector", ChangeDetectorComponent)
         self.add_component("mailer", backend="smtp")
         await super().start(ctx)
