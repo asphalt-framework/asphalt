@@ -907,6 +907,19 @@ class TestDependencyInjection:
             r"forget to add the @inject decorator\?"
         )
 
+    def test_no_resources_declared(self):
+        def injected(foo: int):
+            pass
+
+        match = (
+            f"{__name__}.{self.__class__.__name__}.test_no_resources_declared.<locals>"
+            f".injected does not have any injectable resources declared"
+        )
+        with pytest.warns(UserWarning, match=match):
+            func = inject(injected)
+
+        assert func is injected
+
 
 def test_dependency_deprecated():
     with pytest.deprecated_call():

@@ -1071,7 +1071,13 @@ def inject(func: Callable[P, Any]) -> Callable[P, Any]:
                 f"to add the parentheses at the end?"
             )
 
-    if iscoroutinefunction(func):
-        return async_wrapper
+    if injected_resources:
+        if iscoroutinefunction(func):
+            return async_wrapper
+        else:
+            return sync_wrapper
     else:
-        return sync_wrapper
+        warnings.warn(
+            f"{callable_name(func)} does not have any injectable resources declared"
+        )
+        return func
