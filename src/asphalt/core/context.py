@@ -1031,9 +1031,6 @@ def inject(func: Callable[P, Any]) -> Callable[P, Any]:
             else:
                 resource = ctx.require_resource(dependency.cls, dependency.name)
 
-            if isawaitable(resource):
-                resource = await resource
-
             resources[argname] = resource
 
         return await func(*args, **kwargs, **resources)
