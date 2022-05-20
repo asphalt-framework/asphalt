@@ -87,7 +87,6 @@ testpaths = ["tests"]
 
 [tool.mypy]
 python_version = "3.8"
-ignore_missing_imports = true
 show_error_codes = true
 
 [tool.coverage.run]
