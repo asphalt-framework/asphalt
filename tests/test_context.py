@@ -1,6 +1,5 @@
 import asyncio
 import sys
-from asyncio import CancelledError
 from concurrent.futures import Executor, ThreadPoolExecutor
 from inspect import isawaitable
 from itertools import count
@@ -26,7 +25,6 @@ from asphalt.core import (
     get_resource,
     inject,
     resource,
-    start_background_task,
 )
 from asphalt.core.context import ResourceContainer, require_resource
 
@@ -889,136 +887,3 @@ def test_dependency_deprecated():
 
         async def foo(res: str = Dependency()):
             pass
-
-
-class TestBackgroundTasks:
-    @pytest.mark.asyncio
-    async def test_task_finishes_early(self):
-        task_run = False
-
-        async def taskfunc():
-            nonlocal task_run
-            task_run = True
-
-        async with Context():
-            start_background_task(taskfunc)
-
-        assert task_run
-
-    @pytest.mark.asyncio
-    async def test_wait_task_to_finish(self):
-        """Test that the context waits for the task to finish when it closes."""
-        task_run = False
-
-        async def taskfunc():
-            nonlocal task_run
-            await asyncio.sleep(0.1)
-            task_run = True
-
-        async with Context():
-            start_background_task(taskfunc, grace_period=0.2)
-
-        assert task_run
-
-    @pytest.mark.asyncio
-    async def test_wait_task_too_slow(self):
-        """
-        Test that the task was cancelled because it took longer than grace_period to
-        finish.
-
-        """
-        task_run = False
-
-        async def taskfunc():
-            nonlocal task_run
-            await asyncio.sleep(0.1)
-            task_run = True
-
-        async with Context():
-            start_background_task(taskfunc)
-
-        assert not task_run
-
-    @pytest.mark.asyncio
-    async def test_root_context_closed(self):
-        """
-        Test that if the root context exited with an exception, background tasks are
-        cancelled, and waited on.
-
-        """
-        finished, cancelled, finalized = False, False, False
-
-        async def taskfunc():
-            nonlocal finished, cancelled, finalized
-            try:
-                await asyncio.sleep(1)
-            except CancelledError:
-                cancelled = True
-                await asyncio.sleep(0.1)
-                finalized = True
-                return
-
-            finished = True
-
-        with pytest.raises(Exception, match="root context boo-boo"):
-            async with Context():
-                start_background_task(taskfunc)
-                await asyncio.sleep(0)
-                raise Exception("root context boo-boo")
-
-        assert not finished
-        assert cancelled
-        assert finalized
-
-    @pytest.mark.asyncio
-    async def test_context_inheritance(self):
-        """
-        Test that the task is executed in a context that derives from the root context,
-        not the current context.
-
-        """
-        task_context: Context
-
-        async def taskfunc():
-            nonlocal task_context
-            task_context = current_context()
-
-        async with Context() as root_context:
-            async with Context() as subcontext:
-                start_background_task(taskfunc)
-
-        assert task_context is not subcontext
-        assert task_context.parent is root_context
-
-    @pytest.mark.parametrize(
-        "name, expected_name",
-        [
-            pytest.param("Test name", "Test name", id="explicit"),
-            pytest.param(
-                None,
-                f"Asphalt task: {__name__}.TestBackgroundTasks.test_task_name.<locals>"
-                f".taskfunc()",
-                id="implicit",
-            ),
-        ],
-    )
-    @pytest.mark.skipif(
-        sys.version_info < (3, 8), reason="Task names are only supported on Python 3.8+"
-    )
-    @pytest.mark.asyncio
-    async def test_task_name(self, name, expected_name):
-        """
-        Test that the task gets assigned the proper name, either explicitly or
-        implicitly.
-
-        """
-        task_name: str
-
-        async def taskfunc() -> None:
-            nonlocal task_name
-            task_name = asyncio.current_task().get_name()  # type: ignore[union-attr]
-
-        async with Context():
-            start_background_task(taskfunc, name=name, grace_period=1)
-
-        assert task_name == expected_name

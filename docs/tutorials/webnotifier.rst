@@ -215,7 +215,7 @@ class to it::
     import logging
 
     import aiohttp
-    from asphalt.core import Component, Context, Event, Signal, start_background_task
+    from asphalt.core import Component, Event, Signal, context_teardown
 
     logger = logging.getLogger(__name__)
 
@@ -272,16 +272,27 @@ Asphalt application::
             self.url = url
             self.delay = delay
 
-        async def start(self, ctx: Context) -> None:
+        @context_teardown
+        async def start(self, ctx):
             detector = Detector(self.url, self.delay)
-            ctx.add_resource(detector)
-            start_background_task(detector.run)
-            logging.info('Started web page change detector for url "%s" with a delay of %d seconds',
-                         self.url, self.delay)
+            ctx.add_resource(detector, context_attr='detector')
+            task = asyncio.create_task(detector.run())
+            logging.info(
+                'Started web page change detector for url "%s" with a delay of %d seconds',
+                self.url,
+                self.delay,
+            )
 
-The component's ``start()`` method starts the detector's ``run()`` method as a
-background task, adds the detector object as resource and installs an event listener
-that will shut down the detector when the context is torn down.
+            yield
+
+            # This part is run when the context is being torn down
+            task.cancel()
+            await asyncio.gather(task, return_exceptions=True)
+            logging.info("Shut down web page change detector")
+
+The component's ``start()`` method starts the detector's ``run()`` method as a new task, adds
+the detector object as resource and installs an event listener that will shut down the detector
+when the context is torn down.
 
 Now that you've moved the change detection code to its own module, ``ApplicationComponent`` will
 become somewhat lighter::

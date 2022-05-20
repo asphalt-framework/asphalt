@@ -111,47 +111,6 @@ And of course as a decorator too, as long as the context is provided::
         contents = Path('file.txt').read_bytes()
         ctx.call_async(connection.send, contents)
 
-Starting background tasks
--------------------------
-
-As a convenience, Asphalt provides a way to start asynchronous tasks that run within
-their own, separate contexts. This context inherits from the context which it was
-started from. The top-level :func:`start_background_task` function spawns a task with a
-context deriving from the top level context (looked up from the currently active
-context). If you need to tie the task to a specific context, then you can use the
-:meth:`Context.start_background_task` method on the target context instead.
-
-Example::
-
-    import asyncio
-
-    from asphalt.core import Context, start_background_task
-
-
-    async def taskfunc(sleep_duration: float) -> None:
-        print(f"Started background task (sleep duration={sleep_duration} s)")
-        await asyncio.sleep(sleep_duration)
-        print(f"Finished background task (sleep duration={sleep_duration} s)")
-
-
-    async def main():
-        async with Context() as root_context:
-            async with Context() as sub_context:
-                # This is equivalent to root_context.start_background_task(...)
-                # This task will outlive this inner context
-                start_background_task(lambda: taskfunc(3), name="Task in root context",
-                                      grace_period=4)
-
-                # This task will be done one way or another when this inner context
-                # block ends
-                subctx.start_background_task(lambda: taskfunc(1),
-                                             name="Task in subcontext", grace_period=4)
-
-            print("Subcontext ended")
-
-
-    asyncio.run(main())
-
 .. _co-operative multitasking: https://en.wikipedia.org/wiki/Cooperative_multitasking
 .. _preemptive multitasking: https://en.wikipedia.org/wiki/Preemption_%28computing%29
 .. _race conditions: https://en.wikipedia.org/wiki/Race_condition

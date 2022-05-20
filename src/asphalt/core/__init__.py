@@ -15,7 +15,6 @@ __all__ = (
     "Dependency",
     "inject",
     "resource",
-    "start_background_task",
     "executor",
     "Event",
     "Signal",
@@ -45,7 +44,6 @@ from .context import (
     inject,
     require_resource,
     resource,
-    start_background_task,
 )
 from .event import Event, Signal, stream_events, wait_event
 from .runner import run_application
