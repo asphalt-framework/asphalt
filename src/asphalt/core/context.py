@@ -352,7 +352,7 @@ class Context:
         self._check_closed()
         self._teardown_callbacks.append((callback, pass_exception))
 
-    async def close(self, exception: BaseException = None) -> None:
+    async def close(self, exception: BaseException | None = None) -> None:
         """
         Close this context and call any necessary resource teardown callbacks.
 
@@ -442,7 +442,7 @@ class Context:
         self,
         value,
         name: str = "default",
-        context_attr: str = None,
+        context_attr: str | None = None,
         types: Union[type, Sequence[type]] = (),
     ) -> None:
         """
@@ -517,7 +517,7 @@ class Context:
         factory_callback: factory_callback_type,
         types: Union[type, Sequence[Type], None] = None,
         name: str = "default",
-        context_attr: str = None,
+        context_attr: str | None = None,
     ) -> None:
         """
         Add a resource factory to this context.
@@ -900,7 +900,7 @@ def context_teardown(
 
     @wraps(func)
     async def wrapper(*args, **kwargs) -> None:
-        async def teardown_callback(exception: Optional[Exception]):
+        async def teardown_callback(exception: Optional[Exception]) -> None:
             try:
                 await generator.asend(exception)
             except StopAsyncIteration:

@@ -5,6 +5,7 @@ __all__ = ("Component", "ContainerComponent", "CLIApplicationComponent")
 import asyncio
 import sys
 from abc import ABCMeta, abstractmethod
+from asyncio import Future
 from collections import OrderedDict
 from traceback import print_exception
 from typing import Any, Dict, Optional, Type, Union
@@ -133,7 +134,7 @@ class CLIApplicationComponent(ContainerComponent):
     """
 
     async def start(self, ctx: Context) -> None:
-        def run_complete(f):
+        def run_complete(f: Future[int | None]) -> None:
             # If run() raised an exception, print it with a traceback and exit with code 1
             exc = f.exception()
             if exc is not None:

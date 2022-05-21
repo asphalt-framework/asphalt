@@ -131,7 +131,7 @@ class TestContext:
         await context.close()
 
     @pytest.mark.asyncio
-    async def test_teardown_callback_exception(self, context):
+    async def test_teardown_callback_exception(self, context: Context) -> None:
         """
         Test that all callbacks are called even when some teardown callbacks raise
         exceptions, and that a TeardownError is raised in such a case, containing the
@@ -149,7 +149,7 @@ class TestContext:
         context.add_teardown_callback(callback2)
         context.add_teardown_callback(callback1)
         context.add_teardown_callback(callback2)
-        items = []
+        items: list[int] = []
         with pytest.raises(TeardownError) as exc:
             await context.close()
 
@@ -158,7 +158,7 @@ class TestContext:
         assert len(exc.value.exceptions) == 2
 
     @pytest.mark.asyncio
-    async def test_close_closed(self, context):
+    async def test_close_closed(self, context: Context) -> None:
         """Test that closing an already closed context raises a RuntimeError."""
         assert not context.closed
         await context.close()
@@ -208,7 +208,7 @@ class TestContext:
         assert context.get_resource(int, "foo") == 6
 
     @pytest.mark.asyncio
-    async def test_add_resource_name_conflict(self, context):
+    async def test_add_resource_name_conflict(self, context: Context) -> None:
         """Test that adding a resource won't replace any existing resources."""
         context.add_resource(5, "foo")
         with pytest.raises(ResourceConflict) as exc:
@@ -219,20 +219,20 @@ class TestContext:
         )
 
     @pytest.mark.asyncio
-    async def test_add_resource_none_value(self, context):
+    async def test_add_resource_none_value(self, context: Context) -> None:
         """Test that None is not accepted as a resource value."""
         exc = pytest.raises(ValueError, context.add_resource, None)
         exc.match('"value" must not be None')
 
     @pytest.mark.asyncio
-    async def test_add_resource_context_attr(self, context):
+    async def test_add_resource_context_attr(self, context: Context) -> None:
         """Test that when resources are added, they are also set as properties of the context."""
         with pytest.deprecated_call():
             context.add_resource(1, context_attr="foo")
 
         assert context.foo == 1
 
-    def test_add_resource_context_attr_conflict(self, context):
+    def test_add_resource_context_attr_conflict(self, context: Context) -> None:
         """
         Test that the context won't allow adding a resource with an attribute name that conflicts
         with an existing attribute.
@@ -246,7 +246,7 @@ class TestContext:
         assert context.get_resource(int) is None
 
     @pytest.mark.asyncio
-    async def test_add_resource_type_conflict(self, context):
+    async def test_add_resource_type_conflict(self, context: Context) -> None:
         context.add_resource(5)
         with pytest.raises(ResourceConflict) as exc:
             context.add_resource(6)
@@ -269,7 +269,9 @@ class TestContext:
         )
 
     @pytest.mark.asyncio
-    async def test_add_resource_parametrized_generic_type(self, context):
+    async def test_add_resource_parametrized_generic_type(
+        self, context: Context
+    ) -> None:
         resource = {"a": 1}
         resource_type = Dict[str, int]
         context.add_resource(resource, types=[resource_type])
@@ -280,7 +282,7 @@ class TestContext:
         assert context.get_resource(dict) is None
 
     @pytest.mark.asyncio
-    async def test_add_resource_factory(self, context):
+    async def test_add_resource_factory(self, context: Context) -> None:
         """Test that resources factory callbacks are only called once for each context."""
 
         def factory(ctx):
@@ -296,7 +298,9 @@ class TestContext:
         assert context.__dict__["foo"] == 1
 
     @pytest.mark.asyncio
-    async def test_add_resource_factory_parametrized_generic_type(self, context):
+    async def test_add_resource_factory_parametrized_generic_type(
+        self, context: Context
+    ) -> None:
         resource = {"a": 1}
         resource_type = Dict[str, int]
         context.add_resource_factory(lambda ctx: resource, types=[resource_type])
@@ -320,7 +324,9 @@ class TestContext:
         )
 
     @pytest.mark.asyncio
-    async def test_add_resource_factory_coroutine_callback(self, context):
+    async def test_add_resource_factory_coroutine_callback(
+        self, context: Context
+    ) -> None:
         async def factory(ctx):
             return 1
 
@@ -330,14 +336,16 @@ class TestContext:
         exc.match('"factory_callback" must not be a coroutine function')
 
     @pytest.mark.asyncio
-    async def test_add_resource_factory_empty_types(self, context):
+    async def test_add_resource_factory_empty_types(self, context: Context) -> None:
         with pytest.raises(ValueError) as exc:
             context.add_resource_factory(lambda ctx: 1, ())
 
         exc.match("no resource types were specified")
 
     @pytest.mark.asyncio
-    async def test_add_resource_factory_context_attr_conflict(self, context):
+    async def test_add_resource_factory_context_attr_conflict(
+        self, context: Context
+    ) -> None:
         with pytest.deprecated_call():
             context.add_resource_factory(lambda ctx: None, str, context_attr="foo")
 
@@ -351,7 +359,7 @@ class TestContext:
         )
 
     @pytest.mark.asyncio
-    async def test_add_resource_factory_type_conflict(self, context):
+    async def test_add_resource_factory_type_conflict(self, context: Context) -> None:
         context.add_resource_factory(lambda ctx: None, (str, int))
         with pytest.raises(ResourceConflict) as exc:
             await context.add_resource_factory(lambda ctx: None, int)
@@ -359,7 +367,7 @@ class TestContext:
         exc.match("this context already contains a resource factory for the type int")
 
     @pytest.mark.asyncio
-    async def test_add_resource_factory_no_inherit(self, context):
+    async def test_add_resource_factory_no_inherit(self, context: Context) -> None:
         """
         Test that a subcontext gets its own version of a factory-generated resource even if a
         parent context has one already.
@@ -373,7 +381,7 @@ class TestContext:
             assert subcontext.foo == id(subcontext)
 
     @pytest.mark.asyncio
-    async def test_add_resource_return_type_single(self, context):
+    async def test_add_resource_return_type_single(self, context: Context) -> None:
         def factory(ctx: Context) -> str:
             return "foo"
 
@@ -382,7 +390,7 @@ class TestContext:
             assert context.require_resource(str) == "foo"
 
     @pytest.mark.asyncio
-    async def test_add_resource_return_type_union(self, context):
+    async def test_add_resource_return_type_union(self, context: Context) -> None:
         def factory(ctx: Context) -> Union[int, float]:
             return 5
 
@@ -393,7 +401,7 @@ class TestContext:
 
     @pytest.mark.skipif(sys.version_info < (3, 10), reason="Requires Python 3.10+")
     @pytest.mark.asyncio
-    async def test_add_resource_return_type_uniontype(self, context):
+    async def test_add_resource_return_type_uniontype(self, context: Context) -> None:
         def factory(ctx: Context) -> int | float:
             return 5
 
@@ -403,7 +411,7 @@ class TestContext:
             assert context.require_resource(float) == 5
 
     @pytest.mark.asyncio
-    async def test_add_resource_return_type_optional(self, context):
+    async def test_add_resource_return_type_optional(self, context: Context) -> None:
         def factory(ctx: Context) -> Optional[str]:
             return "foo"
 
@@ -412,14 +420,14 @@ class TestContext:
             assert context.require_resource(str) == "foo"
 
     @pytest.mark.asyncio
-    async def test_getattr_attribute_error(self, context):
+    async def test_getattr_attribute_error(self, context: Context) -> None:
         async with context, Context() as child_context:
             pytest.raises(AttributeError, getattr, child_context, "foo").match(
                 "no such context variable: foo"
             )
 
     @pytest.mark.asyncio
-    async def test_getattr_parent(self, context):
+    async def test_getattr_parent(self, context: Context) -> None:
         """
         Test that accessing a nonexistent attribute on a context retrieves the value from parent.
 
@@ -429,7 +437,7 @@ class TestContext:
             assert child_context.a == 2
 
     @pytest.mark.asyncio
-    async def test_get_resources(self, context):
+    async def test_get_resources(self, context: Context) -> None:
         context.add_resource(9, "foo")
         context.add_resource_factory(lambda ctx: len(ctx.context_chain), int, "bar")
         context.require_resource(int, "bar")
@@ -438,11 +446,11 @@ class TestContext:
             assert subctx.get_resources(int) == {1, 4}
 
     @pytest.mark.asyncio
-    async def test_require_resource(self, context):
+    async def test_require_resource(self, context: Context) -> None:
         context.add_resource(1)
         assert context.require_resource(int) == 1
 
-    def test_require_resource_not_found(self, context):
+    def test_require_resource_not_found(self, context: Context) -> None:
         """Test that ResourceNotFound is raised when a required resource is not found."""
         exc = pytest.raises(ResourceNotFound, context.require_resource, int, "foo")
         exc.match("no matching resource was found for type=int name='foo'")
@@ -463,7 +471,9 @@ class TestContext:
             assert resource == 6
 
     @pytest.mark.asyncio
-    async def test_request_resource_factory_context_attr(self, context):
+    async def test_request_resource_factory_context_attr(
+        self, context: Context
+    ) -> None:
         """Test that requesting a factory-generated resource also sets the context variable."""
         with pytest.deprecated_call():
             context.add_resource_factory(lambda ctx: 6, int, context_attr="foo")
@@ -472,7 +482,7 @@ class TestContext:
         assert context.__dict__["foo"] == 6
 
     @pytest.mark.asyncio
-    async def test_call_async_plain(self, context):
+    async def test_call_async_plain(self, context: Context) -> None:
         def runs_in_event_loop(worker_thread: Thread, x: int, y: int) -> int:
             assert current_thread() is not worker_thread
             return x + y
@@ -484,7 +494,7 @@ class TestContext:
         assert await context.call_in_executor(runs_in_worker_thread) == 3
 
     @pytest.mark.asyncio
-    async def test_call_async_coroutine(self, context):
+    async def test_call_async_coroutine(self, context: Context) -> None:
         async def runs_in_event_loop(worker_thread, x, y):
             assert current_thread() is not worker_thread
             await asyncio.sleep(0.1)
@@ -497,7 +507,7 @@ class TestContext:
         assert await context.call_in_executor(runs_in_worker_thread) == 3
 
     @pytest.mark.asyncio
-    async def test_call_async_exception(self, context):
+    async def test_call_async_exception(self, context: Context) -> None:
         def runs_in_event_loop() -> NoReturn:
             raise ValueError("foo")
 
@@ -507,7 +517,7 @@ class TestContext:
         assert exc.match("foo")
 
     @pytest.mark.asyncio
-    async def test_call_in_executor(self, context):
+    async def test_call_in_executor(self, context: Context) -> None:
         """Test that call_in_executor actually runs the target in a worker thread."""
         worker_thread = await context.call_in_executor(current_thread)
         assert worker_thread is not current_thread()
@@ -527,7 +537,7 @@ class TestContext:
         assert worker_thread is not current_thread()
 
     @pytest.mark.asyncio
-    async def test_call_in_executor_context_preserved(self, context):
+    async def test_call_in_executor_context_preserved(self, context: Context) -> None:
         """
         Test that call_in_executor runs the callable in a copy of the current (PEP 567)
         context.
@@ -537,7 +547,7 @@ class TestContext:
             assert await context.call_in_executor(current_context) is ctx
 
     @pytest.mark.asyncio
-    async def test_threadpool(self, context):
+    async def test_threadpool(self, context: Context) -> None:
         event_loop_thread = current_thread()
         async with context.threadpool():
             assert current_thread() is not event_loop_thread
@@ -551,7 +561,7 @@ class TestContext:
 
 class TestExecutor:
     @pytest.mark.asyncio
-    async def test_no_arguments(self, context):
+    async def test_no_arguments(self, context: Context) -> None:
         @executor
         def runs_in_default_worker() -> None:
             assert current_thread() is not event_loop_thread
@@ -697,7 +707,7 @@ class TestContextTeardown:
         ],
     )
     @pytest.mark.asyncio
-    async def test_get_resource_at_teardown(self, resource_func):
+    async def test_get_resource_at_teardown(self, resource_func) -> None:
         resource: str
 
         async def teardown_callback() -> None:
@@ -721,7 +731,7 @@ class TestContextTeardown:
         ],
     )
     @pytest.mark.asyncio
-    async def test_generate_resource_at_teardown(self, resource_func):
+    async def test_generate_resource_at_teardown(self, resource_func) -> None:
         resource: str
 
         async def teardown_callback() -> None:

@@ -11,7 +11,7 @@ from echo.server import ServerComponent
 
 
 def test_client_and_server(
-    event_loop: AbstractEventLoop, capsys: CaptureFixture
+    event_loop: AbstractEventLoop, capsys: CaptureFixture[str]
 ) -> None:
     async def run() -> None:
         async with Context() as ctx:

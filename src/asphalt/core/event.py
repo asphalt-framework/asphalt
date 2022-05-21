@@ -255,14 +255,14 @@ class Signal(Generic[T_Event]):
         return wait_event([self], filter)
 
     def stream_events(
-        self, filter: Callable[[Event], bool] = None, *, max_queue_size: int = 0
+        self, filter: Callable[[T_Event], bool] = None, *, max_queue_size: int = 0
     ) -> AsyncIterator[T_Event]:
         """Shortcut for calling :func:`stream_events` with this signal in the first argument."""
         return stream_events([self], filter, max_queue_size=max_queue_size)
 
 
 def stream_events(
-    signals: Sequence[Signal],
+    signals: Sequence[Signal[T_Event]],
     filter: Callable[[T_Event], bool] = None,
     *,
     max_queue_size: int = 0,

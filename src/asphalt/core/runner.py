@@ -11,8 +11,6 @@ from logging import INFO, Logger, basicConfig, getLogger, shutdown
 from logging.config import dictConfig
 from typing import Any, Dict, Optional, Union, cast
 
-from typeguard import check_argument_types
-
 from asphalt.core.component import Component, component_types
 from asphalt.core.context import Context, _current_context
 from asphalt.core.utils import PluginContainer, qualified_name
@@ -29,8 +27,8 @@ def sigterm_handler(logger: Logger, event_loop: AbstractEventLoop) -> None:
 def run_application(
     component: Union[Component, Dict[str, Any]],
     *,
-    event_loop_policy: str = None,
-    max_threads: int = None,
+    event_loop_policy: str | None = None,
+    max_threads: int | None = None,
     logging: Union[Dict[str, Any], int, None] = INFO,
     start_timeout: Union[int, float, None] = 10,
 ) -> None:
@@ -68,8 +66,6 @@ def run_application(
         up before giving up (``None`` = wait forever)
 
     """
-    assert check_argument_types()
-
     # Configure the logging system
     if isinstance(logging, dict):
         dictConfig(logging)

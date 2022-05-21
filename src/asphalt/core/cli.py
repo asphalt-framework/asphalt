@@ -5,23 +5,24 @@ from pathlib import Path
 from typing import Any, Dict, Optional
 
 import click
-from ruamel.yaml import YAML
+from ruamel.yaml import YAML, ScalarNode
+from ruamel.yaml.loader import Loader
 
 from asphalt.core.runner import policies, run_application
 from asphalt.core.utils import merge_config, qualified_name
 
 
-def env_constructor(loader, node):
+def env_constructor(loader: Loader, node: ScalarNode) -> str | None:
     value = loader.construct_scalar(node)
     return os.getenv(value)
 
 
-def text_file_constructor(loader, node):
+def text_file_constructor(loader: Loader, node: ScalarNode) -> str:
     value = loader.construct_scalar(node)
     return Path(value).read_text()
 
 
-def binary_file_constructor(loader, node):
+def binary_file_constructor(loader: Loader, node: ScalarNode) -> bytes:
     value = loader.construct_scalar(node)
     return Path(value).read_bytes()
 

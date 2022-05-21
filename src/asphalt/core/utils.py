@@ -21,7 +21,7 @@ else:
     from importlib_metadata import EntryPoint, entry_points
 
 
-def resolve_reference(ref):
+def resolve_reference(ref: Any) -> Any:
     """
     Return the object pointed to by ``ref``.
 
