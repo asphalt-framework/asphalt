@@ -59,14 +59,14 @@ provided by asphalt-mailer_. The library has an abstract base class for all mail
 configure mailer services using the ``Mailer`` interface so that components that just need *some*
 was to send email don't have to care what implementation was chosen in the configuration.
 
-Resources can be added to a context in two forms: regular resources and resource factories.
-A regular resource can be any arbitrary object. The same object can be added to the context under
-several different types, as long as the type/name combination remains unique within the same
-context.
+Resources can be added to a context in two forms: static resources and resource factories.
+A static resource can be any arbitrary object (except ``None``). The same object can be
+added to the context under several different types, as long as the type/name combination
+remains unique within the same context.
 
-A resource factory is a callable that takes a :class:`~asphalt.core.context.Context` as an argument
-an returns the value of the resource. There are at least a couple reasons to use resource factories
-instead of regular resources:
+A resource factory is a callable that takes a :class:`~asphalt.core.context.Context` as
+an argument an returns the value of the resource. There are at least a couple reasons to
+use resource factories instead of static resources:
 
   * the resource's lifecycle needs to be bound to the local context (example: database
     transactions)
@@ -90,7 +90,8 @@ The third method, :meth:`~asphalt.core.context.Context.request_resource`, calls
 indefinitely for the resource to be added to the context or its parents. When that happens, it
 calls :meth:`~asphalt.core.context.Context.get_resource` again, at which point success is
 guaranteed. This is usually used only in the components'
-:meth:`~asphalt.core.component.Component.start` methods.
+:meth:`~asphalt.core.component.Component.start` methods to retrieve resources provided
+by sibling components. Resources
 
 The order of resource lookup is as follows:
 

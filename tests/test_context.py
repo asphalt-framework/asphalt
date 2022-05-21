@@ -7,7 +7,7 @@ from concurrent.futures import Executor, ThreadPoolExecutor
 from inspect import isawaitable
 from itertools import count
 from threading import Thread, current_thread
-from typing import AsyncGenerator, AsyncIterator, Dict, NoReturn, Optional, Tuple
+from typing import AsyncGenerator, AsyncIterator, Dict, NoReturn, Optional, Tuple, Union
 from unittest.mock import patch
 
 import pytest
@@ -334,7 +334,7 @@ class TestContext:
         with pytest.raises(ValueError) as exc:
             context.add_resource_factory(lambda ctx: 1, ())
 
-        exc.match('"types" must not be empty')
+        exc.match("no resource types were specified")
 
     @pytest.mark.asyncio
     async def test_add_resource_factory_context_attr_conflict(self, context):
@@ -371,6 +371,45 @@ class TestContext:
         async with context, Context() as subcontext:
             assert context.foo == id(context)
             assert subcontext.foo == id(subcontext)
+
+    @pytest.mark.asyncio
+    async def test_add_resource_return_type_single(self, context):
+        def factory(ctx: Context) -> str:
+            return "foo"
+
+        async with context:
+            context.add_resource_factory(factory)
+            assert context.require_resource(str) == "foo"
+
+    @pytest.mark.asyncio
+    async def test_add_resource_return_type_union(self, context):
+        def factory(ctx: Context) -> Union[int, float]:
+            return 5
+
+        async with context:
+            context.add_resource_factory(factory)
+            assert context.require_resource(int) == 5
+            assert context.require_resource(float) == 5
+
+    @pytest.mark.skipif(sys.version_info < (3, 10), reason="Requires Python 3.10+")
+    @pytest.mark.asyncio
+    async def test_add_resource_return_type_uniontype(self, context):
+        def factory(ctx: Context) -> int | float:
+            return 5
+
+        async with context:
+            context.add_resource_factory(factory)
+            assert context.require_resource(int) == 5
+            assert context.require_resource(float) == 5
+
+    @pytest.mark.asyncio
+    async def test_add_resource_return_type_optional(self, context):
+        def factory(ctx: Context) -> Optional[str]:
+            return "foo"
+
+        async with context:
+            context.add_resource_factory(factory)
+            assert context.require_resource(str) == "foo"
 
     @pytest.mark.asyncio
     async def test_getattr_attribute_error(self, context):

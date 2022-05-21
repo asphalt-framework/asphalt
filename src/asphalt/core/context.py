@@ -515,7 +515,7 @@ class Context:
     def add_resource_factory(
         self,
         factory_callback: factory_callback_type,
-        types: Union[type, Sequence[Type]],
+        types: Union[type, Sequence[Type], None] = None,
         name: str = "default",
         context_attr: str = None,
     ) -> None:
@@ -528,12 +528,20 @@ class Context:
         requested by either using any of the methods :meth:`get_resource`, :meth:`require_resource`
         or :meth:`request_resource` or its context attribute is accessed.
 
+        The type(s) of the generated resources need to be specified, either by passing
+        the ``types`` argument, or by adding a return type annotation to the factory
+        function. If the generated resource needs to be registered as multiple types,
+        you can use :data:`~typing.Union` (e.g. ``Union[str, int]``) or a union type
+        (e.g. ``str | int``; requires ``from __future__ import annotations`` on earlier
+        than Python 3.10).
+
         When a new resource is created in this manner, it is always bound to the context through
         it was requested, regardless of where in the chain the factory itself was added to.
 
         :param factory_callback: a (non-coroutine) callable that takes a context instance as
             argument and returns the created resource object
         :param types: one or more types to register the generated resource as on the target context
+            (can be omitted if the factory callable has a return type annotation)
         :param name: name of the resource that will be created in the target context
         :param context_attr: name of the context attribute the created resource will be accessible
             as
@@ -541,8 +549,8 @@ class Context:
             the given type/name combinations or the given context variable
 
         """
-        # TODO: re-enable when typeguard properly identifies parametrized types as types
-        # assert check_argument_types()
+        import types as stdlib_types
+
         self._check_closed()
         if not resource_name_re.fullmatch(name):
             raise ValueError(
@@ -551,13 +559,36 @@ class Context:
             )
         if iscoroutinefunction(factory_callback):
             raise TypeError('"factory_callback" must not be a coroutine function')
-        if not types:
-            raise ValueError('"types" must not be empty')
 
-        if isinstance(types, type):
-            resource_types: Tuple[type, ...] = (types,)
+        if types is not None:
+            if isinstance(types, type):
+                resource_types: Tuple[type, ...] = (types,)
+            else:
+                resource_types = tuple(types)
         else:
-            resource_types = tuple(types)
+            # Extract the resources types from the return type annotation of the factory
+            type_hints = get_type_hints(factory_callback)
+            try:
+                return_type_hint = type_hints["return"]
+            except KeyError:
+                raise ValueError(
+                    "no resource types specified, and the factory callback does not "
+                    "have a return type hint"
+                )
+
+            origin = get_origin(return_type_hint)
+            if origin is Union or (
+                sys.version_info >= (3, 10) and origin is stdlib_types.UnionType
+            ):
+                resource_types = return_type_hint.__args__
+            else:
+                resource_types = (return_type_hint,)
+
+        if not resource_types:
+            raise ValueError("no resource types were specified")
+
+        if None in resource_types:
+            raise TypeError("None is not a valid resource type")
 
         # Check for a conflicting context attribute
         if context_attr in self._resource_factories_by_context_attr:

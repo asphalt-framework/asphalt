@@ -12,6 +12,8 @@ This library adheres to `Semantic Versioning 2.0 <http://semver.org/>`_.
   ``RuntimeError("this context has already been closed")``)
 - Allowed specifying optional dependencies with dependency injection, using either
   ``Optional[SomeType]`` (all Python versions) or ``SomeType | None`` (Python 3.10+)
+- Allowed omitting the ``types`` argument in ``Context.add_resource_factory()`` if the
+  factory callable has a return type annotation
 - ``Context.call_in_executor()`` now copies the current `PEP 567`_ context to the worker
   thread, allowing operations that require the "current context" to be present (e.g.
   dependency injection)
