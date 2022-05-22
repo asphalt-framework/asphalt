@@ -342,7 +342,7 @@ class TestContext:
         assert exc.value.type == int
         assert exc.value.name == "foo"
 
-    async def test_request_resource_parent_add(self, context, event_loop):
+    async def test_request_resource_parent_add(self, context):
         """
         Test that adding a resource to the parent context will satisfy a resource
         request in a child context.
@@ -518,13 +518,8 @@ async def test_require_resource() -> None:
         pytest.raises(ResourceNotFound, require_resource, int)
 
 
-def test_explicit_parent_deprecation() -> None:
-    parent_ctx = Context()
-    pytest.warns(DeprecationWarning, Context, parent_ctx)
-
-
-async def test_context_stack_corruption(event_loop):
-    async def generator() -> AsyncGenerator:
+async def test_context_stack_corruption() -> None:
+    async def generator() -> AsyncGenerator[None, None]:
         async with Context():
             yield
 

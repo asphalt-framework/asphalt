@@ -168,9 +168,6 @@ class Context:
     current context causes the attribute to be looked up in the parent instance and so
     on, until the attribute is found (or :class:`AttributeError` is raised).
 
-    :param parent: the parent context, if any
-
-    :ivar Context parent: the parent context, if any
     :var Signal resource_added: a signal (:class:`ResourceEvent`) dispatched when a
         resource has been published in this context
     """
@@ -179,19 +176,8 @@ class Context:
 
     _reset_token: Token
 
-    def __init__(self, parent: Context | None = None) -> None:
-        if parent is None:
-            self._parent = _current_context.get(None)
-        else:
-            warnings.warn(
-                "Explicitly passing the parent context has been deprecated. "
-                "The context stack is now tracked by the means of PEP 555 context "
-                "variables.",
-                DeprecationWarning,
-                stacklevel=2,
-            )
-            self._parent = parent
-
+    def __init__(self) -> None:
+        self._parent = _current_context.get(None)
         self._state = ContextState.open
         self._resources: dict[tuple[type, str], ResourceContainer] = {}
         self._resource_factories: dict[tuple[type, str], ResourceContainer] = {}
