@@ -95,6 +95,7 @@ def executor(
                 return func(ctx, *args, **kwargs)
 
             # Resolve the executor resource name to an Executor instance
+            _executor: Executor | None
             if isinstance(executor, str):
                 _executor = ctx.require_resource(Executor, executor)
             else:

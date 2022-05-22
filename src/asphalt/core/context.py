@@ -111,7 +111,7 @@ class ResourceContainer:
 
     def __init__(
         self,
-        value_or_factory,
+        value_or_factory: Any,
         types: Tuple[type, ...],
         name: str,
         context_attr: Optional[str],
@@ -123,7 +123,7 @@ class ResourceContainer:
         self.context_attr = context_attr
         self.is_factory = is_factory
 
-    def generate_value(self, ctx: Context):
+    def generate_value(self, ctx: Context) -> Any:
         assert self.is_factory, "generate_value() only works for resource factories"
         value = self.value_or_factory(ctx)
 
@@ -138,7 +138,7 @@ class ResourceContainer:
 
         return value
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         typenames = ", ".join(qualified_name(cls) for cls in self.types)
         value_repr = (
             "factory=%s" % callable_name(self.value_or_factory)

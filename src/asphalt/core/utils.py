@@ -11,7 +11,7 @@ __all__ = (
 import sys
 from importlib import import_module
 from inspect import isclass
-from typing import Any, Callable, Dict, List, Optional, Type, Union
+from typing import Any, Callable, Dict, List, Optional, Type, TypeVar, Union, overload
 
 from typeguard import check_argument_types
 
@@ -20,8 +20,10 @@ if sys.version_info >= (3, 10):
 else:
     from importlib_metadata import EntryPoint, entry_points
 
+T_Object = TypeVar("T_Object")
 
-def resolve_reference(ref: Any) -> Any:
+
+def resolve_reference(ref: object) -> Any:
     """
     Return the object pointed to by ``ref``.
 
@@ -56,23 +58,21 @@ def resolve_reference(ref: Any) -> Any:
         raise LookupError(f"error resolving reference {ref}: error looking up object")
 
 
-def qualified_name(obj) -> str:
+def qualified_name(obj: object) -> str:
     """
     Return the qualified name (e.g. package.module.Type) for the given object.
 
     If ``obj`` is not a class, the returned name will match its type instead.
 
     """
-    if not isclass(obj):
-        obj = type(obj)
-
-    if obj.__module__ == "builtins":
-        return obj.__name__
+    cls = obj if isclass(obj) else type(obj)
+    if cls.__module__ == "builtins":
+        return cls.__name__
     else:
-        return f"{obj.__module__}.{obj.__qualname__}"
+        return f"{cls.__module__}.{cls.__qualname__}"
 
 
-def callable_name(func: Callable) -> str:
+def callable_name(func: Callable[..., Any]) -> str:
     """Return the qualified name (e.g. package.module.func) for the given callable."""
     if func.__module__ == "builtins":
         return func.__name__
@@ -132,7 +132,15 @@ class PluginContainer:
         group = entry_points().select(group=namespace)  # type: ignore[attr-defined]
         self._entrypoints = {ep.name: ep for ep in group}
 
-    def resolve(self, obj):
+    @overload
+    def resolve(self, obj: str) -> Any:
+        pass
+
+    @overload
+    def resolve(self, obj: T_Object) -> T_Object:
+        pass
+
+    def resolve(self, obj: Any) -> Any:
         """
         Resolve a reference to an entry point or a variable in a module.
 
@@ -175,7 +183,7 @@ class PluginContainer:
         assert check_argument_types()
         assert self.base_class, "base class has not been defined"
         plugin_class = self.resolve(type)
-        if not issubclass(plugin_class, self.base_class):
+        if not isclass(plugin_class) or not issubclass(plugin_class, self.base_class):
             raise TypeError(
                 "{} is not a subclass of {}".format(
                     qualified_name(plugin_class), qualified_name(self.base_class)
