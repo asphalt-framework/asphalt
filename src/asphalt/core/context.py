@@ -89,6 +89,7 @@ resource_name_re = re.compile(r"\w+")
 T_Resource = TypeVar("T_Resource")
 T_Retval = TypeVar("T_Retval")
 T_Context = TypeVar("T_Context", bound="Context")
+T_Self = TypeVar("T_Self")
 P = ParamSpec("P")
 _current_context: ContextVar[Context | None] = ContextVar(
     "_current_context", default=None
@@ -872,9 +873,26 @@ def executor(arg: Union[Executor, str, Callable] = None):
     return asyncio_extras.threadpool(arg)
 
 
+@overload
 def context_teardown(
     func: Callable[[T_Context], AsyncGenerator[None, Exception | None]]
-) -> Callable[[T_Context], Coroutine]:
+) -> Callable[[T_Context], Coroutine[Any, Any, None]]:
+    ...
+
+
+@overload
+def context_teardown(
+    func: Callable[[T_Self, T_Context], AsyncGenerator[None, Exception | None]]
+) -> Callable[[T_Self, T_Context], Coroutine[Any, Any, None]]:
+    ...
+
+
+def context_teardown(
+    func: Callable[[T_Context], AsyncGenerator[None, Exception | None]]
+    | Callable[[T_Self, T_Context], AsyncGenerator[None, Exception | None]]
+) -> Callable[[T_Context], Coroutine[Any, Any, None]] | Callable[
+    [T_Self, T_Context], Coroutine[Any, Any, None]
+]:
     """
     Wrap an async generator function to execute the rest of the function at context teardown.
 
