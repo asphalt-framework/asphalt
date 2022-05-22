@@ -3,9 +3,10 @@ Version history
 
 This library adheres to `Semantic Versioning 2.0 <http://semver.org/>`_.
 
-**UNRELEASED**
+**4.9.1** (2022-05-22)
 
 - Fixed type annotation for ``@context_teardown``
+- Improved type annotations
 
 **4.9.0** (2022-05-22)
 
