@@ -288,7 +288,7 @@ class TestContext:
             return "foo"
 
         async with context:
-            context.add_resource_factory(factory)
+            await context.add_resource_factory(factory)
             assert context.require_resource(str) == "foo"
 
     async def test_add_resource_return_type_union(self, context: Context) -> None:
@@ -296,7 +296,7 @@ class TestContext:
             return 5
 
         async with context:
-            context.add_resource_factory(factory)
+            await context.add_resource_factory(factory)
             assert context.require_resource(int) == 5
             assert context.require_resource(float) == 5
 
@@ -306,7 +306,7 @@ class TestContext:
             return 5
 
         async with context:
-            context.add_resource_factory(factory)
+            await context.add_resource_factory(factory)
             assert context.require_resource(int) == 5
             assert context.require_resource(float) == 5
 
@@ -315,24 +315,8 @@ class TestContext:
             return "foo"
 
         async with context:
-            context.add_resource_factory(factory)
+            await context.add_resource_factory(factory)
             assert context.require_resource(str) == "foo"
-
-    async def test_getattr_attribute_error(self, context: Context) -> None:
-        async with context, Context() as child_context:
-            pytest.raises(AttributeError, getattr, child_context, "foo").match(
-                "no such context variable: foo"
-            )
-
-    async def test_getattr_parent(self, context: Context) -> None:
-        """
-        Test that accessing a nonexistent attribute on a context retrieves the value
-        from parent.
-
-        """
-        async with context, Context() as child_context:
-            context.a = 2
-            assert child_context.a == 2
 
     async def test_get_resources(self, context: Context) -> None:
         await context.add_resource(9, "foo")
@@ -444,7 +428,6 @@ class TestContextTeardown:
             pytest.param(Context.request_resource, id="request_resource"),
         ],
     )
-    @pytest.mark.asyncio
     async def test_get_resource_at_teardown(self, resource_func) -> None:
         resource: str
 
@@ -455,7 +438,7 @@ class TestContextTeardown:
                 resource = await resource
 
         async with Context() as ctx:
-            ctx.add_resource("blah")
+            await ctx.add_resource("blah")
             ctx.add_teardown_callback(teardown_callback)
 
         assert resource == "blah"
@@ -468,7 +451,6 @@ class TestContextTeardown:
             pytest.param(Context.request_resource, id="request_resource"),
         ],
     )
-    @pytest.mark.asyncio
     async def test_generate_resource_at_teardown(self, resource_func) -> None:
         resource: str
 
@@ -479,7 +461,7 @@ class TestContextTeardown:
                 resource = await resource
 
         async with Context() as ctx:
-            ctx.add_resource_factory(lambda context: "blah", [str])
+            await ctx.add_resource_factory(lambda context: "blah", [str])
             ctx.add_teardown_callback(teardown_callback)
 
         assert resource == "blah"
@@ -522,18 +504,16 @@ async def test_current_context() -> None:
     pytest.raises(NoCurrentContext, current_context)
 
 
-@pytest.mark.asyncio
 async def test_get_resource() -> None:
     async with Context() as ctx:
-        ctx.add_resource("foo")
+        await ctx.add_resource("foo")
         assert get_resource(str) == "foo"
         assert get_resource(int) is None
 
 
-@pytest.mark.asyncio
 async def test_require_resource() -> None:
     async with Context() as ctx:
-        ctx.add_resource("foo")
+        await ctx.add_resource("foo")
         assert require_resource(str) == "foo"
         pytest.raises(ResourceNotFound, require_resource, int)
 
@@ -664,7 +644,7 @@ class TestDependencyInjection:
         async with Context() as ctx:
             retval = injected() if sync else (await injected())
             assert retval is None
-            ctx.add_resource("hello")
+            await ctx.add_resource("hello")
             retval = injected() if sync else (await injected())
             assert retval == "hello"
 
