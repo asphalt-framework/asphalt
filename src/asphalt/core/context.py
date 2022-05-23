@@ -25,6 +25,7 @@ import types
 import warnings
 from asyncio import (
     AbstractEventLoop,
+    Future,
     current_task,
     get_event_loop,
     get_running_loop,
@@ -824,7 +825,7 @@ class Context:
         return asyncio_extras.threadpool(executor)
 
 
-def executor(arg: Union[Executor, str, Callable] = None):
+def executor(arg: Union[Executor, str, None, Callable[..., T_Retval]] = None):
     """
     Decorate a function so that it runs in an :class:`~concurrent.futures.Executor`.
 
@@ -842,35 +843,46 @@ def executor(arg: Union[Executor, str, Callable] = None):
         def should_run_in_executor(ctx):
             ...
 
-    :param arg: a callable to decorate, an :class:`~concurrent.futures.Executor` instance, the
-        resource name of one or ``None`` to use the event loop's default executor
+    :param arg: a callable to decorate, an :class:`~concurrent.futures.Executor`
+        instance, the resource name of one or ``None`` to use the event loop's default
+        executor
     :return: the wrapped function
 
     """
+    function: Callable[..., T_Retval]
 
-    def outer_wrapper(func: Callable):
-        @wraps(func)
-        def inner_wrapper(*args, **kwargs):
+    def inner_wrapper(*args, **kwargs) -> Future[T_Retval]:
+        executor: Executor | None
+        if isinstance(executor_arg, str):
             try:
-                ctx = next(arg for arg in args[:2] if isinstance(arg, Context))
+                ctx = next(a for a in args[:2] if isinstance(a, Context))
             except StopIteration:
                 raise RuntimeError(
-                    "the first positional argument to {}() has to be a Context "
-                    "instance".format(callable_name(func))
+                    f"the first positional argument to {callable_name(function)}() has "
+                    f"to be a Context instance"
                 ) from None
 
-            executor = ctx.require_resource(Executor, resource_name)
-            return asyncio_extras.call_in_executor(
-                func, *args, executor=executor, **kwargs
-            )
+            executor = ctx.require_resource(Executor, executor_arg)
+        else:
+            executor = executor_arg
 
-        return inner_wrapper
+        current_context()
+        callback: partial[T_Retval] = partial(
+            copy_context().run, function, *args, **kwargs
+        )
+        return get_running_loop().run_in_executor(executor, callback)
 
-    if isinstance(arg, str):
-        resource_name = arg
+    def outer_wrapper(func: Callable[..., T_Retval]) -> Callable[..., Future[T_Retval]]:
+        nonlocal function
+        function = func
+        return wraps(func)(inner_wrapper)
+
+    if arg is None or isinstance(arg, (Executor, str)):
+        executor_arg = arg
         return outer_wrapper
-
-    return asyncio_extras.threadpool(arg)
+    else:
+        executor_arg = None
+        return outer_wrapper(arg)
 
 
 @overload

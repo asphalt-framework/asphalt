@@ -3,6 +3,11 @@ Version history
 
 This library adheres to `Semantic Versioning 2.0 <http://semver.org/>`_.
 
+**UNRELEASED**
+
+- Changed ``@executor`` to propagate the `PEP 567`_ context to the worker thread, just
+  like ``Context.call_in_executor()``
+
 **4.9.1** (2022-05-22)
 
 - Fixed type annotation for ``@context_teardown``

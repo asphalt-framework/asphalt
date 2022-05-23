@@ -553,7 +553,9 @@ class TestContext:
             assert current_thread() is not event_loop_thread
 
     @pytest.mark.asyncio
-    async def test_threadpool_named_executor(self, context, special_executor):
+    async def test_threadpool_named_executor(
+        self, context: Context, special_executor: Executor
+    ) -> None:
         special_executor_thread = special_executor.submit(current_thread).result()
         async with context.threadpool("special"):
             assert current_thread() is special_executor_thread
@@ -565,27 +567,34 @@ class TestExecutor:
         @executor
         def runs_in_default_worker() -> None:
             assert current_thread() is not event_loop_thread
+            current_context()
 
         event_loop_thread = current_thread()
-        await runs_in_default_worker()
+        async with context:
+            await runs_in_default_worker()
 
     @pytest.mark.asyncio
-    async def test_named_executor(self, context, special_executor):
+    async def test_named_executor(
+        self, context: Context, special_executor: Executor
+    ) -> None:
         @executor("special")
         def runs_in_default_worker(ctx: Context) -> None:
             assert current_thread() is special_executor_thread
+            assert current_context() is ctx
 
         special_executor_thread = special_executor.submit(current_thread).result()
-        await runs_in_default_worker(context)
+        async with context:
+            await runs_in_default_worker(context)
 
     @pytest.mark.asyncio
-    async def test_executor_missing_context(self, event_loop, context):
+    async def test_executor_missing_context(self, context: Context):
         @executor("special")
         def runs_in_default_worker() -> None:
-            pass
+            current_context()
 
         with pytest.raises(RuntimeError) as exc:
-            await runs_in_default_worker()
+            async with context:
+                await runs_in_default_worker()
 
         exc.match(
             r"the first positional argument to %s\(\) has to be a Context instance"
