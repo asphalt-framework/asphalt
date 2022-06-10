@@ -105,40 +105,42 @@ def run_application(
         # Start the root component
         token = _current_context.set(context)
         try:
-            coro = asyncio.wait_for(component.start(context), start_timeout)
-            event_loop.run_until_complete(coro)
-        except asyncio.TimeoutError as e:
-            exception = e
-            logger.error("Timeout waiting for the root component to start")
-            exit_code = 1
-        except Exception as e:
-            exception = e
-            logger.exception("Error during application startup")
-            exit_code = 1
-        else:
-            logger.info("Application started")
-
-            # Add a signal handler to gracefully deal with SIGTERM
             try:
-                event_loop.add_signal_handler(
-                    signal.SIGTERM, sigterm_handler, logger, event_loop
-                )
-            except NotImplementedError:
-                pass  # Windows does not support signals very well
+                coro = asyncio.wait_for(component.start(context), start_timeout)
+                event_loop.run_until_complete(coro)
+            except asyncio.TimeoutError as e:
+                exception = e
+                logger.error("Timeout waiting for the root component to start")
+                exit_code = 1
+            except Exception as e:
+                exception = e
+                logger.exception("Error during application startup")
+                exit_code = 1
+            else:
+                logger.info("Application started")
 
-            # Finally, run the event loop until the process is terminated or Ctrl+C is pressed
-            try:
-                event_loop.run_forever()
-            except KeyboardInterrupt:
-                pass
-            except SystemExit as e:
-                exit_code = e.code
+                # Add a signal handler to gracefully deal with SIGTERM
+                try:
+                    event_loop.add_signal_handler(
+                        signal.SIGTERM, sigterm_handler, logger, event_loop
+                    )
+                except NotImplementedError:
+                    pass  # Windows does not support signals very well
+
+                # Finally, run the event loop until the process is terminated or Ctrl+C
+                # is pressed
+                try:
+                    event_loop.run_forever()
+                except KeyboardInterrupt:
+                    pass
+                except SystemExit as e:
+                    exit_code = e.code
+
+            # Close the root context
+            logger.info("Stopping application")
+            event_loop.run_until_complete(context.close(exception))
         finally:
             _current_context.reset(token)
-
-        # Close the root context
-        logger.info("Stopping application")
-        event_loop.run_until_complete(context.close(exception))
 
         # Shut down leftover async generators
         event_loop.run_until_complete(event_loop.shutdown_asyncgens())

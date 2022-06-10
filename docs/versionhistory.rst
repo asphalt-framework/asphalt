@@ -3,6 +3,11 @@ Version history
 
 This library adheres to `Semantic Versioning 2.0 <http://semver.org/>`_.
 
+**UNRELEASED**
+
+- Fixed root context being unset as the current context before its ``close()`` method is
+  run
+
 **4.10.0** (2022-05-27)
 
 - Changed ``@executor`` to propagate the `PEP 567`_ context to the worker thread, just

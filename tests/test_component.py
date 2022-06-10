@@ -6,6 +6,7 @@ from typing import NoReturn
 
 import pytest
 
+from asphalt.core import current_context, run_application
 from asphalt.core.component import (
     CLIApplicationComponent,
     Component,
@@ -159,3 +160,13 @@ class TestCLIApplicationComponent:
         event_loop.run_until_complete(component.start(Context()))
         exc = pytest.raises(SystemExit, event_loop.run_forever)
         assert exc.value.code == 1
+
+    def test_add_teardown_callback(self) -> None:
+        async def callback() -> None:
+            current_context()
+
+        class DummyCLIComponent(CLIApplicationComponent):
+            async def run(self, ctx: Context) -> None:
+                ctx.add_teardown_callback(callback)
+
+        run_application(DummyCLIComponent())
