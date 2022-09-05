@@ -22,7 +22,7 @@ repos:
         args: [ "--py37-plus", "--keep-runtime-typing" ]
 
   - repo: https://github.com/psf/black
-    rev: 22.6.0
+    rev: 22.8.0
     hooks:
       - id: black
 
