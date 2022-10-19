@@ -34,7 +34,7 @@ their services as *resources* in a shared *context*. Components can build on res
 each other, making it possible to create components that offer highly sophisticated functionality
 with relatively little effort.
 
-Full documentation: https://asphalt.readthedocs.io/en/latest/
+Full documentation: https://asphalt.readthedocs.io/
 
 .. _asyncio: https://docs.python.org/3/library/asyncio.html
 .. _uvloop: https://github.com/MagicStack/uvloop
