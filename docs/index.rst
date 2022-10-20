@@ -1,5 +1,5 @@
 This is the core Asphalt library. If you're looking for documentation for some specific component
-project, you will the appropriate link from the project's `Github page`_.
+project, you will find the appropriate link from the project's `Github page`_.
 
 If you're a new user, it's a good idea to start from the tutorials. Pick a tutorial that suits
 your current level of knowledge.

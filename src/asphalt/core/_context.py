@@ -5,7 +5,7 @@ import re
 import sys
 import types
 import warnings
-from collections.abc import Coroutine, Sequence
+from collections.abc import AsyncGenerator, Coroutine, Sequence
 from contextvars import ContextVar, Token
 from dataclasses import dataclass, field
 from enum import Enum, auto
@@ -21,7 +21,6 @@ from inspect import (
 from types import TracebackType
 from typing import (
     Any,
-    AsyncGenerator,
     Callable,
     Optional,
     TypeVar,

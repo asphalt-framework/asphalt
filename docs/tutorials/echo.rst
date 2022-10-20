@@ -2,10 +2,9 @@ Tutorial 1: Getting your feet wet – a simple echo server and client
 ===================================================================
 
 This tutorial will get you started with Asphalt development from the ground up.
-You will be learn how to build a simple network server that echoes back messages sent to
-it, along with a matching client application. It will however not yet touch more advanced
-concepts like using the ``asphalt`` command to run an application with a configuration
-file.
+You will learn how to build a simple network server that echoes back messages sent to it, along
+with a matching client application. It will however not yet touch more advanced concepts like
+using the ``asphalt`` command to run an application with a configuration file.
 
 Prerequisites
 -------------

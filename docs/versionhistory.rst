@@ -40,6 +40,16 @@ This library adheres to `Semantic Versioning 2.0 <http://semver.org/>`_.
 - Dropped explicit run-time type checking
 - Dropped the deprecated ``Dependency()`` marker
 
+**4.10.1** (2022-06-10)
+
+- Fixed root context being unset as the current context before its ``close()`` method is
+  run
+
+**4.10.0** (2022-05-27)
+
+- Changed ``@executor`` to propagate the `PEP 567`_ context to the worker thread, just
+  like ``Context.call_in_executor()``
+
 **4.9.1** (2022-05-22)
 
 - Fixed type annotation for ``@context_teardown``
@@ -71,7 +81,6 @@ This library adheres to `Semantic Versioning 2.0 <http://semver.org/>`_.
 
 **4.8.0** (2022-04-28)
 
-- Dropped support for Python 3.8 and earlier
 - ``Context`` now accepts parametrized generic classes as resource types
 - Deprecated context variables in favor of dependency injection
 - Replaced ``asphalt.core.context.Dependency`` with
