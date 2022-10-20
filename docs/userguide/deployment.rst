@@ -27,9 +27,9 @@ What this will do is:
 
 #. read all the given configuration files, starting from ``yourconfig.yaml``
 #. merge the configuration files' contents into a single configuration dictionary using
-    :func:`~asphalt.core.utils.merge_config`
+   :func:`~asphalt.core.utils.merge_config`
 #. call :func:`~asphalt.core.runner.run_application` using the configuration dictionary as keyword
-    arguments
+   arguments
 
 Writing a configuration file
 ----------------------------
