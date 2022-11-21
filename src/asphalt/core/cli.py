@@ -52,7 +52,19 @@ def main() -> None:
     type=str,
     help="service to run (if the configuration file contains multiple services)",
 )
-def run(configfile, unsafe: bool, loop: Optional[str], service: Optional[str]) -> None:
+@click.option(
+    "--set",
+    multiple=True,
+    type=str,
+    help="set configuration",
+)
+def run(
+    configfile,
+    unsafe: bool,
+    loop: Optional[str],
+    service: Optional[str],
+    set: str,
+) -> None:
     yaml = YAML(typ="unsafe" if unsafe else "safe")
     yaml.constructor.add_constructor("!Env", env_constructor)
     yaml.constructor.add_constructor("!TextFile", text_file_constructor)
@@ -70,6 +82,26 @@ def run(configfile, unsafe: bool, loop: Optional[str], service: Optional[str]) -
     # Override the event loop policy if specified
     if loop:
         config["event_loop_policy"] = loop
+
+    # Read the configuration from the CLI
+    for cli_conf in set:
+        if "=" not in cli_conf:
+            click.echo(f"Configuration must be set with '=', got: {cli_conf}")
+            raise click.Abort()
+
+        key, value = cli_conf.split("=", 1)
+        if "." in key:
+            ks = key.split(".")
+            last_i = len(ks) - 1
+            d = config["component"]["components"]
+            for i, k in enumerate(ks):
+                if i == last_i:
+                    d[k] = value
+                else:
+                    d[k] = d.get(k, {})
+                    d = d[k]
+        else:
+            config["component"][key] = value
 
     services = config.pop("services", {})
     if not isinstance(services, dict):

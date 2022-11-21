@@ -106,6 +106,7 @@ logging:
 component:
   dummyval1: alternate
   dummyval2: 10
+  dummyval3: foo
 """
 
     with runner.isolated_filesystem(), patch(
@@ -113,7 +114,17 @@ component:
     ) as run_app:
         Path("conf1.yml").write_text(config1)
         Path("conf2.yml").write_text(config2)
-        result = runner.invoke(cli.run, ["conf1.yml", "conf2.yml"])
+        result = runner.invoke(
+            cli.run,
+            [
+                "conf1.yml",
+                "conf2.yml",
+                "--set",
+                "dummyval3=bar",
+                "--set",
+                "dummyval4=baz",
+            ],
+        )
 
         assert result.exit_code == 0
         assert run_app.call_count == 1
@@ -124,6 +135,8 @@ component:
                 "type": component_class,
                 "dummyval1": "alternate",
                 "dummyval2": 10,
+                "dummyval3": "bar",
+                "dummyval4": "baz",
             },
             "logging": {"version": 1, "disable_existing_loggers": False},
         }
