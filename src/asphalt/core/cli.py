@@ -54,6 +54,7 @@ def main() -> None:
 )
 @click.option(
     "--set",
+    "set_",
     multiple=True,
     type=str,
     help="set configuration",
@@ -63,7 +64,7 @@ def run(
     unsafe: bool,
     loop: Optional[str],
     service: Optional[str],
-    set: str,
+    set_: str,
 ) -> None:
     yaml = YAML(typ="unsafe" if unsafe else "safe")
     yaml.constructor.add_constructor("!Env", env_constructor)
@@ -84,7 +85,7 @@ def run(
         config["event_loop_policy"] = loop
 
     # Read the configuration from the CLI
-    for cli_conf in set:
+    for cli_conf in set_:
         if "=" not in cli_conf:
             click.echo(f"Configuration must be set with '=', got: {cli_conf}")
             raise click.Abort()
@@ -93,13 +94,12 @@ def run(
         if "." in key:
             ks = key.split(".")
             last_i = len(ks) - 1
-            d = config["component"]["components"]
+            d = config.setdefault("component", {}).setdefault("components", {})
             for i, k in enumerate(ks):
                 if i == last_i:
                     d[k] = value
                 else:
-                    d[k] = d.get(k, {})
-                    d = d[k]
+                    d = d.setdefault(k, {})
         else:
             config["component"][key] = value
 
