@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import re
 from pathlib import Path
 from typing import Any, Dict, Optional
 
@@ -87,17 +88,7 @@ def run(
             raise click.Abort()
 
         key, value = cli_conf.split("=", 1)
-        ks = key.split(".")
-        # handle escape characters ("a\\.b" should be key "a.b")
-        keys = []
-        i = 0
-        while i < len(ks):
-            if ks[i].endswith("\\"):
-                keys.append(f"{ks[i][:-1]}.{ks[i + 1]}")
-                i += 1
-            else:
-                keys.append(ks[i])
-            i += 1
+        keys = [k.replace("\\.", ".") for k in re.split("(?<!\\\\)\.", key)]
         if len(keys) > 1:
             # subcomponent configuration
             last_i = len(keys) - 1
