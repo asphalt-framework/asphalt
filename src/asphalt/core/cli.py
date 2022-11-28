@@ -80,10 +80,6 @@ def run(
         ), "the document root element must be a dictionary"
         config = merge_config(config, config_data)
 
-    # Override the event loop policy if specified
-    if loop:
-        config["event_loop_policy"] = loop
-
     # Read the configuration from the CLI
     for cli_conf in set_:
         if "=" not in cli_conf:
@@ -91,17 +87,33 @@ def run(
             raise click.Abort()
 
         key, value = cli_conf.split("=", 1)
-        if "." in key:
-            ks = key.split(".")
-            last_i = len(ks) - 1
+        ks = key.split(".")
+        # handle escape characters ("a\\.b" should be key "a.b")
+        keys = []
+        i = 0
+        while i < len(ks):
+            if ks[i].endswith("\\"):
+                keys.append(f"{ks[i][:-1]}.{ks[i + 1]}")
+                i += 1
+            else:
+                keys.append(ks[i])
+            i += 1
+        if len(keys) > 1:
+            # subcomponent configuration
+            last_i = len(keys) - 1
             d = config.setdefault("component", {}).setdefault("components", {})
-            for i, k in enumerate(ks):
+            for i, k in enumerate(keys):
                 if i == last_i:
                     d[k] = value
                 else:
                     d = d.setdefault(k, {})
         else:
+            # root component configuration
             config["component"][key] = value
+
+    # Override the event loop policy if specified
+    if loop:
+        config["event_loop_policy"] = loop
 
     services = config.pop("services", {})
     if not isinstance(services, dict):

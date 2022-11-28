@@ -172,6 +172,17 @@ command line (with the configuration file saved as ``config.yaml``):
 
     asphalt run config.yaml --set mailer.backend=sendmail
 
+.. note::
+    Note that if you want a ``.`` to be treated as part of an identifier, and not as a separator,
+    you need to escape it at the command line with ``\``. For instance, in both commands:
+
+    .. code-block:: bash
+
+        asphalt run config.yaml --set "logging.loggers.asphalt\.templating.level=DEBUG"
+        asphalt run config.yaml --set logging.loggers.asphalt\\.templating.level=DEBUG
+
+    The logging level for the ``asphalt.templating`` logger will be set to ``DEBUG``.
+
 The same effect can be achieved programmatically by supplying the override configuration to the
 container component via its ``components`` constructor argument. This is very useful when writing
 tests against your application. For example, you might want to use the ``mock`` mailer in your test
