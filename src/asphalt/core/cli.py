@@ -98,7 +98,7 @@ def run(
             if not isinstance(section, Mapping):
                 path = " ⟶ ".join(x for x in keys[: i + 1])
                 raise click.ClickException(
-                    f"Cannot execute override for {key!r}: value at {path} is not "
+                    f"Cannot apply override for {key!r}: value at {path} is not "
                     f"a mapping, but {qualified_name(section)}"
                 )
 

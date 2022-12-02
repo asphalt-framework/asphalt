@@ -115,7 +115,7 @@ def test_run_bad_path(runner: CliRunner) -> None:
         )
         assert result.exit_code == 1
         assert result.stdout == (
-            "Error: Cannot execute override for 'component.listvalue.foo': value at "
+            "Error: Cannot apply override for 'component.listvalue.foo': value at "
             "component ⟶ listvalue is not a mapping, but list\n"
         )
 
