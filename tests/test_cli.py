@@ -88,6 +88,38 @@ logging:
         }
 
 
+def test_run_bad_override(runner: CliRunner) -> None:
+    config = """\
+    component:
+        type: does.not.exist:Component
+"""
+    with runner.isolated_filesystem():
+        Path("test.yml").write_text(config)
+        result = runner.invoke(cli.run, ["test.yml", "--set", "foobar"])
+        assert result.exit_code == 1
+        assert result.stdout == (
+            "Error: Configuration must be set with '=', got: foobar\n"
+        )
+
+
+def test_run_bad_path(runner: CliRunner) -> None:
+    config = """\
+    component:
+        type: does.not.exist:Component
+        listvalue: []
+"""
+    with runner.isolated_filesystem():
+        Path("test.yml").write_text(config)
+        result = runner.invoke(
+            cli.run, ["test.yml", "--set", "component.listvalue.foo=1"]
+        )
+        assert result.exit_code == 1
+        assert result.stdout == (
+            "Error: Cannot execute override for 'component.listvalue.foo': value at "
+            "component ⟶ listvalue is not a mapping, but list\n"
+        )
+
+
 def test_run_multiple_configs(runner: CliRunner) -> None:
     component_class = "{0.__module__}:{0.__name__}".format(DummyComponent)
     config1 = """\

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import os
 import re
-from io import StringIO
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -73,32 +73,36 @@ def run(
     yaml.constructor.add_constructor("!TextFile", text_file_constructor)
     yaml.constructor.add_constructor("!BinaryFile", binary_file_constructor)
 
-    configfiles = list(configfile)
-    # Read the configuration from the CLI
-    for cli_conf in set_:
-        cli_conf_list = []
-        if "=" not in cli_conf:
-            click.echo(f"Configuration must be set with '=', got: {cli_conf}")
-            raise click.Abort()
-
-        key, value = cli_conf.split("=", 1)
-        keys = [k.replace(r"\.", ".") for k in re.split(r"(?<!\\)\.", key)]
-        last_i = len(keys) - 1
-        for i, k in enumerate(keys):
-            cli_conf_list.append(f"{'  ' * i}{k}:")
-            if i == last_i:
-                cli_conf_list.append(f" {value}")
-            cli_conf_list.append("\n")
-        configfiles.append(StringIO("".join(cli_conf_list)))
-
     # Read the configuration from the supplied YAML files
     config: Dict[str, Any] = {}
-    for f in configfiles:
-        config_data = yaml.load(f)
+    for path in configfile:
+        config_data = yaml.load(path)
         assert isinstance(
             config_data, dict
         ), "the document root element must be a dictionary"
         config = merge_config(config, config_data)
+
+    # Override config options
+    for override in set_:
+        if "=" not in override:
+            raise click.ClickException(
+                f"Configuration must be set with '=', got: {override}"
+            )
+
+        key, value = override.split("=", 1)
+        parsed_value = yaml.load(value)
+        keys = [k.replace(r"\.", ".") for k in re.split(r"(?<!\\)\.", key)]
+        section = config
+        for i, part_key in enumerate(keys[:-1]):
+            section = section.setdefault(part_key, {})
+            if not isinstance(section, Mapping):
+                path = " ⟶ ".join(x for x in keys[: i + 1])
+                raise click.ClickException(
+                    f"Cannot execute override for {key!r}: value at {path} is not "
+                    f"a mapping, but {qualified_name(section)}"
+                )
+
+        section[keys[-1]] = parsed_value
 
     # Override the event loop policy if specified
     if loop:
