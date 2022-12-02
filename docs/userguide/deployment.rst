@@ -17,17 +17,18 @@ Running the launcher is very straightfoward:
 
 .. code-block:: bash
 
-    asphalt run yourconfig.yaml [your-overrides.yml...]
+    asphalt run yourconfig.yaml [your-overrides.yml...] [--set path.to.key=val]
 
 Or alternatively:
 
-    python -m asphalt run yourconfig.yaml [your-overrides.yml...]
+    python -m asphalt run yourconfig.yaml [your-overrides.yml...] [--set path.to.key=val]
 
 What this will do is:
 
 #. read all the given configuration files, starting from ``yourconfig.yaml``
-#. merge the configuration files' contents into a single configuration dictionary using
-   :func:`~asphalt.core.utils.merge_config`
+#. read the command line configuration options passed with ``--set``, if any
+#. merge the configuration files' contents and the command line configuration options into a single configuration dictionary using
+   :func:`~asphalt.core.utils.merge_config`.
 #. call :func:`~asphalt.core.runner.run_application` using the configuration dictionary as keyword
    arguments
 
@@ -147,8 +148,10 @@ Component configuration can be specified on several levels:
 * First configuration file argument to ``asphalt run``
 * Second configuration file argument to ``asphalt run``
 * ...
+* Command line configuration options to ``asphalt run --set``
 
 Any options you specify on each level override or augment any options given on previous levels.
+The command line configuration options have precedence over the configuration files.
 To minimize the effort required to build a working configuration file for your application, it is
 suggested that you pass as many of the options directly in the component initialization code and
 leave only deployment specific options like API keys, access credentials and such to the
@@ -162,12 +165,29 @@ gets passed three keyword arguments:
 * ``ssl=True``
 
 The first one is provided in the root component code while the other two options come from the YAML
-file. You could also override the mailer backend in the configuration file if you wanted. The same
-effect can be achieved programmatically by supplying the override configuration to the container
-component via its ``components`` constructor argument. This is very useful when writing tests
-against your application. For example, you might want to use the ``mock`` mailer in your test suite
-configuration to test that the application correctly sends out emails (and to prevent them from
-actually being sent to recipients!).
+file. You could also override the mailer backend in the configuration file if you wanted, or at the
+command line (with the configuration file saved as ``config.yaml``):
+
+.. code-block:: bash
+
+    asphalt run config.yaml --set component.components.mailer.backend=sendmail
+
+.. note::
+    Note that if you want a ``.`` to be treated as part of an identifier, and not as a separator,
+    you need to escape it at the command line with ``\``. For instance, in both commands:
+
+    .. code-block:: bash
+
+        asphalt run config.yaml --set "logging.loggers.asphalt\.templating.level=DEBUG"
+        asphalt run config.yaml --set logging.loggers.asphalt\\.templating.level=DEBUG
+
+    The logging level for the ``asphalt.templating`` logger will be set to ``DEBUG``.
+
+The same effect can be achieved programmatically by supplying the override configuration to the
+container component via its ``components`` constructor argument. This is very useful when writing
+tests against your application. For example, you might want to use the ``mock`` mailer in your test
+suite configuration to test that the application correctly sends out emails (and to prevent them
+from actually being sent to recipients!).
 
 There is another neat trick that lets you easily modify a specific key in the configuration.
 By using dotted notation in a configuration key, you can target a specific key arbitrarily deep in

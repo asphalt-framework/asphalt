@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import os
+import re
+from collections.abc import Mapping
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 import click
 from ruamel.yaml import YAML, ScalarNode
@@ -52,7 +54,20 @@ def main() -> None:
     type=str,
     help="service to run (if the configuration file contains multiple services)",
 )
-def run(configfile, unsafe: bool, loop: Optional[str], service: Optional[str]) -> None:
+@click.option(
+    "--set",
+    "set_",
+    multiple=True,
+    type=str,
+    help="set configuration",
+)
+def run(
+    configfile,
+    unsafe: bool,
+    loop: Optional[str],
+    service: Optional[str],
+    set_: List[str],
+) -> None:
     yaml = YAML(typ="unsafe" if unsafe else "safe")
     yaml.constructor.add_constructor("!Env", env_constructor)
     yaml.constructor.add_constructor("!TextFile", text_file_constructor)
@@ -66,6 +81,28 @@ def run(configfile, unsafe: bool, loop: Optional[str], service: Optional[str]) -
             config_data, dict
         ), "the document root element must be a dictionary"
         config = merge_config(config, config_data)
+
+    # Override config options
+    for override in set_:
+        if "=" not in override:
+            raise click.ClickException(
+                f"Configuration must be set with '=', got: {override}"
+            )
+
+        key, value = override.split("=", 1)
+        parsed_value = yaml.load(value)
+        keys = [k.replace(r"\.", ".") for k in re.split(r"(?<!\\)\.", key)]
+        section = config
+        for i, part_key in enumerate(keys[:-1]):
+            section = section.setdefault(part_key, {})
+            if not isinstance(section, Mapping):
+                path = " ⟶ ".join(x for x in keys[: i + 1])
+                raise click.ClickException(
+                    f"Cannot apply override for {key!r}: value at {path} is not "
+                    f"a mapping, but {qualified_name(section)}"
+                )
+
+        section[keys[-1]] = parsed_value
 
     # Override the event loop policy if specified
     if loop:
