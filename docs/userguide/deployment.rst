@@ -17,11 +17,11 @@ Running the launcher is very straightfoward:
 
 .. code-block:: bash
 
-    asphalt run yourconfig.yaml [your-overrides.yml...] [--set your.component.arg=val]
+    asphalt run yourconfig.yaml [your-overrides.yml...] [--set path.to.key=val]
 
 Or alternatively:
 
-    python -m asphalt run yourconfig.yaml [your-overrides.yml...] [--set your.component.arg=val]
+    python -m asphalt run yourconfig.yaml [your-overrides.yml...] [--set path.to.key=val]
 
 What this will do is:
 
@@ -170,7 +170,7 @@ command line (with the configuration file saved as ``config.yaml``):
 
 .. code-block:: bash
 
-    asphalt run config.yaml --set mailer.backend=sendmail
+    asphalt run config.yaml --set component.components.mailer.backend=sendmail
 
 .. note::
     Note that if you want a ``.`` to be treated as part of an identifier, and not as a separator,

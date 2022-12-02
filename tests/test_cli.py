@@ -120,9 +120,9 @@ component:
                 "conf1.yml",
                 "conf2.yml",
                 "--set",
-                "dummyval3=bar",
+                "component.dummyval3=bar",
                 "--set",
-                "dummyval4=baz",
+                "component.dummyval4=baz",
             ],
         )
 

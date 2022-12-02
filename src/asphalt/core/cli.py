@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import os
 import re
+from io import StringIO
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 import click
 from ruamel.yaml import YAML, ScalarNode
@@ -65,42 +66,39 @@ def run(
     unsafe: bool,
     loop: Optional[str],
     service: Optional[str],
-    set_: str,
+    set_: List[str],
 ) -> None:
     yaml = YAML(typ="unsafe" if unsafe else "safe")
     yaml.constructor.add_constructor("!Env", env_constructor)
     yaml.constructor.add_constructor("!TextFile", text_file_constructor)
     yaml.constructor.add_constructor("!BinaryFile", binary_file_constructor)
 
-    # Read the configuration from the supplied YAML files
-    config: Dict[str, Any] = {}
-    for path in configfile:
-        config_data = yaml.load(path)
-        assert isinstance(
-            config_data, dict
-        ), "the document root element must be a dictionary"
-        config = merge_config(config, config_data)
-
+    configfiles = list(configfile)
     # Read the configuration from the CLI
     for cli_conf in set_:
+        cli_conf_list = []
         if "=" not in cli_conf:
             click.echo(f"Configuration must be set with '=', got: {cli_conf}")
             raise click.Abort()
 
         key, value = cli_conf.split("=", 1)
         keys = [k.replace(r"\.", ".") for k in re.split(r"(?<!\\)\.", key)]
-        if len(keys) > 1:
-            # subcomponent configuration
-            last_i = len(keys) - 1
-            d = config.setdefault("component", {}).setdefault("components", {})
-            for i, k in enumerate(keys):
-                if i == last_i:
-                    d[k] = value
-                else:
-                    d = d.setdefault(k, {})
-        else:
-            # root component configuration
-            config["component"][key] = value
+        last_i = len(keys) - 1
+        for i, k in enumerate(keys):
+            cli_conf_list.append(f"{'  ' * i}{k}:")
+            if i == last_i:
+                cli_conf_list.append(f" {value}")
+            cli_conf_list.append("\n")
+        configfiles.append(StringIO("".join(cli_conf_list)))
+
+    # Read the configuration from the supplied YAML files
+    config: Dict[str, Any] = {}
+    for f in configfiles:
+        config_data = yaml.load(f)
+        assert isinstance(
+            config_data, dict
+        ), "the document root element must be a dictionary"
+        config = merge_config(config, config_data)
 
     # Override the event loop policy if specified
     if loop:
