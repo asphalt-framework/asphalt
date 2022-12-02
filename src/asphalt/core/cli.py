@@ -88,7 +88,7 @@ def run(
             raise click.Abort()
 
         key, value = cli_conf.split("=", 1)
-        keys = [k.replace("\\.", ".") for k in re.split("(?<!\\\\)\\.", key)]
+        keys = [k.replace(r"\.", ".") for k in re.split(r"(?<!\\)\.", key)]
         if len(keys) > 1:
             # subcomponent configuration
             last_i = len(keys) - 1
