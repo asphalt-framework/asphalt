@@ -40,6 +40,12 @@ This library adheres to `Semantic Versioning 2.0 <http://semver.org/>`_.
 - Dropped explicit run-time type checking
 - Dropped the deprecated ``Dependency()`` marker
 
+**4.11.0** (2022-12-03)
+
+- Added the ``--set`` option for ``asphalt run`` for overriding specific values in
+  configuration (PR by David Brochart)
+- Made configuration files optional (PR by David Brochart)
+
 **4.10.1** (2022-06-10)
 
 - Fixed root context being unset as the current context before its ``close()`` method is
