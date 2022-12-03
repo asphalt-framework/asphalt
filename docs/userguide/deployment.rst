@@ -21,6 +21,8 @@ Running the launcher is very straightfoward:
 
 Or alternatively:
 
+.. code-block:: bash
+
     python -m asphalt [run yourconfig.yaml your-overrides.yml...] [--set path.to.key=val]
 
 What this will do is:
