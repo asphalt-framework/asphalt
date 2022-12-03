@@ -34,7 +34,9 @@ def main() -> None:
     pass  # pragma: no cover
 
 
-@main.command(help="Read configuration files, pass configuration options, and start the application.")
+@main.command(
+    help="Read configuration files, pass configuration options, and start the application."
+)
 @click.argument("configfile", type=click.File(), nargs=-1)
 @click.option(
     "--unsafe",
