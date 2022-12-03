@@ -3,6 +3,12 @@ Version history
 
 This library adheres to `Semantic Versioning 2.0 <http://semver.org/>`_.
 
+**UNRELEASED**
+
+- Added the ``--set`` option for ``asphalt run`` for overriding specific values in
+  configuration (PR by David Brochart)
+- Made configuration files optional (PR by David Brochart)
+
 **4.10.1** (2022-06-10)
 
 - Fixed root context being unset as the current context before its ``close()`` method is
