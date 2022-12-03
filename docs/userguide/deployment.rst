@@ -17,15 +17,15 @@ Running the launcher is very straightfoward:
 
 .. code-block:: bash
 
-    asphalt run yourconfig.yaml [your-overrides.yml...] [--set path.to.key=val]
+    asphalt run [yourconfig.yaml your-overrides.yml...] [--set path.to.key=val]
 
 Or alternatively:
 
-    python -m asphalt run yourconfig.yaml [your-overrides.yml...] [--set path.to.key=val]
+    python -m asphalt [run yourconfig.yaml your-overrides.yml...] [--set path.to.key=val]
 
 What this will do is:
 
-#. read all the given configuration files, starting from ``yourconfig.yaml``
+#. read all the given configuration files, if any, starting from ``yourconfig.yaml``
 #. read the command line configuration options passed with ``--set``, if any
 #. merge the configuration files' contents and the command line configuration options into a single configuration dictionary using
    :func:`~asphalt.core.utils.merge_config`.
