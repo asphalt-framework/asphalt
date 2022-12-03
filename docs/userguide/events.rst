@@ -21,7 +21,7 @@ Here's how it works::
 
 
     class CustomEvent(Event):
-        def __init__(source, topic, extra_argument):
+        def __init__(self, source, topic, extra_argument):
             super().__init__(source, topic)
             self.extra_argument = extra_argument
 

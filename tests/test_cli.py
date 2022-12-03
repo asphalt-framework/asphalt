@@ -73,6 +73,38 @@ logging:
         }
 
 
+def test_run_bad_override(runner: CliRunner) -> None:
+    config = """\
+    component:
+        type: does.not.exist:Component
+"""
+    with runner.isolated_filesystem():
+        Path("test.yml").write_text(config)
+        result = runner.invoke(_cli.run, ["test.yml", "--set", "foobar"])
+        assert result.exit_code == 1
+        assert result.stdout == (
+            "Error: Configuration must be set with '=', got: foobar\n"
+        )
+
+
+def test_run_bad_path(runner: CliRunner) -> None:
+    config = """\
+    component:
+        type: does.not.exist:Component
+        listvalue: []
+"""
+    with runner.isolated_filesystem():
+        Path("test.yml").write_text(config)
+        result = runner.invoke(
+            _cli.run, ["test.yml", "--set", "component.listvalue.foo=1"]
+        )
+        assert result.exit_code == 1
+        assert result.stdout == (
+            "Error: Cannot apply override for 'component.listvalue.foo': value at "
+            "component ⟶ listvalue is not a mapping, but list\n"
+        )
+
+
 def test_run_multiple_configs(runner: CliRunner) -> None:
     component_class = "{0.__module__}:{0.__name__}".format(DummyComponent)
     config1 = """\
@@ -91,6 +123,7 @@ logging:
 component:
   dummyval1: alternate
   dummyval2: 10
+  dummyval3: foo
 """
 
     with runner.isolated_filesystem(), patch(
@@ -98,7 +131,17 @@ component:
     ) as run_app:
         Path("conf1.yml").write_text(config1)
         Path("conf2.yml").write_text(config2)
-        result = runner.invoke(_cli.run, ["conf1.yml", "conf2.yml"])
+        result = runner.invoke(
+            _cli.run,
+            [
+                "conf1.yml",
+                "conf2.yml",
+                "--set",
+                "component.dummyval3=bar",
+                "--set",
+                "component.dummyval4=baz",
+            ],
+        )
 
         assert result.exit_code == 0
         assert run_app.call_count == 1
@@ -109,6 +152,8 @@ component:
                 "type": component_class,
                 "dummyval1": "alternate",
                 "dummyval2": 10,
+                "dummyval3": "bar",
+                "dummyval4": "baz",
             },
             "logging": {"version": 1, "disable_existing_loggers": False},
         }
