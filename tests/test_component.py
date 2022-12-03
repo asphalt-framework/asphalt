@@ -10,7 +10,6 @@ from asphalt.core import (
     Component,
     ContainerComponent,
     Context,
-    current_context,
     run_application,
 )
 from asphalt.core._component import component_types
@@ -155,13 +154,3 @@ class TestCLIApplicationComponent:
 
         with pytest.raises(Exception, match="blah"):
             await run_application(DummyCLIComponent())
-
-    def test_add_teardown_callback(self) -> None:
-        async def callback() -> None:
-            current_context()
-
-        class DummyCLIComponent(CLIApplicationComponent):
-            async def run(self, ctx: Context) -> None:
-                ctx.add_teardown_callback(callback)
-
-        run_application(DummyCLIComponent())
