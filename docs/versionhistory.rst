@@ -3,7 +3,7 @@ Version history
 
 This library adheres to `Semantic Versioning 2.0 <http://semver.org/>`_.
 
-**UNRELEASED**
+**4.11.0** (2022-12-03)
 
 - Added the ``--set`` option for ``asphalt run`` for overriding specific values in
   configuration (PR by David Brochart)
