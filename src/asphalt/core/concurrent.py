@@ -81,6 +81,7 @@ def executor(
         instance or the name of an :class:`~concurrent.futures.Executor` resource
 
     """
+    executor: Executor | str | None = None
 
     def outer(
         func: Callable[Concatenate[Context, P], T_Retval]
@@ -109,7 +110,6 @@ def executor(
         ), "Cannot wrap coroutine functions to be run in an executor"
         return wraps(func)(wrapper)
 
-    executor: Executor | str | None = None
     if isinstance(func_or_executor, (str, Executor)):
         executor = func_or_executor
         return outer
