@@ -249,13 +249,16 @@ class Signal(Generic[T_Event]):
         return self.dispatch_raw(event)
 
     def wait_event(
-        self, filter: Callable[[T_Event], bool] = None
+        self, filter: Callable[[T_Event], bool] | None = None
     ) -> Awaitable[T_Event]:
         """Shortcut for calling :func:`wait_event` with this signal in the first argument."""
         return wait_event([self], filter)
 
     def stream_events(
-        self, filter: Callable[[T_Event], bool] = None, *, max_queue_size: int = 0
+        self,
+        filter: Callable[[T_Event], bool] | None = None,
+        *,
+        max_queue_size: int = 0,
     ) -> AsyncIterator[T_Event]:
         """Shortcut for calling :func:`stream_events` with this signal in the first argument."""
         return stream_events([self], filter, max_queue_size=max_queue_size)
@@ -263,7 +266,7 @@ class Signal(Generic[T_Event]):
 
 def stream_events(
     signals: Sequence[Signal[T_Event]],
-    filter: Callable[[T_Event], bool] = None,
+    filter: Optional[Callable[[T_Event], bool]] = None,
     *,
     max_queue_size: int = 0,
 ) -> AsyncIterator[T_Event]:
@@ -309,7 +312,8 @@ def stream_events(
 
 
 async def wait_event(
-    signals: Sequence[Signal[T_Event]], filter: Callable[[T_Event], bool] = None
+    signals: Sequence[Signal[T_Event]],
+    filter: Optional[Callable[[T_Event], bool]] = None,
 ) -> T_Event:
     """
     Wait until any of the given signals dispatches an event that satisfies the filter (if any).
@@ -322,8 +326,6 @@ async def wait_event(
     :return: the event that was dispatched
 
     """
-    if sys.version_info >= (3, 5, 3):
-        assert check_argument_types()
-
+    assert check_argument_types()
     async with aclosing(stream_events(signals, filter)) as events:
         return await events.asend(None)

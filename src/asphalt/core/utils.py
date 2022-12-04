@@ -126,7 +126,7 @@ class PluginContainer:
 
     __slots__ = "namespace", "base_class", "_entrypoints"
 
-    def __init__(self, namespace: str, base_class: type = None) -> None:
+    def __init__(self, namespace: str, base_class: type | None = None) -> None:
         self.namespace = namespace
         self.base_class = base_class
         group = entry_points().select(group=namespace)  # type: ignore[attr-defined]

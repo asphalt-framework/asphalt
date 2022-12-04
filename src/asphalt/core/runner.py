@@ -100,7 +100,7 @@ def run_application(
         logger.info("Starting application")
         context = Context()
         exception: Optional[BaseException] = None
-        exit_code = 0
+        exit_code: str | int = 0
 
         # Start the root component
         token = _current_context.set(context)
@@ -134,7 +134,7 @@ def run_application(
                 except KeyboardInterrupt:
                     pass
                 except SystemExit as e:
-                    exit_code = e.code
+                    exit_code = e.code or 0
 
             # Close the root context
             logger.info("Stopping application")

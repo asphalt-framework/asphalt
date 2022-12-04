@@ -58,13 +58,15 @@ class ContainerComponent(Component):
 
     __slots__ = "child_components", "component_configs"
 
-    def __init__(self, components: Dict[str, Optional[Dict[str, Any]]] = None) -> None:
+    def __init__(
+        self, components: Optional[Dict[str, Optional[Dict[str, Any]]]] = None
+    ) -> None:
         assert check_argument_types()
         self.child_components: OrderedDict[str, Component] = OrderedDict()
         self.component_configs = components or {}
 
     def add_component(
-        self, alias: str, type: Union[str, Type] = None, **config
+        self, alias: str, type: Union[str, Type, None] = None, **config
     ) -> None:
         """
         Add a child component.

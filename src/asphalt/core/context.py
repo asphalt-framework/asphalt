@@ -784,7 +784,7 @@ class Context:
         self,
         func: Callable[..., T_Retval],
         *args,
-        executor: Union[Executor, str] = None,
+        executor: Union[Executor, str, None] = None,
         **kwargs,
     ) -> Awaitable[T_Retval]:
         """
@@ -1091,7 +1091,7 @@ def inject(func: Callable[P, Any]) -> Callable[P, Any]:
         forward_refs_resolved = True
 
     @wraps(func)
-    def sync_wrapper(*args, **kwargs) -> T_Retval:
+    def sync_wrapper(*args, **kwargs) -> Any:
         if not forward_refs_resolved:
             resolve_forward_refs()
 
@@ -1108,7 +1108,7 @@ def inject(func: Callable[P, Any]) -> Callable[P, Any]:
         return func(*args, **kwargs, **resources)
 
     @wraps(func)
-    async def async_wrapper(*args, **kwargs) -> T_Retval:
+    async def async_wrapper(*args, **kwargs) -> Any:
         if not forward_refs_resolved:
             resolve_forward_refs()
 
