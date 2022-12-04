@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import weakref
-from collections.abc import Callable, Iterator, Sequence
+from collections.abc import AsyncGenerator, AsyncIterator, Callable, Iterator, Sequence
 from contextlib import (
     AbstractAsyncContextManager,
     AsyncExitStack,
@@ -11,7 +11,7 @@ from contextlib import (
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from time import time as stdlib_time
-from typing import Any, AsyncGenerator, AsyncIterator, Generic, TypeVar, overload
+from typing import Any, Generic, TypeVar, overload
 from weakref import WeakKeyDictionary
 
 from anyio import BrokenResourceError, create_memory_object_stream
@@ -90,7 +90,7 @@ class BoundSignal(Generic[T_Event]):
 
     async def wait_event(
         self,
-        filter: Callable[[T_Event], bool] = None,
+        filter: Callable[[T_Event], bool] | None = None,
     ) -> T_Event:
         """
         Shortcut for calling :func:`wait_event` with this signal in the first argument.
@@ -99,7 +99,10 @@ class BoundSignal(Generic[T_Event]):
         return await wait_event([self], filter)
 
     def stream_events(
-        self, filter: Callable[[T_Event], bool] = None, *, max_queue_size: int = 50
+        self,
+        filter: Callable[[T_Event], bool] | None = None,
+        *,
+        max_queue_size: int = 50,
     ) -> AbstractAsyncContextManager[AsyncIterator[T_Event]]:
         """
         Shortcut for calling :func:`stream_events` with this signal in the first
@@ -203,7 +206,8 @@ async def stream_events(
 
 
 async def wait_event(
-    signals: Sequence[BoundSignal[T_Event]], filter: Callable[[T_Event], bool] = None
+    signals: Sequence[BoundSignal[T_Event]],
+    filter: Callable[[T_Event], bool] | None = None,
 ) -> T_Event:
     """
     Wait until any of the given signals dispatches an event that satisfies the filter

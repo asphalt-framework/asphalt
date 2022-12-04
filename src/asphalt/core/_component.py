@@ -53,7 +53,9 @@ class ContainerComponent(Component):
 
     __slots__ = "child_components", "component_configs"
 
-    def __init__(self, components: dict[str, dict[str, Any] | None] = None) -> None:
+    def __init__(
+        self, components: dict[str, dict[str, Any] | None] | None = None
+    ) -> None:
         self.child_components: OrderedDict[str, Component] = OrderedDict()
         self.component_configs = components or {}
 

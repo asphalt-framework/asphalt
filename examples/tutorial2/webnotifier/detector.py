@@ -2,7 +2,8 @@
 # isort: off
 import logging
 from dataclasses import dataclass
-from typing import Any, AsyncIterator
+from typing import Any
+from collections.abc import AsyncIterator
 
 import anyio
 import httpx
