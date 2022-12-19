@@ -4,6 +4,7 @@ import signal
 import sys
 from logging import INFO, basicConfig, getLogger
 from logging.config import dictConfig
+from traceback import format_stack
 from typing import Any, cast
 
 import anyio
@@ -12,6 +13,7 @@ from anyio import (
     WouldBlock,
     create_memory_object_stream,
     create_task_group,
+    get_running_tasks,
     to_thread,
 )
 from anyio.abc import TaskGroup, TaskStatus
@@ -96,13 +98,28 @@ async def run_application(
             send, receive = create_memory_object_stream(1, int)
             await context.add_resource(send, "exit_code_stream")
             await context.add_resource(root_tg, "root_taskgroup", [TaskGroup])
-            await root_tg.start(handle_signals)
+            await root_tg.start(handle_signals, name="Asphalt signal handler")
+            existing_task_ids = {task.id for task in get_running_tasks()}
             try:
                 with anyio.fail_after(start_timeout):
                     await component.start(context)
             except TimeoutError:
+                tracebacks: list[tuple[str, str]] = []
+                for task in get_running_tasks():
+                    if task.id not in existing_task_ids:
+                        frame = getattr(task.coro, "cr_frame", None)
+                        task_tb = "".join(format_stack(frame)) if frame else "(unknown)"
+                        tracebacks.append((task.name, task_tb))
+
+                joined_tracebacks = "\n".join(
+                    f"Task {task_name!r}:\n{task_tb}"
+                    for task_name, task_tb in tracebacks
+                )
                 logger.error(
-                    "Timeout waiting for the root component to start – exiting"
+                    "Timeout waiting for the root component to start – exiting.\n"
+                    "Stack traces of %d tasks still running:\n%s",
+                    len(tracebacks),
+                    joined_tracebacks,
                 )
                 raise
             except Exception:

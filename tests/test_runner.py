@@ -198,7 +198,8 @@ async def test_start_timeout(caplog):
     assert records[0].message == "Running in development mode"
     assert records[1].message == "Starting application"
     assert records[2].message == (
-        "Timeout waiting for the root component to start – exiting"
+        "Timeout waiting for the root component to start – exiting.\n"
+        "Stack traces of "
     )
     assert records[3].message == "Application stopped"
 
