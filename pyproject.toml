@@ -83,7 +83,8 @@ testpaths = ["tests"]
 
 [tool.mypy]
 python_version = "3.9"
-mypy_path = ["src", "tests"]
+mypy_path = ["src", "tests", "examples/tutorial1", "examples/tutorial2"]
+explicit_package_bases = true
 
 [tool.coverage.run]
 source = ["asphalt"]
@@ -98,13 +99,31 @@ legacy_tox_ini = """
 [tox]
 envlist = py39, py310, py311, pypy3
 skip_missing_interpreters = true
-isolated_build = true
+minversion = 4.0
 
 [testenv]
 extras = test
 commands = python -m pytest {posargs}
 
+[testenv:pypy3]
+basepython = pypy3.9
+
+[testenv:mypy]
+basepython = python3.9
+commands = mypy src tests examples
+deps =
+  asphalt-mailer
+  httpx
+  mypy
+
 [testenv:docs]
 extras = doc
 commands = sphinx-build docs build/sphinx {posargs}
+
+[gh-actions]
+python =
+    3.9: py39
+    3.10: py310
+    3.11: py311
+    pypy-3: pypy3
 """
