@@ -18,8 +18,8 @@ jobs:
       uses: actions/cache@v3
       with:
         path: |
-          ~/.cache/pip
           .tox
+          ${{ env.pythonLocation }}
         key: mypy
     - name: Install requirements
       run: pip install -U tox tox-gh-actions
@@ -48,15 +48,12 @@ jobs:
       uses: actions/setup-python@v4
       with:
         python-version: ${{ matrix.python-version }}
-    - name: Get pip cache directory
-      id: pip-cache
-      run: echo "cache-dir=$(pip cache dir)" >> $GITHUB_OUTPUT
     - name: Set up cache
       uses: actions/cache@v3
       with:
         path: |
           .tox
-          ${{ steps.pip-cache.outputs.cache-dir }}
+          ${{ env.pythonLocation }}
         key: tox-${{ runner.os }}-${{ matrix.python-version }}
     - name: Install requirements
       run: pip install -U tox tox-gh-actions coveralls
