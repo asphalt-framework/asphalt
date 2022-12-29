@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import platform
 import signal
 from unittest.mock import patch
 
@@ -19,6 +20,9 @@ from asphalt.core import (
 )
 
 pytestmark = pytest.mark.anyio()
+windows_signal_mark = pytest.mark.skipif(
+    platform.system() == "Windows", reason="Signals don't work on Windows"
+)
 
 
 class ShutdownComponent(Component):
@@ -127,11 +131,13 @@ async def test_run_callbacks(caplog):
             "keyboard",
             "Received signal (Interrupt) – terminating application",
             id="keyboard",
+            marks=[windows_signal_mark],
         ),
         pytest.param(
             "sigterm",
             "Received signal (Terminated) – terminating application",
             id="sigterm",
+            marks=[windows_signal_mark],
         ),
     ],
 )
