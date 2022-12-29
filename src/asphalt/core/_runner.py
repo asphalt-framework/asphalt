@@ -34,12 +34,17 @@ class ApplicationStartTimeoutError(Exception):
 
 async def handle_signals(*, task_status: TaskStatus) -> None:
     logger = getLogger(__name__)
-    with anyio.open_signal_receiver(signal.SIGTERM, signal.SIGINT) as signals:
+    handled_signals: list[signal.Signals] = [signal.SIGINT]
+    if platform.system() != "Windows":
+        handled_signals.append(signal.SIGTERM)
+
+    with anyio.open_signal_receiver(*handled_signals) as signals:
         task_status.started()
         async for signum in signals:
+            signal_name = signal.strsignal(signum) or ""
             logger.info(
                 "Received signal (%s) – terminating application",
-                signal.strsignal(signum).split(":", 1)[0],
+                signal_name.split(":", 1)[0],  # macOS has ": <signum>" after the name
             )
             raise ApplicationExit
 
@@ -137,9 +142,7 @@ async def run_application(
     try:
         async with Context() as context, create_task_group() as root_tg:
             await context.add_resource(root_tg, "root_taskgroup", [TaskGroup])
-            if platform.system() != "Windows":
-                await root_tg.start(handle_signals, name="Asphalt signal handler")
-
+            await root_tg.start(handle_signals, name="Asphalt signal handler")
             try:
                 async with create_task_group() as startup_tg:
                     started_event = Event()
