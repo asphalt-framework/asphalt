@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import inspect
+import platform
 import signal
 from logging import INFO, basicConfig, getLogger
 from logging.config import dictConfig
@@ -38,7 +39,7 @@ async def handle_signals(*, task_status: TaskStatus) -> None:
         async for signum in signals:
             logger.info(
                 "Received signal (%s) – terminating application",
-                signal.strsignal(signum),
+                signal.strsignal(signum).split(":", 1)[0],
             )
             raise ApplicationExit
 
@@ -136,7 +137,9 @@ async def run_application(
     try:
         async with Context() as context, create_task_group() as root_tg:
             await context.add_resource(root_tg, "root_taskgroup", [TaskGroup])
-            await root_tg.start(handle_signals, name="Asphalt signal handler")
+            if platform.system() != "Windows":
+                await root_tg.start(handle_signals, name="Asphalt signal handler")
+
             try:
                 async with create_task_group() as startup_tg:
                     started_event = Event()
