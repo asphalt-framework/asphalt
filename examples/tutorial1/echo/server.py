@@ -1,5 +1,7 @@
 """This is the server code for the Asphalt echo server tutorial."""
-from collections.abc import AsyncIterator
+from __future__ import annotations
+
+from collections.abc import AsyncGenerator
 
 import anyio
 from anyio.abc import SocketStream
@@ -21,7 +23,7 @@ async def handle(stream: SocketStream) -> None:
 
 class ServerComponent(Component):
     @context_teardown
-    async def start(self, ctx: Context) -> AsyncIterator[None]:
+    async def start(self, ctx: Context) -> AsyncGenerator[None, Exception | None]:
         async with await anyio.create_tcp_listener(
             local_host="localhost", local_port=64100
         ) as listener:

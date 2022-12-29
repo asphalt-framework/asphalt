@@ -1,9 +1,12 @@
 """This is the change detector component for the Asphalt webnotifier tutorial."""
+from __future__ import annotations
+
+from collections.abc import AsyncGenerator
+
 # isort: off
 import logging
 from dataclasses import dataclass
 from typing import Any
-from collections.abc import AsyncIterator
 
 import anyio
 import httpx
@@ -40,17 +43,17 @@ class Detector:
                 headers: dict[str, Any] = (
                     {"if-modified-since": last_modified} if last_modified else {}
                 )
-                async with http.get(self.url, headers=headers) as resp:
-                    logger.debug("Response status: %d", resp.status)
-                    if resp.status == 200:
-                        last_modified = resp.headers["date"]
-                        new_lines = (await resp.text()).split("\n")
-                        if old_lines is not None and old_lines != new_lines:
-                            await self.changed.dispatch(
-                                WebPageChangeEvent(old_lines, new_lines)
-                            )
+                resp = await http.get(self.url, headers=headers)
+                logger.debug("Response status: %d", resp.status_code)
+                if resp.status_code == 200:
+                    last_modified = resp.headers["date"]
+                    new_lines = resp.text.split("\n")
+                    if old_lines is not None and old_lines != new_lines:
+                        await self.changed.dispatch(
+                            WebPageChangeEvent(old_lines, new_lines)
+                        )
 
-                        old_lines = new_lines
+                    old_lines = new_lines
 
                 await anyio.sleep(self.delay)
 
@@ -61,7 +64,7 @@ class ChangeDetectorComponent(Component):
         self.delay = delay
 
     @context_teardown
-    async def start(self, ctx: Context) -> AsyncIterator[None]:
+    async def start(self, ctx: Context) -> AsyncGenerator[None, Exception | None]:
         detector = Detector(self.url, self.delay)
         await ctx.add_resource(detector)
         start_service_task(detector.run, "Web page change detector")

@@ -1,4 +1,5 @@
 __all__ = (
+    "ApplicationExit",
     "CLIApplicationComponent",
     "Component",
     "ContainerComponent",
@@ -21,7 +22,6 @@ __all__ = (
     "stream_events",
     "wait_event",
     "run_application",
-    "stop_application",
     "PluginContainer",
     "callable_name",
     "merge_config",
@@ -47,7 +47,8 @@ from ._context import (
     resource,
 )
 from ._event import Event, Signal, stream_events, wait_event
-from ._runner import run_application, stop_application
+from ._exceptions import ApplicationExit
+from ._runner import run_application
 from ._utils import PluginContainer, callable_name, merge_config, qualified_name
 
 # Re-export imports so they look like they live directly in this package

@@ -1,17 +1,19 @@
 ---
-component:
-  type: !!python/name:webnotifier.app.ApplicationComponent
-  components:
-    detector:
-      url: http://imgur.com/
-      delay: 15
-    mailer:
-      host: your.smtp.server.here
-      username: yourusername
-      password: yourpassword
-      message_defaults:
-        sender: your@email.here
-        to: your@email.here
+services:
+  default:
+    component:
+      type: webnotifier.app:ApplicationComponent
+      components:
+        detector:
+          url: http://imgur.com/
+          delay: 15
+        mailer:
+          host: your.smtp.server.here
+          username: yourusername
+          password: yourpassword
+          message_defaults:
+            sender: your@email.here
+            to: your@email.here
 
 logging:
   version: 1

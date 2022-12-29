@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import logging
 from collections.abc import Callable, Coroutine
 from typing import Any
@@ -5,6 +7,7 @@ from typing import Any
 from anyio.abc import TaskGroup
 
 from ._context import Context, current_context
+from ._exceptions import ApplicationExit
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +44,9 @@ def start_background_task(
     while ctx.parent:
         ctx = ctx.parent
 
-    root_taskgroup = current_context().require_resource(TaskGroup, "root_taskgroup")
+    root_taskgroup = current_context().require_resource(
+        TaskGroup, "root_taskgroup"  # type: ignore[type-abstract]
+    )
     root_taskgroup.start_soon(run_background_task, name=name)
 
 
@@ -68,6 +73,16 @@ def start_service_task(
         try:
             async with Context():
                 await func()
+        except ApplicationExit:
+            logger.info(
+                "Service task (%s) requested the application to be shut down", name
+            )
+            raise
+        except SystemExit as exc:
+            # asyncio stops the loop prematurely if a base exception like SystemExit
+            # is raised, so we work around that with Asphalt's SoftSystemExit which
+            # inherits from Exception instead
+            raise ApplicationExit(exc.code).with_traceback(exc.__traceback__) from None
         except Exception:
             logger.exception(
                 "Service task (%s) crashed – terminating application", name
@@ -80,5 +95,7 @@ def start_service_task(
     while ctx.parent:
         ctx = ctx.parent
 
-    root_taskgroup = ctx.require_resource(TaskGroup, "root_taskgroup")
+    root_taskgroup = current_context().require_resource(
+        TaskGroup, "root_taskgroup"  # type: ignore[type-abstract]
+    )
     root_taskgroup.start_soon(run_service_task, name=name)

@@ -64,7 +64,7 @@ uvloop = "uvloop:EventLoopPolicy"
 tokio = "tokio:TokioLoopPolicy"
 
 [project.scripts]
-asphalt = "asphalt.core.cli:main"
+asphalt = "asphalt.core._cli:main"
 
 [tool.setuptools_scm]
 version_scheme = "post-release"

@@ -2,27 +2,27 @@ from __future__ import annotations
 
 import logging
 import signal
-import sys
 from unittest.mock import patch
 
 import anyio
 import pytest
 from anyio import to_thread
+from anyio.lowlevel import checkpoint
 
 from asphalt.core import (
+    ApplicationExit,
     CLIApplicationComponent,
     Component,
     Context,
     run_application,
     start_service_task,
-    stop_application,
 )
 
 pytestmark = pytest.mark.anyio()
 
 
 class ShutdownComponent(Component):
-    def __init__(self, method: str = "stop"):
+    def __init__(self, method: str = "exit"):
         self.method = method
         self.teardown_callback_called = False
         self.exception: BaseException | None = None
@@ -32,10 +32,9 @@ class ShutdownComponent(Component):
         self.exception = exception
 
     async def stop_app(self) -> None:
-        if self.method == "stop":
-            stop_application()
-        elif self.method == "exit":
-            sys.exit()
+        await checkpoint()
+        if self.method == "exit":
+            raise ApplicationExit
         elif self.method == "keyboard":
             signal.raise_signal(signal.SIGINT)
         elif self.method == "sigterm":
@@ -123,7 +122,7 @@ async def test_run_callbacks(caplog):
 @pytest.mark.parametrize(
     "method, expected_stop_message",
     [
-        pytest.param("stop", None, id="stop"),
+        pytest.param("exit", None, id="exit"),
         pytest.param(
             "keyboard",
             "Received signal (Interrupt) – terminating application",
@@ -186,8 +185,14 @@ async def test_start_timeout(caplog):
     logs the appropriate error message.
 
     """
+
+    class StallingComponent(Component):
+        async def start(self, ctx: Context) -> None:
+            # Wait forever for a non-existent resource
+            await ctx.request_resource(float)
+
     caplog.set_level(logging.INFO)
-    component = ShutdownComponent(method="timeout")
+    component = StallingComponent()
     with pytest.raises(TimeoutError):
         await run_application(component, start_timeout=0.1)
 
@@ -197,10 +202,10 @@ async def test_start_timeout(caplog):
     assert len(records) == 4
     assert records[0].message == "Running in development mode"
     assert records[1].message == "Starting application"
-    assert records[2].message == (
+    assert records[2].message.startswith(
         "Timeout waiting for the root component to start – exiting.\n"
-        "Stack traces of "
     )
+    assert "-> await ctx.request_resource(float)" in records[2].message
     assert records[3].message == "Application stopped"
 
 

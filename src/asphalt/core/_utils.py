@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import gc
 import sys
 from collections.abc import Callable
+from importlib import import_module
 from inspect import isclass
+from types import FrameType
 from typing import Any, TypeVar, overload
 
 if sys.version_info >= (3, 10):
@@ -11,6 +14,38 @@ else:
     from importlib_metadata import EntryPoint, entry_points
 
 T_Object = TypeVar("T_Object")
+
+
+def resolve_reference(ref: object) -> Any:
+    """
+    Return the object pointed to by ``ref``.
+    If ``ref`` is not a string or does not contain ``:``, it is returned as is.
+    References must be in the form  <modulename>:<varname> where <modulename> is the
+    fully qualified module name and varname is the path to the variable inside that
+    module. For example, "concurrent.futures:Future" would give you the
+    :class:`~concurrent.futures.Future` class.
+
+    :raises LookupError: if the reference could not be resolved
+
+    """
+    if not isinstance(ref, str) or ":" not in ref:
+        return ref
+
+    modulename, rest = ref.split(":", 1)
+    try:
+        obj = import_module(modulename)
+    except ImportError as e:
+        raise LookupError(
+            f"error resolving reference {ref}: could not import module"
+        ) from e
+
+    try:
+        for name in rest.split("."):
+            obj = getattr(obj, name)
+
+        return obj
+    except AttributeError:
+        raise LookupError(f"error resolving reference {ref}: error looking up object")
 
 
 def qualified_name(obj) -> str:
@@ -112,6 +147,8 @@ class PluginContainer:
         """
         if not isinstance(obj, str):
             return obj
+        if ":" in obj:
+            return resolve_reference(obj)
 
         value = self._entrypoints.get(obj)
         if value is None:
@@ -170,3 +207,19 @@ class PluginContainer:
             f"{self.__class__.__name__}(namespace={self.namespace!r}, "
             f"base_class={qualified_name(self.base_class)})"
         )
+
+
+def get_coro_frames(coro: Any) -> list[FrameType]:
+    """Find the relevant code location from the task's stack."""
+    frames: list[FrameType] = []
+    while coro:
+        while coro.__class__.__name__ == "async_generator_asend":
+            # Hack to get past asend() objects
+            coro = gc.get_referents(coro)[0].ag_await
+
+        if frame := getattr(coro, "cr_frame", None):
+            frames.append(frame)
+
+        coro = getattr(coro, "cr_await", None)
+
+    return frames

@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 import sys
-from collections.abc import AsyncGenerator, AsyncIterator, Callable
+from collections.abc import AsyncGenerator, Callable
 from inspect import isawaitable
 from itertools import count
-from typing import NoReturn, Optional, Union
+from typing import Any, NoReturn, Optional, Union
 
 import pytest
 from anyio import create_task_group, to_thread, wait_all_tasks_blocked
@@ -362,7 +362,7 @@ class TestContextTeardown:
         phase = received_exception = None
 
         @context_teardown
-        async def start(ctx: Context) -> AsyncIterator[None]:
+        async def start(ctx: Context) -> AsyncGenerator[None, Any]:
             nonlocal phase, received_exception
             phase = "started"
             exc = yield
@@ -385,7 +385,7 @@ class TestContextTeardown:
 
         class SomeComponent:
             @context_teardown
-            async def start(self, ctx: Context) -> AsyncIterator[None]:
+            async def start(self, ctx: Context) -> AsyncGenerator[None, Any]:
                 nonlocal phase, received_exception
                 phase = "started"
                 exc = yield
@@ -410,7 +410,7 @@ class TestContextTeardown:
 
     async def test_exception(self) -> None:
         @context_teardown
-        async def start(ctx: Context) -> AsyncIterator[None]:
+        async def start(ctx: Context) -> AsyncGenerator[None, Any]:
             raise Exception("dummy error")
             yield
 
@@ -475,7 +475,7 @@ class TestContextFinisher:
         phase = received_exception = None
 
         @context_teardown
-        async def start(ctx: Context) -> AsyncIterator[None]:
+        async def start(ctx: Context) -> AsyncGenerator[None, Any]:
             nonlocal phase, received_exception
             phase = "started"
             exc = yield
@@ -525,7 +525,7 @@ async def test_context_stack_corruption() -> None:
 
     gen = generator()
     async with create_task_group() as tg:
-        tg.start_soon(gen.asend, None)
+        tg.start_soon(gen.asend, None)  # type: ignore[arg-type]
         await wait_all_tasks_blocked()
         with pytest.warns(
             UserWarning, match="Potential context stack corruption detected"
@@ -637,14 +637,16 @@ class TestDependencyInjection:
                 return res
 
         async with Context() as ctx:
-            retval = injected() if sync else (await injected())
+            retval: Any = injected() if sync else (await injected())
             assert retval is None
             await ctx.add_resource("hello")
             retval = injected() if sync else (await injected())
             assert retval == "hello"
 
     def test_resource_function_not_called(self) -> None:
-        async def injected(foo: int, bar: str = resource) -> None:
+        async def injected(
+            foo: int, bar: str = resource  # type: ignore[assignment]
+        ) -> None:
             pass
 
         with pytest.raises(TypeError) as exc:

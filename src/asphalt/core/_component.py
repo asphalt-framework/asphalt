@@ -6,9 +6,11 @@ from typing import Any
 from warnings import warn
 
 from anyio import create_task_group
+from anyio.lowlevel import cancel_shielded_checkpoint
 
 from ._concurrent import start_service_task
 from ._context import Context
+from ._exceptions import ApplicationExit
 from ._utils import PluginContainer, merge_config, qualified_name
 
 
@@ -132,23 +134,26 @@ class CLIApplicationComponent(ContainerComponent):
 
     async def start(self, ctx: Context) -> None:
         async def run() -> None:
-            from ._runner import stop_application
-
             retval = await self.run()
+
+            # Ensure that the runner can conclude application startup, in case run()
+            # returns without going through a checkpoint
+            await cancel_shielded_checkpoint()
+
             if isinstance(retval, int):
                 if 0 <= retval <= 127:
-                    stop_application(retval)
+                    raise ApplicationExit(retval)
                 else:
                     warn(f"exit code out of range: {retval}")
-                    stop_application(1)
+                    raise ApplicationExit(1)
             elif retval is not None:
                 warn(
                     f"run() must return an integer or None, not "
                     f"{qualified_name(retval.__class__)}"
                 )
-                stop_application(1)
+                raise ApplicationExit(1)
             else:
-                stop_application()
+                raise ApplicationExit
 
         await super().start(ctx)
         start_service_task(run, "Main task")

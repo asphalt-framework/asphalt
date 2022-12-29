@@ -17,7 +17,7 @@ class DummyComponent(Component):
         self.dummyval1 = dummyval1
         self.dummyval2 = dummyval2
 
-    def start(self, ctx: Context) -> None:
+    async def start(self, ctx: Context) -> None:
         pass
 
 
@@ -49,7 +49,7 @@ logging:
   version: 1
   disable_existing_loggers: false
 """
-    args = ["test.yml", "--backend", anyio_backend_name]
+    args = ["test.yml"]
     with runner.isolated_filesystem(), patch(
         "asphalt.core._cli.run_application"
     ) as run_app:
@@ -61,7 +61,6 @@ logging:
         args, kwargs = run_app.call_args
         assert len(args) == 0
         assert kwargs == {
-            "backend": anyio_backend_name,
             "component": {
                 "type": DummyComponent,
                 "dummyval1": "testval",

@@ -43,12 +43,6 @@ def main() -> None:
 )
 @click.argument("configfile", type=click.File(), nargs=-1)
 @click.option(
-    "-b",
-    "--backend",
-    type=click.Choice(anyio.get_all_backends()),
-    help="AnyIO backend to use",
-)
-@click.option(
     "-s",
     "--service",
     type=str,
@@ -61,7 +55,7 @@ def main() -> None:
     type=str,
     help="set configuration",
 )
-def run(configfile, backend: str | None, service: str | None, set_: list[str]) -> None:
+def run(configfile, service: str | None, set_: list[str]) -> None:
     yaml = YAML(typ="unsafe")
     yaml.constructor.add_constructor("!Env", env_constructor)
     yaml.constructor.add_constructor("!TextFile", text_file_constructor)
@@ -136,7 +130,7 @@ def run(configfile, backend: str | None, service: str | None, set_: list[str]) -
     config = merge_config(config, service_config)
 
     # Start the application
-    backend = backend or config.pop("backend", "asyncio")
+    backend = config.pop("backend", "asyncio")
     backend_options = config.pop("backend_options", {})
     anyio.run(
         lambda: run_application(**config),
