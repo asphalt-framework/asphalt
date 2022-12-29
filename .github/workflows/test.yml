@@ -59,7 +59,7 @@ jobs:
           ${{ steps.pip-cache.outputs.cache-dir }}
         key: tox-${{ runner.os }}-${{ matrix.python-version }}
     - name: Install requirements
-      run: pip install -U tox tox-gh-actions
+      run: pip install -U tox tox-gh-actions coveralls
     - name: Test with pytest
       run: tox
     - name: Upload Coverage
