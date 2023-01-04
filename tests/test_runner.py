@@ -195,7 +195,7 @@ async def test_start_timeout(caplog):
     class StallingComponent(Component):
         async def start(self, ctx: Context) -> None:
             # Wait forever for a non-existent resource
-            await ctx.request_resource(float)
+            await ctx.get_resource(float)
 
     caplog.set_level(logging.INFO)
     component = StallingComponent()
@@ -211,7 +211,7 @@ async def test_start_timeout(caplog):
     assert records[2].message.startswith(
         "Timeout waiting for the root component to start – exiting.\n"
     )
-    assert "-> await ctx.request_resource(float)" in records[2].message
+    assert "-> await ctx.get_resource(float)" in records[2].message
     assert records[3].message == "Application stopped"
 
 

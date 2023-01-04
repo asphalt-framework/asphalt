@@ -20,7 +20,7 @@ from anyio import (
 )
 from anyio.abc import TaskGroup, TaskStatus
 
-from ._component import Component, component_types
+from ._component import Component, component_types, start_component
 from ._context import Context
 from ._exceptions import ApplicationExit
 from ._utils import get_coro_frames
@@ -147,7 +147,7 @@ async def run_application(
                     await startup_tg.start(
                         fail_on_timeout, start_timeout, started_event
                     )
-                    await component.start(context)
+                    await start_component(component, "default")
                     started_event.set()
             except ApplicationStartTimeoutError as exc:
                 joined_tracebacks = "\n".join(

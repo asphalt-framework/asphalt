@@ -9,8 +9,8 @@ from asphalt.core import (
     CLIApplicationComponent,
     Component,
     ContainerComponent,
-    Context,
     run_application,
+    start_component,
 )
 from asphalt.core._component import component_types
 
@@ -98,7 +98,7 @@ class TestContainerComponent:
         assert str(exc.value) == 'there is already a child component named "dummy"'
 
     async def test_start(self, container) -> None:
-        await container.start(Context())
+        await start_component(container)
         assert container.child_components["dummy"].started
 
 

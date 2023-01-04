@@ -6,7 +6,7 @@ from typing import Any
 
 from anyio.abc import TaskGroup
 
-from ._context import Context, current_context
+from ._context import Context, current_context, get_resource_nowait
 from ._exceptions import ApplicationExit
 
 logger = logging.getLogger(__name__)
@@ -44,7 +44,7 @@ def start_background_task(
     while ctx.parent:
         ctx = ctx.parent
 
-    root_taskgroup = current_context().require_resource(
+    root_taskgroup = get_resource_nowait(
         TaskGroup, "root_taskgroup"  # type: ignore[type-abstract]
     )
     root_taskgroup.start_soon(run_background_task, name=name)
@@ -95,7 +95,7 @@ def start_service_task(
     while ctx.parent:
         ctx = ctx.parent
 
-    root_taskgroup = current_context().require_resource(
+    root_taskgroup = get_resource_nowait(
         TaskGroup, "root_taskgroup"  # type: ignore[type-abstract]
     )
     root_taskgroup.start_soon(run_service_task, name=name)

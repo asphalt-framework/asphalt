@@ -2,16 +2,100 @@ from __future__ import annotations
 
 from abc import ABCMeta, abstractmethod
 from collections import OrderedDict
-from typing import Any
+from collections.abc import Sequence
+from typing import Any, Literal, overload
 from warnings import warn
 
 from anyio import create_task_group
 from anyio.lowlevel import cancel_shielded_checkpoint
 
 from ._concurrent import start_service_task
-from ._context import Context
+from ._context import Context, ResourceNotFound, T_Resource, factory_callback_type
+from ._event import wait_event
 from ._exceptions import ApplicationExit
 from ._utils import PluginContainer, merge_config, qualified_name
+
+
+async def start_component(component: Component, alias: str = "default") -> None:
+    """Initializes the given component."""
+    async with ComponentStartupContext(type(component), alias) as ctx:
+        await component.start(ctx)
+
+
+class ComponentStartupContext(Context):
+    """
+    A variant of Context, used for component initialization.
+
+    Differences with :class:`~.Context`:
+    * :meth:`get_resource`: If a matching resource is not found, and the ``optional``
+      was not ``True``, it will wait until a matching resource (or resource factory)
+      becomes available.
+
+    :var component_type: class of the component
+    :var component_name: alias of the component
+    """
+
+    def __init__(self, component_type: type[Component], component_name: str) -> None:
+        super().__init__()
+        self.component_type = component_type
+        self.component_name = component_name
+
+    async def add_resource(
+        self,
+        value,
+        name: str = "default",
+        types: type | Sequence[type] = (),
+        *,
+        description: str | None = None,
+    ) -> None:
+        await self._parent.add_resource(value, name, types, description=description)
+
+    async def add_resource_factory(
+        self,
+        factory_callback: factory_callback_type,
+        name: str = "default",
+        *,
+        types: Sequence[type] | None = None,
+        description: str | None = None,
+    ) -> None:
+        await self._parent.add_resource_factory(
+            factory_callback, name, types=types, description=description
+        )
+
+    @overload
+    async def get_resource(
+        self, type: type[T_Resource], name: str = ..., *, optional: Literal[True]
+    ) -> T_Resource | None:
+        ...
+
+    @overload
+    async def get_resource(
+        self,
+        type: type[T_Resource],
+        name: str = ...,
+        *,
+        optional: Literal[False] = False,
+    ) -> T_Resource:
+        ...
+
+    async def get_resource(
+        self, type: Any, name: str = "default", *, optional: bool = False
+    ) -> Any:
+        if optional:
+            return await super().get_resource(type, name, optional=True)
+
+        try:
+            return await super().get_resource(type, name, optional=False)
+        except ResourceNotFound:
+            # Wait until a matching resource or resource factory is added to any
+            # context in the chain available
+            signals = [ctx.resource_added for ctx in self._parent.context_chain]
+            await wait_event(
+                signals,
+                lambda event: event.resource_name == name
+                and type in event.resource_types,
+            )
+            return await self.get_resource(type, name)
 
 
 class Component(metaclass=ABCMeta):
@@ -20,7 +104,7 @@ class Component(metaclass=ABCMeta):
     __slots__ = ()
 
     @abstractmethod
-    async def start(self, ctx: Context) -> None:
+    async def start(self, ctx: ComponentStartupContext) -> None:
         """
         Perform any necessary tasks to start the services provided by this component.
 
@@ -28,8 +112,8 @@ class Component(metaclass=ABCMeta):
           * add resources and/or resource factories to it
             (:meth:`~asphalt.core.context.Context.add_resource` and
             :meth:`~asphalt.core.context.Context.add_resource_factory`)
-          * request resources from it asynchronously
-            (:meth:`~asphalt.core.context.Context.request_resource`)
+          * get resources from it asynchronously
+            (:meth:`~asphalt.core.context.Context.get_resource`)
 
         It is advisable for Components to first add all the resources they can to the
         context before requesting any from it. This will speed up the dependency
@@ -100,7 +184,7 @@ class ContainerComponent(Component):
         component = component_types.create_object(**config)
         self.child_components[alias] = component
 
-    async def start(self, ctx: Context) -> None:
+    async def start(self, ctx: ComponentStartupContext) -> None:
         """
         Create child components that have been configured but not yet created and then
         calls their :meth:`~Component.start` methods in separate tasks and waits until
@@ -112,8 +196,8 @@ class ContainerComponent(Component):
                 self.add_component(alias)
 
         async with create_task_group() as tg:
-            for component in self.child_components.values():
-                tg.start_soon(component.start, ctx)
+            for alias, component in self.child_components.items():
+                tg.start_soon(start_component, component, alias)
 
 
 class CLIApplicationComponent(ContainerComponent):
@@ -132,7 +216,7 @@ class CLIApplicationComponent(ContainerComponent):
     it is set to 1 and a warning is emitted.
     """
 
-    async def start(self, ctx: Context) -> None:
+    async def start(self, ctx: ComponentStartupContext) -> None:
         async def run() -> None:
             retval = await self.run()
 

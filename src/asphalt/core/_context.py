@@ -22,6 +22,7 @@ from types import TracebackType
 from typing import (
     Any,
     Callable,
+    Literal,
     Optional,
     TypeVar,
     Union,
@@ -34,7 +35,7 @@ from typing import (
 
 from anyio import get_current_task
 
-from ._event import Event, Signal, wait_event
+from ._event import Event, Signal
 from ._utils import callable_name, qualified_name
 
 if sys.version_info >= (3, 10):
@@ -46,7 +47,7 @@ if sys.version_info < (3, 11):
     from exceptiongroup import BaseExceptionGroup
 
 logger = logging.getLogger(__name__)
-factory_callback_type = Callable[["Context"], Any]
+factory_callback_type = Callable[[], Any]
 resource_name_re = re.compile(r"\w+")
 T_Resource = TypeVar("T_Resource")
 T_Retval = TypeVar("T_Retval")
@@ -58,6 +59,7 @@ _current_context: ContextVar[Context | None] = ContextVar(
 )
 
 
+@dataclass(frozen=True)
 class ResourceContainer:
     """
     Contains the resource value or its factory callable, plus some metadata.
@@ -66,45 +68,16 @@ class ResourceContainer:
     :ivar types: type names the resource was registered with
     :vartype types: Tuple[type, ...]
     :ivar str name: name of the resource
+    :ivar description: free-form description of the resource
     :ivar bool is_factory: ``True`` if ``value_or_factory`` if this is a resource
         factory
     """
 
-    __slots__ = "value_or_factory", "types", "name", "is_factory"
-
-    def __init__(
-        self,
-        value_or_factory: Any,
-        types: tuple[type, ...],
-        name: str,
-        is_factory: bool,
-    ) -> None:
-        self.value_or_factory = value_or_factory
-        self.types = types
-        self.name = name
-        self.is_factory = is_factory
-
-    def generate_value(self, ctx: Context) -> Any:
-        assert self.is_factory, "generate_value() only works for resource factories"
-        value = self.value_or_factory(ctx)
-
-        container = ResourceContainer(value, self.types, self.name, False)
-        for type_ in self.types:
-            ctx._resources[(type_, self.name)] = container
-
-        return value
-
-    def __repr__(self) -> str:
-        typenames = ", ".join(qualified_name(cls) for cls in self.types)
-        value_repr = (
-            f"factory={callable_name(self.value_or_factory)}"
-            if self.is_factory
-            else f"value={self.value_or_factory!r}"
-        )
-        return (
-            f"{self.__class__.__name__}({value_repr}, types=[{typenames}], "
-            f"name={self.name!r})"
-        )
+    value_or_factory: Any
+    types: tuple[type, ...]
+    name: str
+    description: str | None
+    is_factory: bool
 
 
 @dataclass
@@ -122,6 +95,13 @@ class ResourceEvent(Event):
     resource_types: tuple[type, ...]
     resource_name: str
     is_factory: bool
+
+
+class AwaitableResourceError(Exception):
+    """
+    Raised when a resource was requested that comes from an asynchronous factory, but
+    the caller was in a synchronous async callback.
+    """
 
 
 class ResourceConflict(Exception):
@@ -307,6 +287,8 @@ class Context:
         value,
         name: str = "default",
         types: type | Sequence[type] = (),
+        *,
+        description: str | None = None,
     ) -> None:
         """
         Add a resource to this context.
@@ -318,6 +300,8 @@ class Context:
             a single context)
         :param types: type(s) to register the resource as (omit to use the type of
             ``value``)
+        :param description: an optional free-form description, for
+            introspection/debugging
         :raises asphalt.core.context.ResourceConflict: if the resource conflicts with an
             existing one in any way
 
@@ -341,6 +325,7 @@ class Context:
 
         if value is None:
             raise ValueError('"value" must not be None')
+
         if not resource_name_re.fullmatch(name):
             raise ValueError(
                 '"name" must be a nonempty string consisting only of alphanumeric '
@@ -354,9 +339,9 @@ class Context:
                     f"{qualified_name(resource_type)} using the name {name!r}"
                 )
 
-        resource = ResourceContainer(value, types_, name, False)
-        for type_ in resource.types:
-            self._resources[(type_, name)] = resource
+        container = ResourceContainer(value, types_, name, description, False)
+        for type_ in types_:
+            self._resources[(type_, name)] = container
 
         # Notify listeners that a new resource has been made available
         await self.resource_added.dispatch(ResourceEvent(types_, name, False))
@@ -364,8 +349,10 @@ class Context:
     async def add_resource_factory(
         self,
         factory_callback: factory_callback_type,
-        types: type | Sequence[type] | None = None,
         name: str = "default",
+        *,
+        types: Sequence[type] | None = None,
+        description: str | None = None,
     ) -> None:
         """
         Add a resource factory to this context.
@@ -390,10 +377,12 @@ class Context:
 
         :param factory_callback: a (non-coroutine) callable that takes a context
             instance as argument and returns the created resource object
+        :param name: name of the resource that will be created in the target context
         :param types: one or more types to register the generated resource as on the
             target context (can be omitted if the factory callable has a return type
             annotation)
-        :param name: name of the resource that will be created in the target context
+        :param description: an optional free-form description, for
+            introspection/debugging
         :raises asphalt.core.context.ResourceConflict: if there is an existing resource
             factory for the given type/name combinations or the given context variable
 
@@ -406,8 +395,6 @@ class Context:
                 '"name" must be a nonempty string consisting only of alphanumeric '
                 "characters and underscores"
             )
-        if iscoroutinefunction(factory_callback):
-            raise TypeError('"factory_callback" must not be a coroutine function')
 
         if types is not None:
             if isinstance(types, type):
@@ -448,34 +435,27 @@ class Context:
                 )
 
         # Add the resource factory to the appropriate lookup tables
-        resource = ResourceContainer(factory_callback, resource_types, name, True)
+        resource = ResourceContainer(
+            factory_callback, resource_types, name, description, True
+        )
         for type_ in resource_types:
             self._resource_factories[(type_, name)] = resource
 
         # Notify listeners that a new resource has been made available
         await self.resource_added.dispatch(ResourceEvent(resource_types, name, True))
 
-    def get_resource(
-        self, type: type[T_Resource], name: str = "default"
-    ) -> Optional[T_Resource]:
-        """
-        Look up a resource in the chain of contexts.
-
-        :param type: type of the requested resource
-        :param name: name of the requested resource
-        :return: the requested resource, or ``None`` if none was available
-
-        """
+    def _get_resource(
+        self, type: type[T_Resource], name: str
+    ) -> ResourceContainer | None:
         self._check_closed()
         key = (type, name)
 
         # First check if there's already a matching resource in this context
-        resource = self._resources.get(key)
-        if resource is not None:
-            return resource.value_or_factory
+        if key in self._resources:
+            return self._resources[key]
 
         # Next, check if there's a resource factory available on the context chain
-        resource = next(
+        container = next(
             (
                 ctx._resource_factories[key]
                 for ctx in self.context_chain
@@ -483,113 +463,151 @@ class Context:
             ),
             None,
         )
-        if resource is not None:
-            return resource.generate_value(self)
+        if container is not None:
+            return container
 
         # Finally, check parents for a matching resource
         return next(
             (
-                ctx._resources[key].value_or_factory
+                ctx._resources[key]
                 for ctx in self.context_chain
                 if key in ctx._resources
             ),
             None,
         )
 
-    def get_resources(self, type: type[T_Resource]) -> set[T_Resource]:
+    def get_static_resources(self, type: type[T_Resource]) -> set[T_Resource]:
         """
-        Retrieve all the resources of the given type in this context and its parents.
+        Retrieve all the (static) resources of the given type in this context and its
+        parents.
 
-        Any matching resource factories are also triggered if necessary.
+        This will **not** use resource factories to generate matching resources.
 
-        :param type: type of the resources to get
-        :return: a set of all found resources of the given type
+        :param type: resource type to filter by
+        :return: a set of matching resource containers
 
         """
         # Collect all the matching resources from this context
-        resources: dict[str, T_Resource] = {
-            container.name: container.value_or_factory
-            for container in self._resources.values()
-            if not container.is_factory and type in container.types
+        containers = {
+            container
+            for ctx in self.context_chain
+            for container in ctx._resources.values()
+            if type in container.types and not container.is_factory
         }
+        return {container.value_or_factory for container in containers}
 
-        # Next, find all matching resource factories in the context chain and generate
-        # resources
-        resources.update(
-            {
-                container.name: container.generate_value(self)
-                for ctx in self.context_chain
-                for container in ctx._resources.values()
-                if container.is_factory
-                and type in container.types
-                and container.name not in resources
-            }
-        )
+    @overload
+    async def get_resource(
+        self, type: type[T_Resource], name: str = ..., *, optional: Literal[True]
+    ) -> T_Resource | None:
+        ...
 
-        # Finally, add the resource values from the parent contexts
-        resources.update(
-            {
-                container.name: container.value_or_factory
-                for ctx in self.context_chain[1:]
-                for container in ctx._resources.values()
-                if not container.is_factory
-                and type in container.types
-                and container.name not in resources
-            }
-        )
-
-        return set(resources.values())
-
-    def require_resource(
-        self, type: type[T_Resource], name: str = "default"
+    @overload
+    async def get_resource(
+        self, type: type[T_Resource], name: str = ..., *, optional: Literal[False] = ...
     ) -> T_Resource:
-        """
-        Look up a resource in the chain of contexts and raise an exception if it is not
-        found.
+        ...
 
-        This is like :meth:`get_resource` except that instead of returning ``None`` when
-        a resource is not found, it will raise
-        :exc:`~asphalt.core.context.ResourceNotFound`.
-
-        :param type: type of the requested resource
-        :param name: name of the requested resource
-        :return: the requested resource
-        :raises asphalt.core.context.ResourceNotFound: if a resource of the given type
-            and name was not found
-
-        """
-        resource = self.get_resource(type, name)
-        if resource is None:
-            raise ResourceNotFound(type, name)
-
-        return resource
-
-    async def request_resource(
-        self, type: type[T_Resource], name: str = "default"
-    ) -> T_Resource:
+    async def get_resource(
+        self, type: Any, name: str = "default", *, optional: bool = False
+    ) -> Any:
         """
         Look up a resource in the chain of contexts.
 
-        This is like :meth:`get_resource` except that if the resource is not already
-        available, it will wait for one to become available.
+        The resource lookup order is as follows:
+
+        #. static resources in current context
+        #. resource factories in the context chain
+        #. static resources in parent contexts
 
         :param type: type of the requested resource
         :param name: name of the requested resource
+        :param optional: ``True`` to return ``None`` if no matching resource was found
         :return: the requested resource
+        :raises ~.ResourceNotFound: if the resource was required but none was found
 
         """
-        # First try to locate an existing resource in this context and its parents
-        value = self.get_resource(type, name)
-        if value is not None:
+        resource = self._get_resource(type, name)
+        if resource is None:
+            if not optional:
+                raise ResourceNotFound(type, name)
+            else:
+                return None
+
+        if resource.is_factory:
+            retval = resource.value_or_factory(self)
+            if isawaitable(retval):
+                value = await retval
+            else:
+                value = retval
+
+            await self.add_resource(value, name, resource.types)
+            return retval
+        else:
+            return resource.value_or_factory
+
+    @overload
+    def get_resource_nowait(
+        self,
+        type: type[T_Resource] | None,
+        name: str = ...,
+        *,
+        optional: Literal[True],
+    ) -> T_Resource | None:
+        ...
+
+    @overload
+    def get_resource_nowait(
+        self, type: type[T_Resource], name: str = ..., *, optional: Literal[False] = ...
+    ) -> T_Resource:
+        ...
+
+    def get_resource_nowait(
+        self, type: Any, name: str = "default", *, optional: bool = False
+    ) -> Any:
+        """
+        Synchronous version of :meth:`get_resource`.
+
+        This method can be used to retrieve resources in a synchronous callback.
+        If an asynchronous resource factory is required to generate the requested
+        resource, :exc:`~.AwaitableResourceError` is raised.
+
+        :param type: type of the requested resource
+        :param name: name of the requested resource
+        :param optional: ``True`` to return ``None`` if no matching resource was found
+        :return: the requested resource, or ``None`` if the resource was optional and
+            none was available
+        :raises ~.ResourceNotFound: if the resource was required but none was found
+        :raises ~.AwaitableResourceError: if using an asynchronous resource factory was
+            required to fulfill the request
+
+        """
+        resource = self._get_resource(type, name)
+        if resource is None:
+            if optional:
+                return None
+            else:
+                raise ResourceNotFound(type, name)
+
+        if resource.is_factory:
+            if iscoroutinefunction(resource):
+                raise AwaitableResourceError
+
+            value = resource.value_or_factory(self)
+            if resource.description:
+                description = f"Resource generated from {resource.description}"
+            else:
+                description = None
+
+            container = ResourceContainer(
+                value, resource.types, name, description, False
+            )
+            for type_ in resource.types:
+                self._resources[(type_, name)] = container
+
             return value
 
-        # Wait until a matching resource or resource factory is available
-        signals = [ctx.resource_added for ctx in self.context_chain]
-        await wait_event(
-            signals,
-            lambda event: event.resource_name == name and type in event.resource_types,
-        )
-        return self.require_resource(type, name)
+        return resource.value_or_factory
 
 
 @overload
@@ -685,19 +703,57 @@ def current_context() -> Context:
     return ctx
 
 
-def get_resource(type: type[T_Resource], name: str = "default") -> T_Resource | None:
+def get_static_resources(type: type[T_Resource]) -> set[T_Resource]:
+    """Shortcut for ``current_context().get_static_resources(...)``."""
+    return current_context().get_static_resources(type)
+
+
+@overload
+def get_resource_nowait(
+    type: type[T_Resource], name: str = "default", *, optional: Literal[True]
+) -> T_Resource | None:
+    ...
+
+
+@overload
+def get_resource_nowait(
+    type: type[T_Resource], name: str = "default", *, optional: Literal[False] = False
+) -> T_Resource:
+    ...
+
+
+def get_resource_nowait(
+    type: type[T_Resource], name: str = "default", *, optional: bool = False
+) -> T_Resource | None:
     """Shortcut for ``current_context().get_resource(...)``."""
-    return current_context().get_resource(type, name)
+    if optional:
+        return current_context().get_resource_nowait(type, name, optional=True)
+    else:
+        return current_context().get_resource_nowait(type, name, optional=False)
 
 
-def get_resources(type: type[T_Resource]) -> set[T_Resource]:
-    """Shortcut for ``current_context().get_resources(...)``."""
-    return current_context().get_resources(type)
+@overload
+async def get_resource(
+    type: type[T_Resource], name: str = ..., *, optional: Literal[True]
+) -> T_Resource | None:
+    ...
 
 
-def require_resource(type: type[T_Resource], name: str = "default") -> T_Resource:
+@overload
+async def get_resource(
+    type: type[T_Resource], name: str = ..., *, optional: Literal[False] = ...
+) -> T_Resource:
+    ...
+
+
+async def get_resource(
+    type: type[T_Resource], name: str = "default", *, optional: bool = False
+) -> T_Resource | None:
     """Shortcut for ``current_context().require_resource(...)``."""
-    return current_context().require_resource(type, name)
+    if optional:
+        return await current_context().get_resource(type, name, optional=True)
+    else:
+        return await current_context().get_resource(type, name, optional=False)
 
 
 @dataclass
@@ -787,11 +843,13 @@ def inject(func: Callable[P, Any]) -> Callable[P, Any]:
         resources: dict[str, Any] = {}
         for argname, dependency in injected_resources.items():
             if dependency.optional:
-                resource = ctx.get_resource(dependency.cls, dependency.name)
+                resources[argname] = ctx.get_resource_nowait(
+                    dependency.cls, dependency.name, optional=True
+                )
             else:
-                resource = ctx.require_resource(dependency.cls, dependency.name)
-
-            resources[argname] = resource
+                resources[argname] = ctx.get_resource_nowait(
+                    dependency.cls, dependency.name, optional=False
+                )
 
         return func(*args, **kwargs, **resources)
 
@@ -804,11 +862,13 @@ def inject(func: Callable[P, Any]) -> Callable[P, Any]:
         resources: dict[str, Any] = {}
         for argname, dependency in injected_resources.items():
             if dependency.optional:
-                resource = ctx.get_resource(dependency.cls, dependency.name)
+                resources[argname] = await ctx.get_resource(
+                    dependency.cls, dependency.name, optional=True
+                )
             else:
-                resource = ctx.require_resource(dependency.cls, dependency.name)
-
-            resources[argname] = resource
+                resources[argname] = await ctx.get_resource(
+                    dependency.cls, dependency.name, optional=False
+                )
 
         return await func(*args, **kwargs, **resources)
 

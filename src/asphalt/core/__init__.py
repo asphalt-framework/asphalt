@@ -12,8 +12,8 @@ __all__ = (
     "context_teardown",
     "current_context",
     "get_resource",
-    "get_resources",
-    "require_resource",
+    "get_resource_nowait",
+    "get_static_resources",
     "NoCurrentContext",
     "inject",
     "resource",
@@ -22,6 +22,7 @@ __all__ = (
     "stream_events",
     "wait_event",
     "run_application",
+    "start_component",
     "PluginContainer",
     "callable_name",
     "merge_config",
@@ -30,7 +31,12 @@ __all__ = (
 
 from typing import Any
 
-from ._component import CLIApplicationComponent, Component, ContainerComponent
+from ._component import (
+    CLIApplicationComponent,
+    Component,
+    ContainerComponent,
+    start_component,
+)
 from ._concurrent import start_background_task, start_service_task
 from ._context import (
     Context,
@@ -41,9 +47,9 @@ from ._context import (
     context_teardown,
     current_context,
     get_resource,
-    get_resources,
+    get_resource_nowait,
+    get_static_resources,
     inject,
-    require_resource,
     resource,
 )
 from ._event import Event, Signal, stream_events, wait_event
