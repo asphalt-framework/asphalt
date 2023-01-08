@@ -44,8 +44,6 @@ Documentation = "https://asphalt.readthedocs.org/en/latest/"
 "Issue tracker" = "https://github.com/asphalt-framework/asphalt/issues"
 
 [project.optional-dependencies]
-uvloop = ["uvloop >= 0.4.10"]
-tokio = ["tokio"]
 test = [
     "anyio[trio] ~= 3.6",
     "pytest >= 3.9",
@@ -58,10 +56,6 @@ doc = [
     "sphinx-autodoc-typehints >= 1.2.0",
     "sphinxcontrib-asyncio >= 0.2.0",
 ]
-
-[project.entry-points."asphalt.core.event_loop_policies"]
-uvloop = "uvloop:EventLoopPolicy"
-tokio = "tokio:TokioLoopPolicy"
 
 [project.scripts]
 asphalt = "asphalt.core._cli:main"
