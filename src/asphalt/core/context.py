@@ -902,9 +902,10 @@ def context_teardown(
 def context_teardown(
     func: Callable[[T_Context], AsyncGenerator[None, Exception | None]]
     | Callable[[T_Self, T_Context], AsyncGenerator[None, Exception | None]]
-) -> Callable[[T_Context], Coroutine[Any, Any, None]] | Callable[
-    [T_Self, T_Context], Coroutine[Any, Any, None]
-]:
+) -> (
+    Callable[[T_Context], Coroutine[Any, Any, None]]
+    | Callable[[T_Self, T_Context], Coroutine[Any, Any, None]]
+):
     """
     Wrap an async generator function to execute the rest of the function at context teardown.
 
