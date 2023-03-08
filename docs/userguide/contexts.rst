@@ -57,7 +57,7 @@ have to care if you switch the implementation to another. For example, consider 
 provided by asphalt-mailer_. The library has an abstract base class for all mailers,
 ``asphalt.mailer.api.Mailer``. To facilitate this loose coupling of services, it adds all its
 configure mailer services using the ``Mailer`` interface so that components that just need *some*
-was to send email don't have to care what implementation was chosen in the configuration.
+way to send email don't have to care what implementation was chosen in the configuration.
 
 Resources can be added to a context in two forms: static resources and resource factories.
 A static resource can be any arbitrary object (except ``None``). The same object can be
