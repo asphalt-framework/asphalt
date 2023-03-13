@@ -91,7 +91,7 @@ indefinitely for the resource to be added to the context or its parents. When th
 calls :meth:`~asphalt.core.context.Context.get_resource` again, at which point success is
 guaranteed. This is usually used only in the components'
 :meth:`~asphalt.core.component.Component.start` methods to retrieve resources provided
-by sibling components. Resources
+by sibling components.
 
 The order of resource lookup is as follows:
 
