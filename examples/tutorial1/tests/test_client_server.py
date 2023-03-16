@@ -21,7 +21,7 @@ def test_client_and_server(
             client = ClientComponent("Hello!")
             await client.start(ctx)
 
-    event_loop.create_task(run())
+    task = event_loop.create_task(run())  # noqa: F841
     with pytest.raises(SystemExit) as exc:
         event_loop.run_forever()
 

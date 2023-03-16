@@ -5,7 +5,7 @@ __all__ = ("Event", "Signal", "wait_event", "stream_events")
 import logging
 import sys
 import weakref
-from asyncio import Queue, create_task, get_running_loop, iscoroutine, wait
+from asyncio import Queue, Task, create_task, get_running_loop, iscoroutine, wait
 from datetime import datetime, timezone
 from inspect import getmembers, isawaitable
 from time import time as stdlib_time
@@ -19,6 +19,7 @@ from typing import (
     MutableMapping,
     Optional,
     Sequence,
+    Set,
     Type,
     TypeVar,
     cast,
@@ -89,7 +90,14 @@ class Signal(Generic[T_Event]):
     :param event_class: an event class
     """
 
-    __slots__ = "event_class", "topic", "source", "listeners", "bound_signals"
+    __slots__ = (
+        "event_class",
+        "topic",
+        "source",
+        "listeners",
+        "bound_signals",
+        "_background_tasks",
+    )
 
     def __init__(
         self,
@@ -109,6 +117,7 @@ class Signal(Generic[T_Event]):
                 event_class, Event
             ), "event_class must be a subclass of Event"
             self.bound_signals: MutableMapping[Any, Signal] = WeakKeyDictionary()
+        self._background_tasks: Set[Task] = set()
 
     def __get__(self, instance, owner) -> Signal:
         if instance is None:
@@ -225,7 +234,9 @@ class Signal(Generic[T_Event]):
         future = loop.create_future()
         if self.listeners:
             listeners = list(self.listeners)
-            loop.create_task(do_dispatch())
+            task = loop.create_task(do_dispatch())
+            self._background_tasks.add(task)
+            task.add_done_callback(self._background_tasks.discard)
         else:
             future.set_result(True)
 

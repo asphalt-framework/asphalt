@@ -42,7 +42,7 @@ Create a ``tests`` directory at the root of the project directory and create a m
                 client = ClientComponent("Hello!")
                 await client.start(ctx)
 
-        event_loop.create_task(run())
+        task = event_loop.create_task(run())
         with pytest.raises(SystemExit) as exc:
             event_loop.run_forever()
 
