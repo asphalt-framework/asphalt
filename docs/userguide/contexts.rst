@@ -164,12 +164,14 @@ For example::
 There also exists a convenience decorator, :func:`~asphalt.core.context.context_teardown`, which
 makes use of asynchronous generators::
 
+    from __future__ import annotations
+    from collections.abc import AsyncGenerator
     from asphalt.core import Component, Context, context_teardown
 
 
     class FooComponent(Component):
         @context_teardown
-        async def start(self, ctx: Context) -> None:
+        async def start(self, ctx: Context) -> AsyncGenerator[None, BaseException | None]:
             service = SomeService()
             await service.start(ctx)
             ctx.add_resource(service)
@@ -202,7 +204,7 @@ value::
 
     class FooComponent(Component):
         @context_teardown
-        async def start(self, ctx: Context) -> None:
+        async def start(self, ctx: Context) -> AsyncGenerator[None, BaseException | None]:
             db = SomeDatabase()
             await db.start(ctx)
             ctx.add_resource(db)
