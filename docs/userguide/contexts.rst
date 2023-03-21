@@ -150,11 +150,11 @@ use by another resource is never cleaned up prematurely.
 
 For example::
 
-    from asphalt.core import Component
+    from asphalt.core import Component, Context
 
 
     class FooComponent(Component):
-        async def start(ctx):
+        async def start(self, ctx: Context) -> None:
             service = SomeService()
             await service.start(ctx)
             ctx.add_teardown_callback(service.stop)
@@ -164,12 +164,12 @@ For example::
 There also exists a convenience decorator, :func:`~asphalt.core.context.context_teardown`, which
 makes use of asynchronous generators::
 
-    from asphalt.core import Component, context_teardown
+    from asphalt.core import Component, Context, context_teardown
 
 
     class FooComponent(Component):
         @context_teardown
-        async def start(ctx):
+        async def start(self, ctx: Context) -> None:
             service = SomeService()
             await service.start(ctx)
             ctx.add_resource(service)
@@ -185,7 +185,7 @@ transaction. This can be achieved by passing the ``pass_exception`` keyword argu
 :meth:`~asphalt.core.context.Context.add_teardown_callback`::
 
     class FooComponent(Component):
-        async def start(ctx):
+        async def start(self, ctx: Context) -> None:
             def teardown(exception: Optional[BaseException]):
                 if exception:
                     db.rollback()
@@ -202,7 +202,7 @@ value::
 
     class FooComponent(Component):
         @context_teardown
-        async def start(ctx):
+        async def start(self, ctx: Context) -> None:
             db = SomeDatabase()
             await db.start(ctx)
             ctx.add_resource(db)
