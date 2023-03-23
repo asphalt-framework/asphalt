@@ -3,6 +3,11 @@ Version history
 
 This library adheres to `Semantic Versioning 2.0 <http://semver.org/>`_.
 
+**UNRELEASED**
+
+- Worked around the presence of the ``importlib_metadata`` module on Python 3.10 and
+  later causing ``PluginContainer.create_component()`` to fail with ``AttributeError``
+
 **4.11.0** (2022-12-03)
 
 - Added the ``--set`` option for ``asphalt run`` for overriding specific values in

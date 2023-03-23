@@ -16,9 +16,9 @@ from typing import Any, Callable, Dict, List, Optional, Type, TypeVar, Union, ov
 from typeguard import check_argument_types
 
 if sys.version_info >= (3, 10):
-    from importlib.metadata import EntryPoint, entry_points
+    from importlib.metadata import entry_points
 else:
-    from importlib_metadata import EntryPoint, entry_points
+    from importlib_metadata import entry_points
 
 T_Object = TypeVar("T_Object")
 
@@ -124,13 +124,14 @@ class PluginContainer:
         don't point to classes)
     """
 
-    __slots__ = "namespace", "base_class", "_entrypoints"
+    __slots__ = "namespace", "base_class", "_entrypoints", "_resolved"
 
     def __init__(self, namespace: str, base_class: type | None = None) -> None:
         self.namespace = namespace
         self.base_class = base_class
         group = entry_points().select(group=namespace)  # type: ignore[attr-defined]
         self._entrypoints = {ep.name: ep for ep in group}
+        self._resolved: dict[str, Any] = {}
 
     @overload
     def resolve(self, obj: str) -> Any:
@@ -157,14 +158,14 @@ class PluginContainer:
             return obj
         if ":" in obj:
             return resolve_reference(obj)
+        if obj in self._resolved:
+            return self._resolved[obj]
 
         value = self._entrypoints.get(obj)
         if value is None:
             raise LookupError(f"no such entry point in {self.namespace}: {obj}")
 
-        if isinstance(value, EntryPoint):
-            value = self._entrypoints[obj] = value.load()
-
+        value = self._resolved[obj] = value.load()
         return value
 
     def create_object(self, type: Union[Type, str], **constructor_kwargs) -> Any:
@@ -204,9 +205,11 @@ class PluginContainer:
 
         """
         values = []
-        for name, value in self._entrypoints.items():
-            if isinstance(value, EntryPoint):
-                value = self._entrypoints[name] = value.load()
+        for name, ep in self._entrypoints.items():
+            if name in self._resolved:
+                value = self._resolved[name]
+            else:
+                value = self._resolved[name] = ep.load()
 
             values.append(value)
 
