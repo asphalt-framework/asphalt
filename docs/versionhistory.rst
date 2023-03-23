@@ -34,8 +34,16 @@ This library adheres to `Semantic Versioning 2.0 <http://semver.org/>`_.
 - **BACKWARD INCOMPATIBLE** Moved all exported functions and classes directly to
   ``asphalt.core`` and made submodules private
 - Dropped support for Python 3.8 and earlier
-- Dropped explicit run-time type checking
 - Dropped the deprecated ``Dependency()`` marker
+
+**4.12.0**
+
+- Removed explicit run-time argument type checks and the ``typeguard`` dependency
+
+**4.11.1** (2023-03-23)
+
+- Worked around the presence of the ``importlib_metadata`` module on Python 3.10 and
+  later causing ``PluginContainer.create_component()`` to fail with ``AttributeError``
 
 **4.11.0** (2022-12-03)
 
