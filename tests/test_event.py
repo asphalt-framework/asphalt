@@ -94,7 +94,9 @@ class TestSignal:
         assert events[0].kwargs == {"a": 1, "b": 2}
 
     @pytest.mark.asyncio
-    async def test_dispatch_event_coroutine_complete(self, source: DummySource, capfd) -> None:
+    async def test_dispatch_event_coroutine_complete(
+        self, source: DummySource, capfd
+    ) -> None:
         """Test that a coroutine function listening to an event runs until complete."""
 
         async def callback(event: Event) -> None:
