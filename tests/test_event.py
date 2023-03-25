@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import gc
-from asyncio import AbstractEventLoop, Queue, all_tasks, current_task
+from asyncio import AbstractEventLoop, Queue, all_tasks, current_task, sleep
 from datetime import datetime, timedelta, timezone
 from typing import NoReturn
 
@@ -92,6 +92,19 @@ class TestSignal:
         assert len(events) == 1
         assert events[0].args == ("x", "y")
         assert events[0].kwargs == {"a": 1, "b": 2}
+
+    @pytest.mark.asyncio
+    async def test_dispatch_event_coroutine_complete(self, source: DummySource, capfd) -> None:
+        """Test that a coroutine function listening to an event runs until complete."""
+
+        async def callback(event: Event) -> None:
+            await sleep(0.1)
+            print("callback done")
+
+        source.event_a.connect(callback)
+        assert await source.event_a.dispatch()
+        out, err = capfd.readouterr()
+        assert out == "callback done\n"
 
     @pytest.mark.asyncio
     async def test_dispatch_raw(self, source: DummySource) -> None:
