@@ -1,3 +1,5 @@
+__version__ = "4.11.1"
+
 __all__ = (
     "CLIApplicationComponent",
     "Component",
