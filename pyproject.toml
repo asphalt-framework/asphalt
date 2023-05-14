@@ -63,12 +63,15 @@ asphalt = "asphalt.core._cli:main"
 version_scheme = "post-release"
 local_scheme = "dirty-tag"
 
-[tool.isort]
-skip_gitignore = true
-profile = "black"
-
-[tool.flake8]
-max-line-length = 88
+[tool.ruff]
+line-length = 88
+select = [
+    "E", "F", "W",  # default flake-8
+    "I",            # isort
+    "PGH",          # pygrep-hooks
+    "UP",           # pyupgrade
+]
+target-version = "py39"
 
 [tool.pytest.ini_options]
 addopts = "-rsx --tb=short"
