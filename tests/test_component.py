@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+import sys
 from typing import NoReturn
+from unittest.mock import Mock
 
 import anyio
 import pytest
-
 from asphalt.core import (
     CLIApplicationComponent,
     Component,
@@ -15,6 +16,11 @@ from asphalt.core import (
 from asphalt.core._component import component_types
 
 pytestmark = pytest.mark.anyio()
+
+if sys.version_info >= (3, 10):
+    from importlib.metadata import EntryPoint
+else:
+    from importlib_metadata import EntryPoint
 
 
 class DummyComponent(Component):
@@ -29,7 +35,9 @@ class DummyComponent(Component):
 
 @pytest.fixture(autouse=True)
 def monkeypatch_plugins(monkeypatch):
-    monkeypatch.setattr(component_types, "_entrypoints", {"dummy": DummyComponent})
+    entrypoint = Mock(EntryPoint)
+    entrypoint.load.configure_mock(return_value=DummyComponent)
+    monkeypatch.setattr(component_types, "_entrypoints", {"dummy": entrypoint})
 
 
 class TestContainerComponent:
