@@ -1,9 +1,6 @@
 [build-system]
-requires = [
-    "setuptools >= 61",
-    "setuptools_scm >= 6.4"
-]
-build-backend = "setuptools.build_meta"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
 [project]
 name = "asphalt"
@@ -67,9 +64,14 @@ tokio = "tokio:TokioLoopPolicy"
 [project.scripts]
 asphalt = "asphalt.core.cli:main"
 
-[tool.setuptools_scm]
-version_scheme = "post-release"
-local_scheme = "dirty-tag"
+[tool.hatch.version]
+path = "src/asphalt/core/__init__.py"
+
+[tool.hatch.build.targets.wheel]
+only-include = ["src/asphalt"]
+
+[tool.hatch.build.targets.wheel.sources]
+"src" = ""
 
 [tool.isort]
 skip_gitignore = true

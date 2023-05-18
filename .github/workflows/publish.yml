@@ -18,9 +18,9 @@ jobs:
       with:
         python-version: 3.x
     - name: Install dependencies
-      run: pip install build
+      run: pip install hatch
     - name: Create packages
-      run: python -m build
+      run: hatch build
     - name: Upload packages
       uses: pypa/gh-action-pypi-publish@release/v1
       with:
