@@ -391,7 +391,7 @@ class TestContext:
 
     @pytest.mark.asyncio
     async def test_add_resource_return_type_union(self, context: Context) -> None:
-        def factory(ctx: Context) -> Union[int, float]:
+        def factory(ctx: Context) -> Union[int, float]:  # noqa: UP007
             return 5
 
         async with context:
@@ -412,7 +412,7 @@ class TestContext:
 
     @pytest.mark.asyncio
     async def test_add_resource_return_type_optional(self, context: Context) -> None:
-        def factory(ctx: Context) -> Optional[str]:
+        def factory(ctx: Context) -> Optional[str]:  # noqa: UP007
             return "foo"
 
         async with context:
@@ -844,7 +844,7 @@ class TestDependencyInjection:
         @inject
         async def injected(
             foo: int, bar: str = resource(), *, baz: str = resource("alt")
-        ) -> Tuple[int, str, str]:
+        ) -> Tuple[int, str, str]:  # noqa: UP006
             return foo, bar, baz
 
         async with Context() as ctx:
@@ -861,7 +861,7 @@ class TestDependencyInjection:
         @inject
         def injected(
             foo: int, bar: str = resource(), *, baz: str = resource("alt")
-        ) -> Tuple[int, str, str]:
+        ) -> Tuple[int, str, str]:  # noqa: UP006
             return foo, bar, baz
 
         async with Context() as ctx:

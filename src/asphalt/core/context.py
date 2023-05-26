@@ -53,13 +53,7 @@ from typing import (
     AsyncGenerator,
     Awaitable,
     Callable,
-    Dict,
-    List,
-    Optional,
     Sequence,
-    Set,
-    Tuple,
-    Type,
     TypeVar,
     Union,
     cast,
@@ -70,8 +64,8 @@ from typing import (
 import asyncio_extras
 from async_generator import async_generator
 
-from asphalt.core.event import Event, Signal, wait_event
-from asphalt.core.utils import callable_name, qualified_name
+from .event import Event, Signal, wait_event
+from .utils import callable_name, qualified_name
 
 if sys.version_info >= (3, 10):
     from typing import ParamSpec
@@ -113,9 +107,9 @@ class ResourceContainer:
     def __init__(
         self,
         value_or_factory: Any,
-        types: Tuple[type, ...],
+        types: tuple[type, ...],
         name: str,
-        context_attr: Optional[str],
+        context_attr: str | None,
         is_factory: bool,
     ) -> None:
         self.value_or_factory = value_or_factory
@@ -171,7 +165,7 @@ class ResourceEvent(Event):
         self,
         source: Context,
         topic: str,
-        types: Tuple[type, ...],
+        types: tuple[type, ...],
         name: str,
         is_factory: bool,
     ) -> None:
@@ -211,7 +205,7 @@ class TeardownError(Exception):
     :vartype exceptions: List[Exception]
     """
 
-    def __init__(self, exceptions: List[Exception]) -> None:
+    def __init__(self, exceptions: list[Exception]) -> None:
         super().__init__(exceptions)
         self.exceptions = exceptions
 
@@ -259,7 +253,7 @@ class Context:
     _loop: AbstractEventLoop | None = None
     _reset_token: Token
 
-    def __init__(self, parent: Optional[Context] = None) -> None:
+    def __init__(self, parent: Context | None = None) -> None:
         if parent is None:
             self._parent = _current_context.get(None)
         else:
@@ -273,10 +267,10 @@ class Context:
             self._parent = parent
 
         self._state = ContextState.open
-        self._resources: Dict[Tuple[type, str], ResourceContainer] = {}
-        self._resource_factories: Dict[Tuple[type, str], ResourceContainer] = {}
-        self._resource_factories_by_context_attr: Dict[str, ResourceContainer] = {}
-        self._teardown_callbacks: List[Tuple[Callable, bool]] = []
+        self._resources: dict[tuple[type, str], ResourceContainer] = {}
+        self._resource_factories: dict[tuple[type, str], ResourceContainer] = {}
+        self._resource_factories_by_context_attr: dict[str, ResourceContainer] = {}
+        self._teardown_callbacks: list[tuple[Callable, bool]] = []
 
     def __getattr__(self, name):
         # First look for a resource factory in the whole context chain
@@ -294,10 +288,10 @@ class Context:
         raise AttributeError(f"no such context variable: {name}")
 
     @property
-    def context_chain(self) -> List[Context]:
+    def context_chain(self) -> list[Context]:
         """Return a list of contexts starting from this one, its parent and so on."""
         contexts = []
-        ctx: Optional[Context] = self
+        ctx: Context | None = self
         while ctx is not None:
             contexts.append(ctx)
             ctx = ctx.parent
@@ -313,7 +307,7 @@ class Context:
         return self._loop
 
     @property
-    def parent(self) -> Optional[Context]:
+    def parent(self) -> Context | None:
         """Return the parent context, or ``None`` if there is no parent."""
         return self._parent
 
@@ -442,7 +436,7 @@ class Context:
         value,
         name: str = "default",
         context_attr: str | None = None,
-        types: Union[type, Sequence[type]] = (),
+        types: type | Sequence[type] = (),
     ) -> None:
         """
         Add a resource to this context.
@@ -512,7 +506,7 @@ class Context:
     def add_resource_factory(
         self,
         factory_callback: factory_callback_type,
-        types: Union[type, Sequence[Type], None] = None,
+        types: type | Sequence[type] | None = None,
         name: str = "default",
         context_attr: str | None = None,
     ) -> None:
@@ -559,7 +553,7 @@ class Context:
 
         if types is not None:
             if isinstance(types, type):
-                resource_types: Tuple[type, ...] = (types,)
+                resource_types: tuple[type, ...] = (types,)
             else:
                 resource_types = tuple(types)
         else:
@@ -622,8 +616,8 @@ class Context:
         self.resource_added.dispatch(resource_types, name, True)
 
     def get_resource(
-        self, type: Type[T_Resource], name: str = "default"
-    ) -> Optional[T_Resource]:
+        self, type: type[T_Resource], name: str = "default"
+    ) -> T_Resource | None:
         """
         Look up a resource in the chain of contexts.
 
@@ -662,7 +656,7 @@ class Context:
             None,
         )
 
-    def get_resources(self, type: Type[T_Resource]) -> Set[T_Resource]:
+    def get_resources(self, type: type[T_Resource]) -> set[T_Resource]:
         """
         Retrieve all the resources of the given type in this context and its parents.
 
@@ -673,7 +667,7 @@ class Context:
 
         """
         # Collect all the matching resources from this context
-        resources: Dict[str, T_Resource] = {
+        resources: dict[str, T_Resource] = {
             container.name: container.value_or_factory
             for container in self._resources.values()
             if not container.is_factory and type in container.types
@@ -706,7 +700,7 @@ class Context:
         return set(resources.values())
 
     def require_resource(
-        self, type: Type[T_Resource], name: str = "default"
+        self, type: type[T_Resource], name: str = "default"
     ) -> T_Resource:
         """
         Look up a resource in the chain of contexts and raise an exception if it is not found.
@@ -728,7 +722,7 @@ class Context:
         return resource
 
     async def request_resource(
-        self, type: Type[T_Resource], name: str = "default"
+        self, type: type[T_Resource], name: str = "default"
     ) -> T_Resource:
         """
         Look up a resource in the chain of contexts.
@@ -775,7 +769,7 @@ class Context:
         self,
         func: Callable[..., T_Retval],
         *args,
-        executor: Union[Executor, str, None] = None,
+        executor: Executor | str | None = None,
         **kwargs,
     ) -> Awaitable[T_Retval]:
         """
@@ -799,7 +793,7 @@ class Context:
         callback: partial[T_Retval] = partial(copy_context().run, func, *args, **kwargs)
         return self._loop.run_in_executor(executor, callback)
 
-    def threadpool(self, executor: Union[Executor, str, None] = None):
+    def threadpool(self, executor: Executor | str | None = None):
         """
         Return an asynchronous context manager that runs the block in a (thread pool) executor.
 
@@ -814,7 +808,7 @@ class Context:
         return asyncio_extras.threadpool(executor)
 
 
-def executor(arg: Union[Executor, str, None, Callable[..., T_Retval]] = None):
+def executor(arg: Executor | str | None | Callable[..., T_Retval] = None):
     """
     Decorate a function so that it runs in an :class:`~concurrent.futures.Executor`.
 
@@ -838,9 +832,10 @@ def executor(arg: Union[Executor, str, None, Callable[..., T_Retval]] = None):
     :return: the wrapped function
 
     """
-    function: Callable[..., T_Retval]
 
-    def inner_wrapper(*args, **kwargs) -> Future[T_Retval]:
+    def inner_wrapper(
+        function: Callable[..., T_Retval], *args, **kwargs
+    ) -> Future[T_Retval]:
         executor: Executor | None
         if isinstance(executor_arg, str):
             try:
@@ -862,9 +857,7 @@ def executor(arg: Union[Executor, str, None, Callable[..., T_Retval]] = None):
         return get_running_loop().run_in_executor(executor, callback)
 
     def outer_wrapper(func: Callable[..., T_Retval]) -> Callable[..., Future[T_Retval]]:
-        nonlocal function
-        function = func
-        return wraps(func)(inner_wrapper)
+        return wraps(func)(partial(inner_wrapper, func))
 
     if arg is None or isinstance(arg, (Executor, str)):
         executor_arg = arg
@@ -920,7 +913,7 @@ def context_teardown(
 
     @wraps(func)
     async def wrapper(*args, **kwargs) -> None:
-        async def teardown_callback(exception: Optional[Exception]) -> None:
+        async def teardown_callback(exception: Exception | None) -> None:
             try:
                 await generator.asend(exception)
             except StopAsyncIteration:
@@ -978,17 +971,17 @@ def current_context() -> Context:
     return ctx
 
 
-def get_resource(type: Type[T_Resource], name: str = "default") -> T_Resource | None:
+def get_resource(type: type[T_Resource], name: str = "default") -> T_Resource | None:
     """Shortcut for ``current_context().get_resource(...)``."""
     return current_context().get_resource(type, name)
 
 
-def get_resources(type: Type[T_Resource]) -> set[T_Resource]:
+def get_resources(type: type[T_Resource]) -> set[T_Resource]:
     """Shortcut for ``current_context().get_resources(...)``."""
     return current_context().get_resources(type)
 
 
-def require_resource(type: Type[T_Resource], name: str = "default") -> T_Resource:
+def require_resource(type: type[T_Resource], name: str = "default") -> T_Resource:
     """Shortcut for ``current_context().require_resource(...)``."""
     return current_context().require_resource(type, name)
 

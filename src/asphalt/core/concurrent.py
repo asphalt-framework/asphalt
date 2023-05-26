@@ -9,7 +9,7 @@ from concurrent.futures import Executor
 from functools import partial, wraps
 from typing import Awaitable, Callable, TypeVar, overload
 
-from asphalt.core import Context
+from . import Context
 
 if sys.version_info >= (3, 10):
     from typing import Concatenate, ParamSpec

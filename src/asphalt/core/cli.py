@@ -4,14 +4,14 @@ import os
 import re
 from collections.abc import Mapping
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import click
 from ruamel.yaml import YAML, ScalarNode
 from ruamel.yaml.loader import Loader
 
-from asphalt.core.runner import policies, run_application
-from asphalt.core.utils import merge_config, qualified_name
+from .runner import policies, run_application
+from .utils import merge_config, qualified_name
 
 
 def env_constructor(loader: Loader, node: ScalarNode) -> str | None:
@@ -66,9 +66,9 @@ def main() -> None:
 def run(
     configfile,
     unsafe: bool,
-    loop: Optional[str],
-    service: Optional[str],
-    set_: List[str],
+    loop: str | None,
+    service: str | None,
+    set_: list[str],
 ) -> None:
     yaml = YAML(typ="unsafe" if unsafe else "safe")
     yaml.constructor.add_constructor("!Env", env_constructor)
@@ -76,7 +76,7 @@ def run(
     yaml.constructor.add_constructor("!BinaryFile", binary_file_constructor)
 
     # Read the configuration from the supplied YAML files
-    config: Dict[str, Any] = {}
+    config: dict[str, Any] = {}
     for path in configfile:
         config_data = yaml.load(path)
         assert isinstance(

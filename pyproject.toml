@@ -51,7 +51,7 @@ test = [
     "pytest >= 3.9",
     "pytest-asyncio",
     "pytest-cov",
-    "uvloop; python_version < '3.11' and python_implementation == 'CPython' and platform_system != 'Windows'",
+    "uvloop; python_version < '3.12' and python_implementation == 'CPython' and platform_system != 'Windows'",
 ]
 doc = [
     "Sphinx >= 6.0",
@@ -70,12 +70,18 @@ asphalt = "asphalt.core.cli:main"
 version_scheme = "post-release"
 local_scheme = "dirty-tag"
 
-[tool.isort]
-skip_gitignore = true
-profile = "black"
+[tool.ruff]
+line-length = 99
+select = [
+    "E", "F", "W",  # default flake-8
+    "I",            # isort
+    "PGH",          # pygrep-hooks
+    "UP",           # pyupgrade
+]
+target-version = "py37"
 
-[tool.flake8]
-max-line-length = 99
+[tool.ruff.isort]
+known-first-party = ["asphalt.core"]
 
 [tool.pytest.ini_options]
 addopts = "-rsx --tb=short"

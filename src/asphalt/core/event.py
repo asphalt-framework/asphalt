@@ -15,17 +15,14 @@ from typing import (
     Awaitable,
     Callable,
     Generic,
-    List,
     MutableMapping,
-    Optional,
     Sequence,
-    Type,
     TypeVar,
     cast,
 )
 from weakref import WeakKeyDictionary
 
-from asphalt.core.utils import qualified_name
+from .utils import qualified_name
 
 if sys.version_info >= (3, 10):
     from contextlib import aclosing
@@ -91,16 +88,16 @@ class Signal(Generic[T_Event]):
 
     def __init__(
         self,
-        event_class: Type[T_Event],
+        event_class: type[T_Event],
         *,
         source: Any = None,
-        topic: Optional[str] = None,
+        topic: str | None = None,
     ) -> None:
         self.event_class = event_class
         self.topic = topic
         if source is not None:
             self.source = weakref.ref(source)
-            self.listeners: Optional[List[Callable]] = None
+            self.listeners: list[Callable] | None = None
         else:
             assert issubclass(
                 event_class, Event
@@ -184,7 +181,7 @@ class Signal(Generic[T_Event]):
         """
 
         async def do_dispatch() -> None:
-            awaitables: List[Awaitable[Any]] = []
+            awaitables: list[Awaitable[Any]] = []
             all_successful = True
             for callback in listeners:
                 try:
@@ -261,7 +258,7 @@ class Signal(Generic[T_Event]):
 
 def stream_events(
     signals: Sequence[Signal[T_Event]],
-    filter: Optional[Callable[[T_Event], bool]] = None,
+    filter: Callable[[T_Event], bool] | None = None,
     *,
     max_queue_size: int = 0,
 ) -> AsyncIterator[T_Event]:
@@ -307,7 +304,7 @@ def stream_events(
 
 async def wait_event(
     signals: Sequence[Signal[T_Event]],
-    filter: Optional[Callable[[T_Event], bool]] = None,
+    filter: Callable[[T_Event], bool] | None = None,
 ) -> T_Event:
     """
     Wait until any of the given signals dispatches an event that satisfies the filter (if any).

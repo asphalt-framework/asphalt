@@ -9,11 +9,11 @@ from asyncio.events import AbstractEventLoop
 from concurrent.futures import ThreadPoolExecutor
 from logging import INFO, Logger, basicConfig, getLogger, shutdown
 from logging.config import dictConfig
-from typing import Any, Dict, Optional, Union, cast
+from typing import Any, cast
 
-from asphalt.core.component import Component, component_types
-from asphalt.core.context import Context, _current_context
-from asphalt.core.utils import PluginContainer, qualified_name
+from .component import Component, component_types
+from .context import Context, _current_context
+from .utils import PluginContainer, qualified_name
 
 policies = PluginContainer("asphalt.core.event_loop_policies")
 
@@ -25,12 +25,12 @@ def sigterm_handler(logger: Logger, event_loop: AbstractEventLoop) -> None:
 
 
 def run_application(
-    component: Union[Component, Dict[str, Any]],
+    component: Component | dict[str, Any],
     *,
     event_loop_policy: str | None = None,
     max_threads: int | None = None,
-    logging: Union[Dict[str, Any], int, None] = INFO,
-    start_timeout: Union[int, float, None] = 10,
+    logging: dict[str, Any] | int | None = INFO,
+    start_timeout: int | float | None = 10,
 ) -> None:
     """
     Configure logging and start the given root component in the default asyncio event loop.
@@ -99,7 +99,7 @@ def run_application(
 
         logger.info("Starting application")
         context = Context()
-        exception: Optional[BaseException] = None
+        exception: BaseException | None = None
         exit_code: str | int = 0
 
         # Start the root component

@@ -6,6 +6,7 @@
 .cache
 .mypy_cache
 .pytest_cache
+.ruff_cache
 .eggs/
 *.egg-info/
 __pycache__/

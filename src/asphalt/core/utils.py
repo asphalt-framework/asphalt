@@ -11,7 +11,7 @@ __all__ = (
 import sys
 from importlib import import_module
 from inspect import isclass
-from typing import Any, Callable, Dict, List, Optional, Type, TypeVar, Union, overload
+from typing import Any, Callable, TypeVar, overload
 
 if sys.version_info >= (3, 10):
     from importlib.metadata import entry_points
@@ -79,8 +79,8 @@ def callable_name(func: Callable[..., Any]) -> str:
 
 
 def merge_config(
-    original: Optional[Dict[str, Any]], overrides: Optional[Dict[str, Any]]
-) -> Dict[str, Any]:
+    original: dict[str, Any] | None, overrides: dict[str, Any] | None
+) -> dict[str, Any]:
     """
     Return a copy of the ``original`` configuration dictionary, with overrides from ``overrides``
     applied.
@@ -165,7 +165,7 @@ class PluginContainer:
         value = self._resolved[obj] = value.load()
         return value
 
-    def create_object(self, type: Union[Type, str], **constructor_kwargs) -> Any:
+    def create_object(self, type: type | str, **constructor_kwargs) -> Any:
         """
         Instantiate a plugin.
 
@@ -190,11 +190,11 @@ class PluginContainer:
         return plugin_class(**constructor_kwargs)
 
     @property
-    def names(self) -> List[str]:
+    def names(self) -> list[str]:
         """Return names of all entry points in this namespace."""
         return list(self._entrypoints)
 
-    def all(self) -> List[Any]:
+    def all(self) -> list[Any]:
         """
         Load all entry points (if not already loaded) in this namespace and return the resulting
         objects as a list.

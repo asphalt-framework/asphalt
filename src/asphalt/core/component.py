@@ -8,11 +8,11 @@ from abc import ABCMeta, abstractmethod
 from asyncio import Future
 from collections import OrderedDict
 from traceback import print_exception
-from typing import Any, Dict, Optional, Type, Union
+from typing import Any
 from warnings import warn
 
-from asphalt.core.context import Context
-from asphalt.core.utils import PluginContainer, merge_config, qualified_name
+from .context import Context
+from .utils import PluginContainer, merge_config, qualified_name
 
 
 class Component(metaclass=ABCMeta):
@@ -57,13 +57,13 @@ class ContainerComponent(Component):
     __slots__ = "child_components", "component_configs"
 
     def __init__(
-        self, components: Optional[Dict[str, Optional[Dict[str, Any]]]] = None
+        self, components: dict[str, dict[str, Any] | None] | None = None
     ) -> None:
         self.child_components: OrderedDict[str, Component] = OrderedDict()
         self.component_configs = components or {}
 
     def add_component(
-        self, alias: str, type: Union[str, Type, None] = None, **config
+        self, alias: str, type: str | type | None = None, **config
     ) -> None:
         """
         Add a child component.
@@ -163,7 +163,7 @@ class CLIApplicationComponent(ContainerComponent):
         ctx.loop.call_later(0.1, start_run_task)
 
     @abstractmethod
-    async def run(self, ctx: Context) -> Optional[int]:
+    async def run(self, ctx: Context) -> int | None:
         """
         Run the business logic of the command line tool.
 
