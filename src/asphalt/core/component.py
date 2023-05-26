@@ -11,8 +11,6 @@ from traceback import print_exception
 from typing import Any, Dict, Optional, Type, Union
 from warnings import warn
 
-from typeguard import check_argument_types
-
 from asphalt.core.context import Context
 from asphalt.core.utils import PluginContainer, merge_config, qualified_name
 
@@ -61,7 +59,6 @@ class ContainerComponent(Component):
     def __init__(
         self, components: Optional[Dict[str, Optional[Dict[str, Any]]]] = None
     ) -> None:
-        assert check_argument_types()
         self.child_components: OrderedDict[str, Component] = OrderedDict()
         self.component_configs = components or {}
 
@@ -90,7 +87,6 @@ class ContainerComponent(Component):
         :param config: keyword arguments passed to the component's constructor
 
         """
-        assert check_argument_types()
         if not isinstance(alias, str) or not alias:
             raise TypeError("component_alias must be a nonempty string")
         if alias in self.child_components:

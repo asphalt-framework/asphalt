@@ -13,8 +13,6 @@ from importlib import import_module
 from inspect import isclass
 from typing import Any, Callable, Dict, List, Optional, Type, TypeVar, Union, overload
 
-from typeguard import check_argument_types
-
 if sys.version_info >= (3, 10):
     from importlib.metadata import entry_points
 else:
@@ -98,7 +96,6 @@ def merge_config(
     :return: the merge result
 
     """
-    assert check_argument_types()
     copied = original.copy() if original else {}
     if overrides:
         for key, value in overrides.items():
@@ -181,7 +178,6 @@ class PluginContainer:
         :return: the plugin instance
 
         """
-        assert check_argument_types()
         assert self.base_class, "base class has not been defined"
         plugin_class = self.resolve(type)
         if not isclass(plugin_class) or not issubclass(plugin_class, self.base_class):

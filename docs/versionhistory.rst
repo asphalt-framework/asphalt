@@ -3,6 +3,10 @@ Version history
 
 This library adheres to `Semantic Versioning 2.0 <http://semver.org/>`_.
 
+**UNRELEASED**
+
+- Removed explicit run-time argument type checks and the ``typeguard`` dependency
+
 **4.11.1** (2023-03-23)
 
 - Worked around the presence of the ``importlib_metadata`` module on Python 3.10 and

@@ -20,8 +20,6 @@ Its highlight features are:
   event-driven interactions
 * Supports uvloop_ and tokio_ as event loop policy providers (though YMMV with the last one)
 * Elegant handling of blocking APIs through the use of thread pooling
-* Run time type checking for development and testing to fail early when functions are called with
-  incompatible arguments (can be disabled with **zero** overhead for production deployments!)
 * `Type hints`_ and `semantic versioning`_ used throughout the core and all component libraries
 
 Asphalt can be used to make any imaginable kind of networked application, ranging from trivial
