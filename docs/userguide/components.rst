@@ -33,14 +33,6 @@ The reason official Asphalt libraries do not usually do this is that most of the
 of providing multiple instances of their services, which is obviously not possible when you only
 add the component itself as a resource.
 
-.. hint::
-    It is a good idea to use `type hints`_ with typeguard_ checks
-    (``assert check_argument_types()``) in the component's ``__init__`` method to ensure that the
-    received configuration values are of the expected type, but this is of course not required.
-
-.. _type hints: https://www.python.org/dev/peps/pep-0484/
-.. _typeguard: https://pypi.python.org/pypi/typeguard
-
 Container components
 --------------------
 

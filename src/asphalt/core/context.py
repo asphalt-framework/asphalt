@@ -69,7 +69,6 @@ from typing import (
 
 import asyncio_extras
 from async_generator import async_generator
-from typeguard import check_argument_types
 
 from asphalt.core.event import Event, Signal, wait_event
 from asphalt.core.utils import callable_name, qualified_name
@@ -261,7 +260,6 @@ class Context:
     _reset_token: Token
 
     def __init__(self, parent: Optional[Context] = None) -> None:
-        assert check_argument_types()
         if parent is None:
             self._parent = _current_context.get(None)
         else:
@@ -350,7 +348,6 @@ class Context:
             (or ``None`` if the context ended cleanly)
 
         """
-        assert check_argument_types()
         self._check_closed()
         self._teardown_callbacks.append((callback, pass_exception))
 
@@ -463,8 +460,6 @@ class Context:
             existing one in any way
 
         """
-        # TODO: re-enable when typeguard properly identifies parametrized types as types
-        # assert check_argument_types()
         self._check_closed()
         if types:
             if (
@@ -637,8 +632,6 @@ class Context:
         :return: the requested resource, or ``None`` if none was available
 
         """
-        # TODO: re-enable when typeguard properly identifies parametrized types as types
-        # assert check_argument_types()
         self._check_closed()
         key = (type, name)
 
@@ -679,8 +672,6 @@ class Context:
         :return: a set of all found resources of the given type
 
         """
-        assert check_argument_types()
-
         # Collect all the matching resources from this context
         resources: Dict[str, T_Resource] = {
             container.name: container.value_or_factory
@@ -798,7 +789,6 @@ class Context:
         :return: an awaitable that resolves to the return value of the call
 
         """
-        assert check_argument_types()
         if isinstance(executor, str):
             executor = self.require_resource(Executor, executor)
 
@@ -818,7 +808,6 @@ class Context:
         :return: an asynchronous context manager
 
         """
-        assert check_argument_types()
         if isinstance(executor, str):
             executor = self.require_resource(Executor, executor)
 

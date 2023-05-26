@@ -25,8 +25,6 @@ from typing import (
 )
 from weakref import WeakKeyDictionary
 
-from typeguard import check_argument_types
-
 from asphalt.core.utils import qualified_name
 
 if sys.version_info >= (3, 10):
@@ -98,7 +96,6 @@ class Signal(Generic[T_Event]):
         source: Any = None,
         topic: Optional[str] = None,
     ) -> None:
-        assert check_argument_types()
         self.event_class = event_class
         self.topic = topic
         if source is not None:
@@ -143,7 +140,6 @@ class Signal(Generic[T_Event]):
         :return: the value of ``callback`` argument
 
         """
-        assert check_argument_types()
         if self.listeners is None:
             self.listeners = []
         if callback not in self.listeners:
@@ -162,7 +158,6 @@ class Signal(Generic[T_Event]):
         :param callback: the callable to remove
 
         """
-        assert check_argument_types()
         try:
             if self.listeners is not None:
                 self.listeners.remove(callback)
@@ -301,7 +296,6 @@ def stream_events(
 
             queue = None
 
-    assert check_argument_types()
     queue = Queue(max_queue_size)
     for signal in signals:
         signal.connect(queue.put_nowait)
@@ -326,6 +320,5 @@ async def wait_event(
     :return: the event that was dispatched
 
     """
-    assert check_argument_types()
     async with aclosing(stream_events(signals, filter)) as events:
         return await events.asend(None)
