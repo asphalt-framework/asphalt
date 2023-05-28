@@ -3,7 +3,7 @@ Version history
 
 This library adheres to `Semantic Versioning 2.0 <http://semver.org/>`_.
 
-**UNRELEASED**
+**4.12.0**
 
 - Removed explicit run-time argument type checks and the ``typeguard`` dependency
 
