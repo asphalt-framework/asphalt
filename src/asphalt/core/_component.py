@@ -18,8 +18,10 @@ from ._utils import PluginContainer, merge_config, qualified_name
 
 async def start_component(component: Component, alias: str = "default") -> None:
     """Initializes the given component."""
-    async with ComponentStartupContext(type(component), alias) as ctx:
-        await component.start(ctx)
+    ctx = ComponentStartupContext(type(component), alias)
+    async with create_task_group():
+        async with ctx:
+            await component.start(ctx)
 
 
 class ComponentStartupContext(Context):
