@@ -34,14 +34,13 @@ jobs:
     - name: Install dependencies
       run: pip install .[test] coveralls
     - name: Test with pytest
-      run: |
-        coverage run -m pytest
-        coverage xml
+      run: coverage run -m pytest
     - name: Upload Coverage
-      uses: coverallsapp/github-action@v2
-      with:
-        parallel: true
-        file: coverage.xml
+      run: coveralls --service=github
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        COVERALLS_FLAG_NAME: ${{ matrix.test-name }}
+        COVERALLS_PARALLEL: true
 
   coveralls:
     name: Finish Coveralls
