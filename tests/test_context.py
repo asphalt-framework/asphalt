@@ -717,7 +717,7 @@ class TestContextTeardown:
     )
     @pytest.mark.asyncio
     async def test_get_resource_at_teardown(self, resource_func) -> None:
-        resource: str
+        resource = ""
 
         async def teardown_callback() -> None:
             nonlocal resource
@@ -741,7 +741,7 @@ class TestContextTeardown:
     )
     @pytest.mark.asyncio
     async def test_generate_resource_at_teardown(self, resource_func) -> None:
-        resource: str
+        resource = ""
 
         async def teardown_callback() -> None:
             nonlocal resource
