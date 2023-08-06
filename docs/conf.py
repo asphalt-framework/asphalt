@@ -27,7 +27,7 @@ pygments_style = "sphinx"
 highlight_language = "python3"
 todo_include_todos = False
 
-html_theme = "sphinx_rtd_theme"
+html_theme = "nature"
 htmlhelp_basename = "asphaltdoc"
 
 intersphinx_mapping = {"python": ("https://docs.python.org/3/", None)}

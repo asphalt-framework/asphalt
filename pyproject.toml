@@ -55,8 +55,7 @@ test = [
     "uvloop; python_version < '3.12' and python_implementation == 'CPython' and platform_system != 'Windows'",
 ]
 doc = [
-    "Sphinx >= 6.0",
-    "sphinx_rtd_theme >= 1.2.0",
+    "Sphinx >= 7.0",
     "sphinx-autodoc-typehints >= 1.22",
 ]
 
