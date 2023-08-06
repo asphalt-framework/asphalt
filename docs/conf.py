@@ -30,4 +30,10 @@ todo_include_todos = False
 html_theme = "nature"
 htmlhelp_basename = "asphaltdoc"
 
-intersphinx_mapping = {"python": ("https://docs.python.org/3/", None)}
+intersphinx_mapping = {
+    "python": ("https://docs.python.org/3/", None),
+    "asphalt-mailer": (
+        "https://asphalt.readthedocs.io/projects/mailer/en/latest/",
+        None,
+    ),
+}

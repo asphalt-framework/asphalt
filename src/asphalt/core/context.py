@@ -351,13 +351,13 @@ class Context:
         any further teardown callbacks.
 
         All callbacks will be processed, even if some of them raise exceptions. If at least one
-        callback raised an error, this method will raise a :exc:`~.TeardownError` at the end.
+        callback raised an error, this method will raise a :exc:`~TeardownError` at the end.
 
         After this method has been called, resources can no longer be requested or published on
         this context.
 
         :param exception: the exception, if any, that caused this context to be closed
-        :raises .TeardownError: if one or more teardown callbacks raise an exception
+        :raises TeardownError: if one or more teardown callbacks raise an exception
 
         """
         self._check_closed()
@@ -777,6 +777,7 @@ class Context:
         :param args: positional arguments to call the callable with
         :param executor: either an :class:`~concurrent.futures.Executor` instance, the resource
             name of one or ``None`` to use the event loop's default executor
+        :type executor: concurrent.futures.Executor
         :param kwargs: keyword arguments to call the callable with
         :return: an awaitable that resolves to the return value of the call
 

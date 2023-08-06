@@ -77,7 +77,7 @@ class ContainerComponent(Component):
 
         When configuration values are provided both as keyword arguments to this method and
         component configuration through the ``components`` constructor argument, the configurations
-        are merged together using :func:`~asphalt.core.util.merge_config` in a way that the
+        are merged together using :func:`~asphalt.core.utils.merge_config` in a way that the
         configuration values from the ``components`` argument override the keyword arguments to
         this method.
 
