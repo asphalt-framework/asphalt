@@ -6,12 +6,12 @@ import logging
 import sys
 import weakref
 from asyncio import Queue, create_task, get_running_loop, iscoroutine, wait
+from collections.abc import AsyncGenerator
 from datetime import datetime, timezone
 from inspect import getmembers, isawaitable
 from time import time as stdlib_time
 from typing import (
     Any,
-    AsyncIterator,
     Awaitable,
     Callable,
     Generic,
@@ -251,7 +251,7 @@ class Signal(Generic[T_Event]):
         filter: Callable[[T_Event], bool] | None = None,
         *,
         max_queue_size: int = 0,
-    ) -> AsyncIterator[T_Event]:
+    ) -> AsyncGenerator[T_Event, None]:
         """Shortcut for calling :func:`stream_events` with this signal in the first argument."""
         return stream_events([self], filter, max_queue_size=max_queue_size)
 
@@ -261,7 +261,7 @@ def stream_events(
     filter: Callable[[T_Event], bool] | None = None,
     *,
     max_queue_size: int = 0,
-) -> AsyncIterator[T_Event]:
+) -> AsyncGenerator[T_Event, None]:
     """
     Return an async generator that yields events from the given signals.
 
@@ -276,7 +276,7 @@ def stream_events(
     """
     queue: Queue[T_Event] | None
 
-    async def streamer() -> AsyncIterator[T_Event]:
+    async def streamer() -> AsyncGenerator[T_Event, None]:
         try:
             while queue is not None:
                 event = await queue.get()

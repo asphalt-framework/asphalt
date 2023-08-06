@@ -57,6 +57,8 @@ from typing import (
     TypeVar,
     Union,
     cast,
+    get_args,
+    get_origin,
     get_type_hints,
     overload,
 )
@@ -72,10 +74,6 @@ if sys.version_info >= (3, 10):
 else:
     from typing_extensions import ParamSpec
 
-if sys.version_info >= (3, 8):
-    from typing import get_args, get_origin
-else:
-    from typing_extensions import get_args, get_origin
 
 logger = logging.getLogger(__name__)
 factory_callback_type = Callable[["Context"], Any]
