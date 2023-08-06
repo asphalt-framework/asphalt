@@ -49,9 +49,9 @@ Documentation = "https://asphalt.readthedocs.org/en/latest/"
 uvloop = ["uvloop >= 0.4.10"]
 tokio = ["tokio"]
 test = [
+    "coverage >= 7",
     "pytest >= 3.9",
     "pytest-asyncio",
-    "pytest-cov",
     "uvloop; python_version < '3.12' and python_implementation == 'CPython' and platform_system != 'Windows'",
 ]
 doc = [
