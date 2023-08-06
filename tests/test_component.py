@@ -6,6 +6,7 @@ from unittest.mock import Mock
 
 import anyio
 import pytest
+
 from asphalt.core import (
     CLIApplicationComponent,
     Component,

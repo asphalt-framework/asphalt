@@ -64,21 +64,21 @@ version_scheme = "post-release"
 local_scheme = "dirty-tag"
 
 [tool.ruff]
-line-length = 88
 select = [
     "E", "F", "W",  # default flake-8
     "I",            # isort
     "PGH",          # pygrep-hooks
     "UP",           # pyupgrade
 ]
-target-version = "py39"
+
+[tool.ruff.isort]
+known-first-party = ["asphalt.core"]
 
 [tool.pytest.ini_options]
 addopts = "-rsx --tb=short"
 testpaths = ["tests"]
 
 [tool.mypy]
-python_version = "3.9"
 mypy_path = ["src", "tests", "examples/tutorial1", "examples/tutorial2"]
 explicit_package_bases = true
 

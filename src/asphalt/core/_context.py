@@ -23,7 +23,6 @@ from typing import (
     Any,
     Callable,
     Literal,
-    Optional,
     TypeVar,
     Union,
     cast,
@@ -166,7 +165,7 @@ class Context:
     def context_chain(self) -> list[Context]:
         """Return a list of contexts starting from this one, its parent and so on."""
         contexts = []
-        ctx: Optional[Context] = self
+        ctx: Context | None = self
         while ctx is not None:
             contexts.append(ctx)
             ctx = ctx.parent
@@ -174,7 +173,7 @@ class Context:
         return contexts
 
     @property
-    def parent(self) -> Optional[Context]:
+    def parent(self) -> Context | None:
         """Return the parent context, or ``None`` if there is no parent."""
         return self._parent
 
@@ -627,9 +626,10 @@ def context_teardown(
 def context_teardown(
     func: Callable[[T_Context], AsyncGenerator[None, Exception | None]]
     | Callable[[T_Self, T_Context], AsyncGenerator[None, Exception | None]]
-) -> Callable[[T_Context], Coroutine[Any, Any, None]] | Callable[
-    [T_Self, T_Context], Coroutine[Any, Any, None]
-]:
+) -> (
+    Callable[[T_Context], Coroutine[Any, Any, None]]
+    | Callable[[T_Self, T_Context], Coroutine[Any, Any, None]]
+):
     """
     Wrap an async generator function to execute the rest of the function at context
     teardown.
@@ -656,7 +656,7 @@ def context_teardown(
 
     @wraps(func)
     async def wrapper(*args, **kwargs) -> None:
-        async def teardown_callback(exception: Optional[Exception]) -> None:
+        async def teardown_callback(exception: Exception | None) -> None:
             try:
                 await generator.asend(exception)
             except StopAsyncIteration:

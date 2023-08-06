@@ -3,7 +3,7 @@ from __future__ import annotations
 import sys
 from collections.abc import AsyncGenerator, Callable
 from itertools import count
-from typing import Any, NoReturn, Optional, Union
+from typing import Any, NoReturn, Optional
 
 import pytest
 from anyio import create_task_group, wait_all_tasks_blocked
@@ -252,7 +252,7 @@ class TestContext:
             assert context.get_resource_nowait(str) == "foo"
 
     async def test_add_resource_return_type_union(self, context: Context) -> None:
-        def factory(ctx: Context) -> Union[int, float]:
+        def factory(ctx: Context) -> int | float:
             return 5
 
         async with context:
@@ -271,7 +271,7 @@ class TestContext:
             assert context.get_resource_nowait(float) == 5
 
     async def test_add_resource_return_type_optional(self, context: Context) -> None:
-        def factory(ctx: Context) -> Optional[str]:
+        def factory(ctx: Context) -> str | None:
             return "foo"
 
         async with context:
