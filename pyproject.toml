@@ -46,8 +46,8 @@ Documentation = "https://asphalt.readthedocs.org/en/latest/"
 [project.optional-dependencies]
 test = [
     "anyio[trio] ~= 3.6",
+    "coverage >= 7",
     "pytest >= 3.9",
-    "pytest-cov",
     "uvloop; python_implementation == 'CPython' and platform_system != 'Windows'",
 ]
 doc = [
