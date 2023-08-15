@@ -139,10 +139,8 @@ class ResourceContainer:
             else "value=%r" % self.value_or_factory
         )
         return (
-            "{self.__class__.__name__}({value_repr}, types=[{typenames}], name={self.name!r}, "
-            "context_attr={self.context_attr!r})".format(
-                self=self, value_repr=value_repr, typenames=typenames
-            )
+            f"{self.__class__.__name__}({value_repr}, types=[{typenames}], name={self.name!r}, "
+            f"context_attr={self.context_attr!r})"
         )
 
 
@@ -591,7 +589,7 @@ class Context:
             if (type_, name) in self._resource_factories:
                 raise ResourceConflict(
                     "this context already contains a resource factory for the "
-                    "type {}".format(qualified_name(type_))
+                    f"type {qualified_name(type_)}"
                 )
 
         # Add the resource factory to the appropriate lookup tables
@@ -924,8 +922,8 @@ def context_teardown(
             ctx = next(arg for arg in args[:2] if isinstance(arg, Context))
         except StopIteration:
             raise RuntimeError(
-                "the first positional argument to {}() has to be a Context "
-                "instance".format(callable_name(func))
+                f"the first positional argument to {callable_name(func)}() has to be a Context "
+                "instance"
             ) from None
 
         generator = func(*args, **kwargs)

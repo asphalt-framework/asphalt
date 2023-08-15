@@ -220,7 +220,7 @@ def test_run_start_timeout(
 def test_dict_config(event_loop: AbstractEventLoop, caplog: LogCaptureFixture) -> None:
     """Test that component configuration passed as a dictionary works."""
     caplog.set_level(logging.INFO)
-    component_class = "{0.__module__}:{0.__name__}".format(ShutdownComponent)
+    component_class = f"{ShutdownComponent.__module__}:{ShutdownComponent.__name__}"
     run_application(component={"type": component_class})
 
     records = [
