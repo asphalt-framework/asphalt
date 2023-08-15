@@ -34,31 +34,29 @@ def test_run(
     tmp_path: Path,
 ) -> None:
     if unsafe:
-        component_class = "!!python/name:{0.__module__}.{0.__name__}".format(
-            DummyComponent
+        component_class = (
+            f"!!python/name:{DummyComponent.__module__}.{DummyComponent.__name__}"
         )
     else:
-        component_class = "{0.__module__}:{0.__name__}".format(DummyComponent)
+        component_class = f"{DummyComponent.__module__}:{DummyComponent.__name__}"
 
     monkeypatch.setenv("MYENVVAR", "from environment")
     tmp_path = tmp_path.joinpath("tmpfile")
     tmp_path.write_text("Hello, World!")
 
-    config = """\
+    config = f"""\
 ---
 event_loop_policy: bogus
 component:
-  type: {cls}
+  type: {component_class}
   dummyval1: testval
   envval: !Env MYENVVAR
-  textfileval: !TextFile {tmppath}
-  binaryfileval: !BinaryFile {tmppath}
+  textfileval: !TextFile {str(tmp_path)}
+  binaryfileval: !BinaryFile {str(tmp_path)}
 logging:
   version: 1
   disable_existing_loggers: false
-""".format(
-        cls=component_class, tmppath=str(tmp_path)
-    )
+"""
     args = ["test.yml"]
     if unsafe:
         args.append("--unsafe")
@@ -121,7 +119,7 @@ def test_run_bad_path(runner: CliRunner) -> None:
 
 
 def test_run_multiple_configs(runner: CliRunner) -> None:
-    component_class = "{0.__module__}:{0.__name__}".format(DummyComponent)
+    component_class = f"{DummyComponent.__module__}:{DummyComponent.__name__}"
     config1 = f"""\
 ---
 component:
