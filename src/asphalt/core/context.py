@@ -31,9 +31,10 @@ from asyncio import (
     get_running_loop,
     iscoroutinefunction,
 )
-from collections.abc import Coroutine
+from collections.abc import Coroutine, Generator
 from collections.abc import Sequence as ABCSequence
 from concurrent.futures import Executor
+from contextlib import contextmanager
 from contextvars import ContextVar, Token, copy_context
 from dataclasses import dataclass, field
 from enum import Enum, auto
@@ -46,6 +47,7 @@ from inspect import (
     isclass,
     signature,
 )
+from threading import Timer
 from traceback import format_exception
 from types import TracebackType
 from typing import (
@@ -229,6 +231,24 @@ class ContextState(Enum):
     closed = auto()
 
 
+@contextmanager
+def warn_after_timeout(
+    callback: Callable, timeout: float
+) -> Generator[None, None, None]:
+    timer = Timer(
+        timeout,
+        logger.warning,
+        [
+            "Teardown callback (%s) is taking longer than %.0f seconds to run",
+            callable_name(callback),
+            timeout,
+        ],
+    )
+    timer.start()
+    yield
+    timer.cancel()
+
+
 class Context:
     """
     Contexts give request handlers and callbacks access to resources.
@@ -370,9 +390,12 @@ class Context:
                 callbacks, self._teardown_callbacks = self._teardown_callbacks, []
                 for callback, pass_exception in reversed(callbacks):
                     try:
-                        retval = callback(exception) if pass_exception else callback()
-                        if isawaitable(retval):
-                            await retval
+                        with warn_after_timeout(callback, 5):
+                            retval = (
+                                callback(exception) if pass_exception else callback()
+                            )
+                            if isawaitable(retval):
+                                await retval
                     except Exception as e:
                         exceptions.append(e)
 
