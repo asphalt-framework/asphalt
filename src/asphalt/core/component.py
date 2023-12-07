@@ -11,6 +11,9 @@ from traceback import print_exception
 from typing import Any
 from warnings import warn
 
+from anyio import create_task_group
+from anyio.abc import TaskGroup
+
 from .context import Context
 from .utils import PluginContainer, merge_config, qualified_name
 
@@ -19,6 +22,7 @@ class Component(metaclass=ABCMeta):
     """This is the base class for all Asphalt components."""
 
     __slots__ = ()
+    _task_group: TaskGroup
 
     @abstractmethod
     async def start(self, ctx: Context) -> None:
@@ -38,6 +42,10 @@ class Component(metaclass=ABCMeta):
 
         :param ctx: the containing context for this component
         """
+
+    @property
+    def task_group(self) -> TaskGroup:
+        return self._task_group
 
 
 class ContainerComponent(Component):
@@ -107,9 +115,13 @@ class ContainerComponent(Component):
             if alias not in self.child_components:
                 self.add_component(alias)
 
-        tasks = [component.start(ctx) for component in self.child_components.values()]
-        if tasks:
-            await asyncio.gather(*tasks)
+        async def start_child_components():
+            async with create_task_group() as tg:
+                for component in self.child_components.values():
+                    component._task_group = self._task_group
+                    tg.start_soon(component.start, ctx)
+
+        await start_child_components()
 
 
 class CLIApplicationComponent(ContainerComponent):
