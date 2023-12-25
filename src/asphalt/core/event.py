@@ -5,10 +5,18 @@ __all__ = ("Event", "Signal", "wait_event", "stream_events")
 import logging
 import sys
 import weakref
-from asyncio import Queue, create_task, get_running_loop, iscoroutine, wait
+from asyncio import (
+    Future,
+    Queue,
+    create_task,
+    get_running_loop,
+    iscoroutine,
+    isfuture,
+    wait,
+)
 from collections.abc import AsyncGenerator
 from datetime import datetime, timezone
-from inspect import getmembers, isawaitable
+from inspect import getmembers
 from time import time as stdlib_time
 from typing import (
     Any,
@@ -181,7 +189,7 @@ class Signal(Generic[T_Event]):
         """
 
         async def do_dispatch() -> None:
-            awaitables: list[Awaitable[Any]] = []
+            awaitables: list[Future[Any]] = []
             all_successful = True
             for callback in listeners:
                 try:
@@ -192,7 +200,7 @@ class Signal(Generic[T_Event]):
                 else:
                     if iscoroutine(retval):
                         awaitables.append(create_task(retval))
-                    elif isawaitable(retval):
+                    elif isfuture(retval):
                         awaitables.append(retval)
 
             # For any callbacks that returned awaitables, wait for their completion and log any
