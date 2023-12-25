@@ -56,15 +56,11 @@ class ContainerComponent(Component):
 
     __slots__ = "child_components", "component_configs"
 
-    def __init__(
-        self, components: dict[str, dict[str, Any] | None] | None = None
-    ) -> None:
+    def __init__(self, components: dict[str, dict[str, Any] | None] | None = None) -> None:
         self.child_components: OrderedDict[str, Component] = OrderedDict()
         self.component_configs = components or {}
 
-    def add_component(
-        self, alias: str, type: str | type | None = None, **config
-    ) -> None:
+    def add_component(self, alias: str, type: str | type | None = None, **config) -> None:
         """
         Add a child component.
 

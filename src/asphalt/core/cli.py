@@ -79,17 +79,13 @@ def run(
     config: dict[str, Any] = {}
     for path in configfile:
         config_data = yaml.load(path)
-        assert isinstance(
-            config_data, dict
-        ), "the document root element must be a dictionary"
+        assert isinstance(config_data, dict), "the document root element must be a dictionary"
         config = merge_config(config, config_data)
 
     # Override config options
     for override in set_:
         if "=" not in override:
-            raise click.ClickException(
-                f"Configuration must be set with '=', got: {override}"
-            )
+            raise click.ClickException(f"Configuration must be set with '=', got: {override}")
 
         key, value = override.split("=", 1)
         parsed_value = yaml.load(value)
@@ -129,9 +125,7 @@ def run(
         try:
             service_config = services[service]
         except KeyError:
-            raise click.ClickException(
-                f"Service {service!r} has not been defined"
-            ) from None
+            raise click.ClickException(f"Service {service!r} has not been defined") from None
     elif len(services) == 1:
         service_config = next(iter(services.values()))
     elif "default" in services:

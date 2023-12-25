@@ -113,9 +113,7 @@ def test_callable_name(inputval: Callable[..., Any], expected: str) -> None:
 class TestPluginContainer:
     @pytest.fixture
     def container(self) -> PluginContainer:
-        container = PluginContainer(
-            "asphalt.core.test_plugin_container", BaseDummyPlugin
-        )
+        container = PluginContainer("asphalt.core.test_plugin_container", BaseDummyPlugin)
         entrypoint = Mock(EntryPoint)
         entrypoint.load.configure_mock(return_value=DummyPlugin)
         container._entrypoints = {"dummy": entrypoint}
@@ -131,10 +129,7 @@ class TestPluginContainer:
 
     def test_resolve_bad_entrypoint(self, container):
         exc = pytest.raises(LookupError, container.resolve, "blah")
-        assert (
-            str(exc.value)
-            == "no such entry point in asphalt.core.test_plugin_container: blah"
-        )
+        assert str(exc.value) == "no such entry point in asphalt.core.test_plugin_container: blah"
 
     @pytest.mark.parametrize(
         "argument",

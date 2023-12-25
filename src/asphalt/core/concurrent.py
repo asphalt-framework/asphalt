@@ -32,13 +32,13 @@ def executor(
 
 @overload
 def executor(
-    func_or_executor: Callable[Concatenate[Context, P], T_Retval]
+    func_or_executor: Callable[Concatenate[Context, P], T_Retval],
 ) -> Callable[Concatenate[Context, P], T_Retval | Awaitable[T_Retval]]:
     ...
 
 
 def executor(
-    func_or_executor: Executor | str | Callable[Concatenate[Context, P], T_Retval]
+    func_or_executor: Executor | str | Callable[Concatenate[Context, P], T_Retval],
 ) -> (
     Callable[
         [Callable[Concatenate[Context, P], T_Retval]],
@@ -84,7 +84,7 @@ def executor(
     executor: Executor | str | None = None
 
     def outer(
-        func: Callable[Concatenate[Context, P], T_Retval]
+        func: Callable[Concatenate[Context, P], T_Retval],
     ) -> Callable[Concatenate[Context, P], T_Retval | Awaitable[T_Retval]]:
         def wrapper(
             ctx: Context, *args: P.args, **kwargs: P.kwargs

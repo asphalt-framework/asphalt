@@ -43,9 +43,7 @@ def resolve_reference(ref: object) -> Any:
     try:
         obj = import_module(modulename)
     except ImportError as e:
-        raise LookupError(
-            f"error resolving reference {ref}: could not import module"
-        ) from e
+        raise LookupError(f"error resolving reference {ref}: could not import module") from e
 
     try:
         for name in rest.split("."):
@@ -212,8 +210,6 @@ class PluginContainer:
         return values
 
     def __repr__(self):
-        return (
-            "{0.__class__.__name__}(namespace={0.namespace!r}, base_class={1})".format(
-                self, qualified_name(self.base_class)
-            )
+        return "{0.__class__.__name__}(namespace={0.namespace!r}, base_class={1})".format(
+            self, qualified_name(self.base_class)
         )

@@ -167,9 +167,7 @@ class TestSignal:
         ids=["nofilter", "filter"],
     )
     @pytest.mark.asyncio
-    async def test_stream_events(
-        self, source: DummySource, filter, expected_values
-    ) -> None:
+    async def test_stream_events(self, source: DummySource, filter, expected_values) -> None:
         values = []
         async with aclosing(source.event_a.stream_events(filter)) as stream:
             for i in range(1, 4):
@@ -199,10 +197,7 @@ class TestSignal:
         owner.dummy
         del owner
         gc.collect()  # needed on PyPy
-        assert (
-            next((x for x in gc.get_objects() if isinstance(x, SignalOwner)), None)
-            is None
-        )
+        assert next((x for x in gc.get_objects() if isinstance(x, SignalOwner)), None) is None
 
 
 @pytest.mark.parametrize(
@@ -234,9 +229,7 @@ async def test_wait_event(event_loop, filter, expected_value) -> None:
 async def test_stream_events(filter, expected_values) -> None:
     source1, source = DummySource(), DummySource()
     values = []
-    async with aclosing(
-        stream_events([source1.event_a, source.event_b], filter)
-    ) as stream:
+    async with aclosing(stream_events([source1.event_a, source.event_b], filter)) as stream:
         for signal in [source1.event_a, source.event_b]:
             for i in range(1, 4):
                 signal.dispatch(i)

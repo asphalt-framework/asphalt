@@ -70,9 +70,7 @@ class Event:
         return datetime.fromtimestamp(self.time, timezone.utc)
 
     def __repr__(self) -> str:
-        return (
-            f"{self.__class__.__name__}(source={self.source!r}, topic={self.topic!r})"
-        )
+        return f"{self.__class__.__name__}(source={self.source!r}, topic={self.topic!r})"
 
 
 T_Event = TypeVar("T_Event", bound=Event)
@@ -107,9 +105,7 @@ class Signal(Generic[T_Event]):
             self.source = weakref.ref(source)
             self.listeners: list[Callable] | None = None
         else:
-            assert issubclass(
-                event_class, Event
-            ), "event_class must be a subclass of Event"
+            assert issubclass(event_class, Event), "event_class must be a subclass of Event"
             self.bound_signals: MutableMapping[Any, Signal] = WeakKeyDictionary()
 
     def __get__(self, instance, owner) -> Signal:
@@ -211,9 +207,7 @@ class Signal(Generic[T_Event]):
                     exc = f.exception()
                     if exc is not None:
                         all_successful = False
-                        logger.error(
-                            "Uncaught exception in event listener", exc_info=exc
-                        )
+                        logger.error("Uncaught exception in event listener", exc_info=exc)
 
             if not future.cancelled():
                 future.set_result(all_successful)
@@ -248,9 +242,7 @@ class Signal(Generic[T_Event]):
         event = self.event_class(self.source(), cast(str, self.topic), *args, **kwargs)
         return self.dispatch_raw(event)
 
-    def wait_event(
-        self, filter: Callable[[T_Event], bool] | None = None
-    ) -> Awaitable[T_Event]:
+    def wait_event(self, filter: Callable[[T_Event], bool] | None = None) -> Awaitable[T_Event]:
         """Shortcut for calling :func:`wait_event` with this signal in the first argument."""
         return wait_event([self], filter)
 

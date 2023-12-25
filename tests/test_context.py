@@ -47,14 +47,10 @@ async def special_executor(context: Context) -> AsyncIterator[ThreadPoolExecutor
 
 class TestResourceContainer:
     @pytest.mark.parametrize("thread", [False, True], ids=["eventloop", "worker"])
-    @pytest.mark.parametrize(
-        "context_attr", [None, "attrname"], ids=["no_attr", "has_attr"]
-    )
+    @pytest.mark.parametrize("context_attr", [None, "attrname"], ids=["no_attr", "has_attr"])
     @pytest.mark.asyncio
     async def test_generate_value(self, thread: bool, context_attr: str | None) -> None:
-        container = ResourceContainer(
-            lambda ctx: "foo", (str,), "default", context_attr, True
-        )
+        container = ResourceContainer(lambda ctx: "foo", (str,), "default", context_attr, True)
         context = Context()
         if thread:
             value = await context.call_in_executor(container.generate_value, context)
@@ -74,9 +70,7 @@ class TestResourceContainer:
         )
 
     def test_repr_factory(self) -> None:
-        container = ResourceContainer(
-            lambda ctx: "foo", (str,), "default", "attrname", True
-        )
+        container = ResourceContainer(lambda ctx: "foo", (str,), "default", "attrname", True)
         assert repr(container) == (
             "ResourceContainer(factory=test_context.TestResourceContainer"
             ".test_repr_factory.<locals>.<lambda>, types=[str], name='default', "
@@ -214,9 +208,7 @@ class TestContext:
         with pytest.raises(ResourceConflict) as exc:
             context.add_resource(4, "foo")
 
-        exc.match(
-            "this context already contains a resource of type int using the name 'foo'"
-        )
+        exc.match("this context already contains a resource of type int using the name 'foo'")
 
     @pytest.mark.asyncio
     async def test_add_resource_none_value(self, context: Context) -> None:
@@ -251,13 +243,9 @@ class TestContext:
         with pytest.raises(ResourceConflict) as exc:
             context.add_resource(6)
 
-        exc.match(
-            "this context already contains a resource of type int using the name 'default'"
-        )
+        exc.match("this context already contains a resource of type int using the name 'default'")
 
-    @pytest.mark.parametrize(
-        "name", ["a.b", "a:b", "a b"], ids=["dot", "colon", "space"]
-    )
+    @pytest.mark.parametrize("name", ["a.b", "a:b", "a b"], ids=["dot", "colon", "space"])
     @pytest.mark.asyncio
     async def test_add_resource_bad_name(self, context, name):
         with pytest.raises(ValueError) as exc:
@@ -269,9 +257,7 @@ class TestContext:
         )
 
     @pytest.mark.asyncio
-    async def test_add_resource_parametrized_generic_type(
-        self, context: Context
-    ) -> None:
+    async def test_add_resource_parametrized_generic_type(self, context: Context) -> None:
         resource = {"a": 1}
         resource_type = Dict[str, int]
         context.add_resource(resource, types=[resource_type])
@@ -298,9 +284,7 @@ class TestContext:
         assert context.__dict__["foo"] == 1
 
     @pytest.mark.asyncio
-    async def test_add_resource_factory_parametrized_generic_type(
-        self, context: Context
-    ) -> None:
+    async def test_add_resource_factory_parametrized_generic_type(self, context: Context) -> None:
         resource = {"a": 1}
         resource_type = Dict[str, int]
         context.add_resource_factory(lambda ctx: resource, types=[resource_type])
@@ -310,9 +294,7 @@ class TestContext:
         assert context.get_resource(Dict) is None
         assert context.get_resource(dict) is None
 
-    @pytest.mark.parametrize(
-        "name", ["a.b", "a:b", "a b"], ids=["dot", "colon", "space"]
-    )
+    @pytest.mark.parametrize("name", ["a.b", "a:b", "a b"], ids=["dot", "colon", "space"])
     @pytest.mark.asyncio
     async def test_add_resource_factory_bad_name(self, context, name):
         with pytest.raises(ValueError) as exc:
@@ -324,9 +306,7 @@ class TestContext:
         )
 
     @pytest.mark.asyncio
-    async def test_add_resource_factory_coroutine_callback(
-        self, context: Context
-    ) -> None:
+    async def test_add_resource_factory_coroutine_callback(self, context: Context) -> None:
         async def factory(ctx):
             return 1
 
@@ -343,16 +323,12 @@ class TestContext:
         exc.match("no resource types were specified")
 
     @pytest.mark.asyncio
-    async def test_add_resource_factory_context_attr_conflict(
-        self, context: Context
-    ) -> None:
+    async def test_add_resource_factory_context_attr_conflict(self, context: Context) -> None:
         with pytest.deprecated_call():
             context.add_resource_factory(lambda ctx: None, str, context_attr="foo")
 
         with pytest.raises(ResourceConflict) as exc, pytest.deprecated_call():
-            await context.add_resource_factory(
-                lambda ctx: None, str, context_attr="foo"
-            )
+            await context.add_resource_factory(lambda ctx: None, str, context_attr="foo")
 
         exc.match(
             "this context already contains a resource factory for the context attribute 'foo'"
@@ -471,9 +447,7 @@ class TestContext:
             assert resource == 6
 
     @pytest.mark.asyncio
-    async def test_request_resource_factory_context_attr(
-        self, context: Context
-    ) -> None:
+    async def test_request_resource_factory_context_attr(self, context: Context) -> None:
         """Test that requesting a factory-generated resource also sets the context variable."""
         with pytest.deprecated_call():
             context.add_resource_factory(lambda ctx: 6, int, context_attr="foo")
@@ -522,18 +496,14 @@ class TestContext:
         worker_thread = await context.call_in_executor(current_thread)
         assert worker_thread is not current_thread()
 
-    @pytest.mark.parametrize(
-        "use_resource_name", [True, False], ids=["direct", "resource"]
-    )
+    @pytest.mark.parametrize("use_resource_name", [True, False], ids=["direct", "resource"])
     @pytest.mark.asyncio
     async def test_call_in_executor_explicit(self, context, use_resource_name):
         executor = ThreadPoolExecutor(1)
         context.add_resource(executor, types=[Executor])
         context.add_teardown_callback(executor.shutdown)
         executor_arg = "default" if use_resource_name else executor
-        worker_thread = await context.call_in_executor(
-            current_thread, executor=executor_arg
-        )
+        worker_thread = await context.call_in_executor(current_thread, executor=executor_arg)
         assert worker_thread is not current_thread()
 
     @pytest.mark.asyncio
@@ -574,9 +544,7 @@ class TestExecutor:
             await runs_in_default_worker()
 
     @pytest.mark.asyncio
-    async def test_named_executor(
-        self, context: Context, special_executor: Executor
-    ) -> None:
+    async def test_named_executor(self, context: Context, special_executor: Executor) -> None:
         @executor("special")
         def runs_in_default_worker(ctx: Context) -> None:
             assert current_thread() is special_executor_thread
@@ -825,9 +793,7 @@ async def test_context_stack_corruption(event_loop):
     gen = generator()
     await event_loop.create_task(gen.asend(None))
     async with Context() as ctx:
-        with pytest.warns(
-            UserWarning, match="Potential context stack corruption detected"
-        ):
+        with pytest.warns(UserWarning, match="Potential context stack corruption detected"):
             try:
                 await event_loop.create_task(gen.asend(None))
             except StopAsyncIteration:
@@ -875,9 +841,7 @@ class TestDependencyInjection:
 
     @pytest.mark.asyncio
     async def test_missing_annotation(self) -> None:
-        async def injected(
-            foo: int, bar: str = resource(), *, baz=resource("alt")
-        ) -> None:
+        async def injected(foo: int, bar: str = resource(), *, baz=resource("alt")) -> None:
             pass
 
         pytest.raises(TypeError, inject, injected).match(
@@ -907,9 +871,7 @@ class TestDependencyInjection:
                 "str | None",
                 id="uniontype.10",
                 marks=[
-                    pytest.mark.skipif(
-                        sys.version_info < (3, 10), reason="Requires Python 3.10+"
-                    )
+                    pytest.mark.skipif(sys.version_info < (3, 10), reason="Requires Python 3.10+")
                 ],
             ),
         ],
@@ -922,9 +884,7 @@ class TestDependencyInjection:
         ],
     )
     @pytest.mark.asyncio
-    async def test_inject_optional_resource_async(
-        self, annotation: type, sync: bool
-    ) -> None:
+    async def test_inject_optional_resource_async(self, annotation: type, sync: bool) -> None:
         if sync:
 
             @inject

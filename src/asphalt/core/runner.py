@@ -89,9 +89,7 @@ def run_application(
     try:
         if max_threads is not None:
             event_loop.set_default_executor(ThreadPoolExecutor(max_threads))
-            logger.info(
-                "Installed a new thread pool executor with max_workers=%d", max_threads
-            )
+            logger.info("Installed a new thread pool executor with max_workers=%d", max_threads)
 
         # Instantiate the root component if a dict was given
         if isinstance(component, dict):

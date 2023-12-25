@@ -29,9 +29,7 @@ class ApplicationComponent(CLIApplicationComponent):
         diff = HtmlDiff()
         async with aclosing(detector.changed.stream_events()) as stream:
             async for event in stream:
-                difference = diff.make_file(
-                    event.old_lines, event.new_lines, context=True
-                )
+                difference = diff.make_file(event.old_lines, event.new_lines, context=True)
                 await mailer.create_and_deliver(
                     subject=f"Change detected in {event.source.url}",
                     html_body=difference,

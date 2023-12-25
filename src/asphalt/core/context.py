@@ -83,9 +83,7 @@ T_Retval = TypeVar("T_Retval")
 T_Context = TypeVar("T_Context", bound="Context")
 T_Self = TypeVar("T_Self")
 P = ParamSpec("P")
-_current_context: ContextVar[Context | None] = ContextVar(
-    "_current_context", default=None
-)
+_current_context: ContextVar[Context | None] = ContextVar("_current_context", default=None)
 
 
 class ResourceContainer:
@@ -120,9 +118,7 @@ class ResourceContainer:
         assert self.is_factory, "generate_value() only works for resource factories"
         value = self.value_or_factory(ctx)
 
-        container = ResourceContainer(
-            value, self.types, self.name, self.context_attr, False
-        )
+        container = ResourceContainer(value, self.types, self.name, self.context_attr, False)
         for type_ in self.types:
             ctx._resources[(type_, self.name)] = container
 
@@ -320,9 +316,7 @@ class Context:
         if self._state is ContextState.closed:
             raise RuntimeError("this context has already been closed")
 
-    def add_teardown_callback(
-        self, callback: Callable, pass_exception: bool = False
-    ) -> None:
+    def add_teardown_callback(self, callback: Callable, pass_exception: bool = False) -> None:
         """
         Add a callback to be called when this context closes.
 
@@ -472,9 +466,7 @@ class Context:
                 "characters and underscores"
             )
         if context_attr and getattr_static(self, context_attr, None) is not None:
-            raise ResourceConflict(
-                f"this context already has an attribute {context_attr!r}"
-            )
+            raise ResourceConflict(f"this context already has an attribute {context_attr!r}")
 
         for resource_type in types:
             if (resource_type, name) in self._resources:
@@ -489,8 +481,7 @@ class Context:
 
         if context_attr:
             warnings.warn(
-                "context attributes have been deprecated in favor of dependency "
-                "injection",
+                "context attributes have been deprecated in favor of dependency injection",
                 DeprecationWarning,
                 stacklevel=2,
             )
@@ -593,16 +584,13 @@ class Context:
                 )
 
         # Add the resource factory to the appropriate lookup tables
-        resource = ResourceContainer(
-            factory_callback, resource_types, name, context_attr, True
-        )
+        resource = ResourceContainer(factory_callback, resource_types, name, context_attr, True)
         for type_ in resource_types:
             self._resource_factories[(type_, name)] = resource
 
         if context_attr:
             warnings.warn(
-                "context attributes have been deprecated in favor of dependency "
-                "injection",
+                "context attributes have been deprecated in favor of dependency injection",
                 DeprecationWarning,
                 stacklevel=2,
             )
@@ -611,9 +599,7 @@ class Context:
         # Notify listeners that a new resource has been made available
         self.resource_added.dispatch(resource_types, name, True)
 
-    def get_resource(
-        self, type: type[T_Resource], name: str = "default"
-    ) -> T_Resource | None:
+    def get_resource(self, type: type[T_Resource], name: str = "default") -> T_Resource | None:
         """
         Look up a resource in the chain of contexts.
 
@@ -695,9 +681,7 @@ class Context:
 
         return set(resources.values())
 
-    def require_resource(
-        self, type: type[T_Resource], name: str = "default"
-    ) -> T_Resource:
+    def require_resource(self, type: type[T_Resource], name: str = "default") -> T_Resource:
         """
         Look up a resource in the chain of contexts and raise an exception if it is not found.
 
@@ -717,9 +701,7 @@ class Context:
 
         return resource
 
-    async def request_resource(
-        self, type: type[T_Resource], name: str = "default"
-    ) -> T_Resource:
+    async def request_resource(self, type: type[T_Resource], name: str = "default") -> T_Resource:
         """
         Look up a resource in the chain of contexts.
 
@@ -830,9 +812,7 @@ def executor(arg: Executor | str | None | Callable[..., T_Retval] = None):
 
     """
 
-    def inner_wrapper(
-        function: Callable[..., T_Retval], *args, **kwargs
-    ) -> Future[T_Retval]:
+    def inner_wrapper(function: Callable[..., T_Retval], *args, **kwargs) -> Future[T_Retval]:
         executor: Executor | None
         if isinstance(executor_arg, str):
             try:
@@ -848,9 +828,7 @@ def executor(arg: Executor | str | None | Callable[..., T_Retval] = None):
             executor = executor_arg
 
         current_context()
-        callback: partial[T_Retval] = partial(
-            copy_context().run, function, *args, **kwargs
-        )
+        callback: partial[T_Retval] = partial(copy_context().run, function, *args, **kwargs)
         return get_running_loop().run_in_executor(executor, callback)
 
     def outer_wrapper(func: Callable[..., T_Retval]) -> Callable[..., Future[T_Retval]]:
@@ -866,21 +844,21 @@ def executor(arg: Executor | str | None | Callable[..., T_Retval] = None):
 
 @overload
 def context_teardown(
-    func: Callable[[T_Context], AsyncGenerator[None, Exception | None]]
+    func: Callable[[T_Context], AsyncGenerator[None, Exception | None]],
 ) -> Callable[[T_Context], Coroutine[Any, Any, None]]:
     ...
 
 
 @overload
 def context_teardown(
-    func: Callable[[T_Self, T_Context], AsyncGenerator[None, Exception | None]]
+    func: Callable[[T_Self, T_Context], AsyncGenerator[None, Exception | None]],
 ) -> Callable[[T_Self, T_Context], Coroutine[Any, Any, None]]:
     ...
 
 
 def context_teardown(
     func: Callable[[T_Context], AsyncGenerator[None, Exception | None]]
-    | Callable[[T_Self, T_Context], AsyncGenerator[None, Exception | None]]
+    | Callable[[T_Self, T_Context], AsyncGenerator[None, Exception | None]],
 ) -> (
     Callable[[T_Context], Coroutine[Any, Any, None]]
     | Callable[[T_Self, T_Context], Coroutine[Any, Any, None]]
@@ -940,16 +918,13 @@ def context_teardown(
     if not isasyncgenfunction(func):
         if async_generator and iscoroutinefunction(func):
             warnings.warn(
-                "Using @context_teardown on regular coroutine functions has been "
-                "deprecated",
+                "Using @context_teardown on regular coroutine functions has been deprecated",
                 DeprecationWarning,
                 stacklevel=2,
             )
             func = async_generator(func)
         else:
-            raise TypeError(
-                f"{callable_name(func)} must be an async generator function"
-            )
+            raise TypeError(f"{callable_name(func)} must be an async generator function")
 
     return wrapper
 
@@ -1017,7 +992,7 @@ def Dependency(name: str = "default") -> Any:
 
 @overload
 def inject(
-    func: Callable[P, Coroutine[Any, Any, T_Retval]]
+    func: Callable[P, Coroutine[Any, Any, T_Retval]],
 ) -> Callable[P, Coroutine[Any, Any, T_Retval]]:
     ...
 
@@ -1050,14 +1025,8 @@ def inject(func: Callable[P, Any]) -> Callable[P, Any]:
         for key, dependency in injected_resources.items():
             dependency.cls = type_hints[key]
             origin = get_origin(type_hints[key])
-            if origin is Union or (
-                sys.version_info >= (3, 10) and origin is types.UnionType  # noqa: E721
-            ):
-                args = [
-                    arg
-                    for arg in get_args(dependency.cls)
-                    if arg is not type(None)  # noqa: E721
-                ]
+            if origin is Union or (sys.version_info >= (3, 10) and origin is types.UnionType):
+                args = [arg for arg in get_args(dependency.cls) if arg is not type(None)]
                 if len(args) == 1:
                     dependency.optional = True
                     dependency.cls = args[0]
@@ -1110,8 +1079,7 @@ def inject(func: Callable[P, Any]) -> Callable[P, Any]:
         if isinstance(param.default, _Dependency):
             if param.kind is Parameter.POSITIONAL_ONLY:
                 raise TypeError(
-                    f"Cannot inject dependency to positional-only parameter "
-                    f"{param.name!r}"
+                    f"Cannot inject dependency to positional-only parameter {param.name!r}"
                 )
 
             if param.annotation is Parameter.empty:
@@ -1134,7 +1102,5 @@ def inject(func: Callable[P, Any]) -> Callable[P, Any]:
         else:
             return sync_wrapper
     else:
-        warnings.warn(
-            f"{callable_name(func)} does not have any injectable resources declared"
-        )
+        warnings.warn(f"{callable_name(func)} does not have any injectable resources declared")
         return func

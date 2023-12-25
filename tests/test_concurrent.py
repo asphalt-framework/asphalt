@@ -24,9 +24,7 @@ async def special_executor(context: Context) -> ThreadPoolExecutor:
     return executor
 
 
-@pytest.mark.parametrize(
-    "use_resource_name", [False, True], ids=["instance", "resource_name"]
-)
+@pytest.mark.parametrize("use_resource_name", [False, True], ids=["instance", "resource_name"])
 @pytest.mark.asyncio
 async def test_executor_special(
     context: Context, use_resource_name: bool, special_executor: ThreadPoolExecutor
@@ -41,9 +39,7 @@ async def test_executor_special(
 
 
 @pytest.mark.asyncio
-async def test_executor_default(
-    event_loop: AbstractEventLoop, context: Context
-) -> None:
+async def test_executor_default(event_loop: AbstractEventLoop, context: Context) -> None:
     @executor
     def check_thread(ctx: Context) -> None:
         assert current_thread() is not event_loop_thread
@@ -78,9 +74,7 @@ async def test_executor_worker_thread(
 
 
 @pytest.mark.asyncio
-async def test_executor_missing_context(
-    event_loop: AbstractEventLoop, context: Context
-) -> None:
+async def test_executor_missing_context(event_loop: AbstractEventLoop, context: Context) -> None:
     @executor("special")
     def runs_in_default_worker() -> None:
         pass
