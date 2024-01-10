@@ -10,7 +10,8 @@ import click
 from ruamel.yaml import YAML, ScalarNode
 from ruamel.yaml.loader import Loader
 
-from .runner import policies, run_application
+from .component import component_set_help_all
+from .runner import policies, run_application, runner_set_help_all
 from .utils import merge_config, qualified_name
 
 
@@ -63,13 +64,23 @@ def main() -> None:
     type=str,
     help="set configuration",
 )
+@click.option(
+    "--help-all",
+    is_flag=True,
+    default=False,
+    help="show all components' configuration parameters and exit",
+)
 def run(
     configfile,
     unsafe: bool,
     loop: str | None,
     service: str | None,
     set_: list[str],
+    help_all: bool,
 ) -> None:
+    component_set_help_all(help_all)
+    runner_set_help_all(help_all)
+
     yaml = YAML(typ="unsafe" if unsafe else "safe")
     yaml.constructor.add_constructor("!Env", env_constructor)
     yaml.constructor.add_constructor("!TextFile", text_file_constructor)

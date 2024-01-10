@@ -3,6 +3,7 @@ from __future__ import annotations
 __all__ = ("run_application",)
 
 import asyncio
+import inspect
 import signal
 import sys
 from asyncio.events import AbstractEventLoop
@@ -16,6 +17,13 @@ from .context import Context, _current_context
 from .utils import PluginContainer, qualified_name
 
 policies = PluginContainer("asphalt.core.event_loop_policies")
+
+help_all = False
+
+
+def runner_set_help_all(val):
+    global help_all
+    help_all = val
 
 
 def sigterm_handler(logger: Logger, event_loop: AbstractEventLoop) -> None:
@@ -94,6 +102,10 @@ def run_application(
         # Instantiate the root component if a dict was given
         if isinstance(component, dict):
             component = cast(Component, component_types.create_object(**component))
+
+        if help_all:
+            signature = inspect.signature(component.__init__)  # type: ignore[misc]
+            print(component.__class__.__name__, signature)
 
         logger.info("Starting application")
         context = Context()

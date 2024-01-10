@@ -7,7 +7,20 @@ import pytest
 from _pytest.monkeypatch import MonkeyPatch
 from click.testing import CliRunner
 
-from asphalt.core import Component, Context, cli
+from asphalt.core import Component, ContainerComponent, Context, cli
+
+
+class Container0(ContainerComponent):
+    async def start(self, ctx: Context) -> None:
+        self.add_component("container1", Container1)
+        self.add_component("container2", Container1)
+        await super().start(ctx)
+
+
+class Container1(ContainerComponent):
+    async def start(self, ctx: Context) -> None:
+        self.add_component("dummy", DummyComponent)
+        await super().start(ctx)
 
 
 class DummyComponent(Component):
@@ -22,6 +35,53 @@ class DummyComponent(Component):
 @pytest.fixture
 def runner() -> CliRunner:
     return CliRunner()
+
+
+@pytest.mark.parametrize("help_all", [False, True])
+@pytest.mark.parametrize("root_component", [DummyComponent, Container1, Container0])
+def test_help_all(
+    runner: CliRunner,
+    help_all: bool,
+    root_component: Component,
+) -> None:
+    config = f"""\
+    component:
+        type: {root_component.__module__}:{root_component.__name__}
+"""
+    cmd = ["test.yml"]
+    if help_all:
+        cmd.append("--help-all")
+    with runner.isolated_filesystem():
+        Path("test.yml").write_text(config)
+        result = runner.invoke(cli.run, cmd)
+        if help_all:
+            if root_component == DummyComponent:
+                assert result.exit_code == 1
+                assert result.stdout == ("DummyComponent (dummyval1=None, dummyval2=None)\n")
+            elif root_component == Container1:
+                assert result.exit_code == 1
+                assert (
+                    result.stdout
+                    == """\
+Container1 (components: 'dict[str, dict[str, Any] | None] | None' = None) -> 'None'
+Container1.dummy (dummyval1=None, dummyval2=None)
+"""
+                )
+            elif root_component == Container0:
+                assert result.exit_code == 1
+                assert (
+                    result.stdout
+                    == """\
+Container0 (components: 'dict[str, dict[str, Any] | None] | None' = None) -> 'None'
+Container0.container1 (components: 'dict[str, dict[str, Any] | None] | None' = None) -> 'None'
+Container0.container2 (components: 'dict[str, dict[str, Any] | None] | None' = None) -> 'None'
+Container0.container1.dummy (dummyval1=None, dummyval2=None)
+Container0.container2.dummy (dummyval1=None, dummyval2=None)
+"""
+                )
+        else:
+            assert result.exit_code == 1
+            assert result.stdout == ("")
 
 
 @pytest.mark.parametrize("loop", [None, "uvloop"], ids=["default", "override"])

@@ -3,6 +3,7 @@ from __future__ import annotations
 __all__ = ("Component", "ContainerComponent", "CLIApplicationComponent")
 
 import asyncio
+import inspect
 import sys
 from abc import ABCMeta, abstractmethod
 from asyncio import Future
@@ -13,6 +14,13 @@ from warnings import warn
 
 from .context import Context
 from .utils import PluginContainer, merge_config, qualified_name
+
+help_all = False
+
+
+def component_set_help_all(val):
+    global help_all
+    help_all = val
 
 
 class Component(metaclass=ABCMeta):
@@ -54,11 +62,12 @@ class ContainerComponent(Component):
     :vartype component_configs: Dict[str, Optional[Dict[str, Any]]]
     """
 
-    __slots__ = "child_components", "component_configs"
+    __slots__ = "child_components", "component_configs", "_hierarchy"
 
     def __init__(self, components: dict[str, dict[str, Any] | None] | None = None) -> None:
         self.child_components: OrderedDict[str, Component] = OrderedDict()
         self.component_configs = components or {}
+        self._hierarchy = f"{self.__class__.__name__}."
 
     def add_component(self, alias: str, type: str | type | None = None, **config) -> None:
         """
@@ -95,7 +104,12 @@ class ContainerComponent(Component):
         config = merge_config(config, override_config)
 
         component = component_types.create_object(**config)
+        component._hierarchy = f"{self._hierarchy}{alias}."
         self.child_components[alias] = component
+
+        if help_all:
+            signature = inspect.signature(component.__init__)
+            print(f"{self._hierarchy}{alias} {signature}")
 
     async def start(self, ctx: Context) -> None:
         """
@@ -156,6 +170,9 @@ class CLIApplicationComponent(ContainerComponent):
             task.add_done_callback(run_complete)
 
         await super().start(ctx)
+        if help_all:
+            sys.exit(0)
+
         ctx.loop.call_later(0.1, start_run_task)
 
     @abstractmethod
