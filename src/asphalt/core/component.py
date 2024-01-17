@@ -2,7 +2,6 @@ from __future__ import annotations
 
 __all__ = ("Component", "ContainerComponent", "CLIApplicationComponent")
 
-import asyncio
 import sys
 from abc import ABCMeta, abstractmethod
 from asyncio import Future

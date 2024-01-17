@@ -3,8 +3,6 @@ from __future__ import annotations
 __all__ = ("run_application",)
 
 import asyncio
-import signal
-import sys
 from asyncio.events import AbstractEventLoop
 from logging import INFO, Logger, basicConfig, getLogger, shutdown
 from logging.config import dictConfig
