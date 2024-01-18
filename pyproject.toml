@@ -54,6 +54,7 @@ test = [
     "pytest >= 3.9",
     "pytest-asyncio",
     "uvloop; python_version < '3.12' and python_implementation == 'CPython' and platform_system != 'Windows'",
+    "trio >=0.24.0",
 ]
 doc = [
     "Sphinx >= 7.0",

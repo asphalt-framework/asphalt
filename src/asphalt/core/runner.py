@@ -3,14 +3,16 @@ from __future__ import annotations
 __all__ = ("run_application",)
 
 import asyncio
+import sys
 from asyncio.events import AbstractEventLoop
 from logging import INFO, Logger, basicConfig, getLogger, shutdown
 from logging.config import dictConfig
+from traceback import print_exception
 from typing import Any, cast
 
 from anyio import create_task_group, fail_after
 
-from .component import Component, component_types
+from .component import CLIApplicationComponent, Component, component_types
 from .context import Context, _current_context
 from .utils import PluginContainer, qualified_name
 
@@ -81,17 +83,31 @@ async def run_application(
     logger.info("Starting application")
     context = Context()
     exception: BaseException | None = None
+    exit_code = 0
 
     # Start the root component
     token = _current_context.set(context)
     try:
         async with create_task_group() as tg:
             component._task_group = tg
-            with fail_after(start_timeout) as scope:
-                await component.start(context)
-            logger.info("Application started")
+            try:
+                with fail_after(start_timeout):
+                    await component.start(context)
+            except TimeoutError as e:
+                exception = e
+                logger.error("Timeout waiting for the root component to start")
+                exit_code = 1
+            except Exception as e:
+                exception = e
+                logger.exception("Error during application startup")
+                exit_code = 1
+            else:
+                logger.info("Application started")
+                if isinstance(component, CLIApplicationComponent):
+                    exit_code = await component._exit_code.receive()
     except Exception as e:
         exception = e
+        exit_code = 1
     finally:
         # Close the root context
         logger.info("Stopping application")
@@ -102,5 +118,8 @@ async def run_application(
     # Shut down the logging system
     shutdown()
 
-    if exception:
-        raise exception
+    if exception is not None:
+        print_exception(type(exception), exception, exception.__traceback__)
+
+    if exit_code:
+        sys.exit(exit_code)

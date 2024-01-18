@@ -2,15 +2,14 @@ from __future__ import annotations
 
 __all__ = ("Component", "ContainerComponent", "CLIApplicationComponent")
 
-import sys
 from abc import ABCMeta, abstractmethod
-from asyncio import Future
 from collections import OrderedDict
+from contextlib import AsyncExitStack
 from traceback import print_exception
 from typing import Any
 from warnings import warn
 
-from anyio import create_task_group
+from anyio import create_memory_object_stream, create_task_group
 from anyio.abc import TaskGroup
 
 from .context import Context
@@ -20,8 +19,25 @@ from .utils import PluginContainer, merge_config, qualified_name
 class Component(metaclass=ABCMeta):
     """This is the base class for all Asphalt components."""
 
-    __slots__ = ()
-    _task_group: TaskGroup
+    _task_group = None
+
+    async def __aenter__(self) -> Component:
+        if self._task_group is not None:
+            raise RuntimeError("Component already entered")
+
+        async with AsyncExitStack() as exit_stack:
+            tg = create_task_group()
+            self._task_group = await exit_stack.enter_async_context(tg)
+            self._exit_stack = exit_stack.pop_all()
+
+        return self
+
+    async def __aexit__(self, exc_type, exc_value, exc_tb):
+        if self._task_group is None:
+            raise RuntimeError("Component not entered")
+
+        self._task_group = None
+        return await self._exit_stack.__aexit__(exc_type, exc_value, exc_tb)
 
     @abstractmethod
     async def start(self, ctx: Context) -> None:
@@ -139,35 +155,37 @@ class CLIApplicationComponent(ContainerComponent):
     """
 
     async def start(self, ctx: Context) -> None:
-        def run_complete(f: Future[int | None]) -> None:
-            # If run() raised an exception, print it with a traceback and exit with code 1
-            exc = f.exception()
-            if exc is not None:
-                print_exception(type(exc), exc, exc.__traceback__)
-                sys.exit(1)
+        await super().start(ctx)
 
-            retval = f.result()
+        async def run(exit_code):
+            try:
+                retval = await self.run(ctx)
+            except Exception as exc:
+                print_exception(type(exc), exc, exc.__traceback__)
+                exit_code.send_nowait(1)
+                return
+
             if isinstance(retval, int):
                 if 0 <= retval <= 127:
-                    sys.exit(retval)
+                    exit_code.send_nowait(retval)
                 else:
                     warn("exit code out of range: %d" % retval)
-                    sys.exit(1)
+                    exit_code.send_nowait(1)
             elif retval is not None:
                 warn(
                     "run() must return an integer or None, not %s"
                     % qualified_name(retval.__class__)
                 )
-                sys.exit(1)
+                exit_code.send_nowait(1)
             else:
-                sys.exit(0)
+                exit_code.send_nowait(0)
 
-        def start_run_task() -> None:
-            task = ctx.loop.create_task(self.run(ctx))
-            task.add_done_callback(run_complete)
+        send_stream, receive_stream = create_memory_object_stream[int](max_buffer_size=1)
+        self._exit_code = receive_stream
+        self.task_group.start_soon(run, send_stream)
 
-        await super().start(ctx)
-        ctx.loop.call_later(0.1, start_run_task)
+    async def exit_code(self) -> int:
+        return await self._exit_code.receive()
 
     @abstractmethod
     async def run(self, ctx: Context) -> int | None:

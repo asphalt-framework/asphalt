@@ -25,7 +25,8 @@ async def special_executor(context: Context) -> ThreadPoolExecutor:
 
 
 @pytest.mark.parametrize("use_resource_name", [False, True], ids=["instance", "resource_name"])
-@pytest.mark.asyncio
+@pytest.mark.anyio
+@pytest.mark.parametrize("anyio_backend", ["asyncio"])
 async def test_executor_special(
     context: Context, use_resource_name: bool, special_executor: ThreadPoolExecutor
 ) -> None:
@@ -38,7 +39,8 @@ async def test_executor_special(
         await check_thread(context)
 
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
+@pytest.mark.parametrize("anyio_backend", ["asyncio"])
 async def test_executor_default(event_loop: AbstractEventLoop, context: Context) -> None:
     @executor
     def check_thread(ctx: Context) -> None:
@@ -49,7 +51,8 @@ async def test_executor_default(event_loop: AbstractEventLoop, context: Context)
         await check_thread(context)
 
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
+@pytest.mark.parametrize("anyio_backend", ["asyncio"])
 async def test_executor_worker_thread(
     event_loop: AbstractEventLoop,
     context: Context,
@@ -73,7 +76,8 @@ async def test_executor_worker_thread(
         assert retval == "foo"
 
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
+@pytest.mark.parametrize("anyio_backend", ["asyncio"])
 async def test_executor_missing_context(event_loop: AbstractEventLoop, context: Context) -> None:
     @executor("special")
     def runs_in_default_worker() -> None:

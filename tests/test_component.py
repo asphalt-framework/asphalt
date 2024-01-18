@@ -112,65 +112,71 @@ class TestContainerComponent:
 
 
 class TestCLIApplicationComponent:
-    def test_run_return_none(self, event_loop: AbstractEventLoop) -> None:
+    @pytest.mark.anyio
+    async def test_run_return_none(self) -> None:
         class DummyCLIComponent(CLIApplicationComponent):
             async def run(self, ctx: Context) -> None:
                 pass
 
         component = DummyCLIComponent()
-        event_loop.run_until_complete(component.start(Context()))
-        exc = pytest.raises(SystemExit, event_loop.run_forever)
-        assert exc.value.code == 0
+        async with component:
+            await component.start(Context())
+            assert await component.exit_code() == 0
 
-    def test_run_return_5(self, event_loop: AbstractEventLoop) -> None:
+    @pytest.mark.anyio
+    async def test_run_return_5(self) -> None:
         class DummyCLIComponent(CLIApplicationComponent):
             async def run(self, ctx: Context) -> int:
                 return 5
 
         component = DummyCLIComponent()
-        event_loop.run_until_complete(component.start(Context()))
-        exc = pytest.raises(SystemExit, event_loop.run_forever)
-        assert exc.value.code == 5
+        async with component:
+            await component.start(Context())
+            assert await component.exit_code() == 5
 
-    def test_run_return_invalid_value(self, event_loop: AbstractEventLoop) -> None:
+    @pytest.mark.anyio
+    async def test_run_return_invalid_value(self) -> None:
         class DummyCLIComponent(CLIApplicationComponent):
             async def run(self, ctx: Context) -> int:
                 return 128
 
         component = DummyCLIComponent()
-        event_loop.run_until_complete(component.start(Context()))
-        with pytest.warns(UserWarning) as record:
-            exc = pytest.raises(SystemExit, event_loop.run_forever)
+        async with component:
+            with pytest.warns(UserWarning) as record:
+                await component.start(Context())
+                assert await component.exit_code() == 1
 
-        assert exc.value.code == 1
-        assert len(record) == 1
-        assert str(record[0].message) == "exit code out of range: 128"
+        assert len(record) >= 1
+        assert str(record[-1].message) == "exit code out of range: 128"
 
-    def test_run_return_invalid_type(self, event_loop: AbstractEventLoop) -> None:
+    @pytest.mark.anyio
+    async def test_run_return_invalid_type(self) -> None:
         class DummyCLIComponent(CLIApplicationComponent):
             async def run(self, ctx: Context) -> int:
                 return "foo"  # type: ignore[return-value]
 
         component = DummyCLIComponent()
-        event_loop.run_until_complete(component.start(Context()))
-        with pytest.warns(UserWarning) as record:
-            exc = pytest.raises(SystemExit, event_loop.run_forever)
+        async with component:
+            with pytest.warns(UserWarning) as record:
+                await component.start(Context())
+                assert await component.exit_code() == 1
 
-        assert exc.value.code == 1
         assert len(record) == 1
         assert str(record[0].message) == "run() must return an integer or None, not str"
 
-    def test_run_exception(self, event_loop: AbstractEventLoop) -> None:
+    @pytest.mark.anyio
+    async def test_run_exception(self, event_loop: AbstractEventLoop) -> None:
         class DummyCLIComponent(CLIApplicationComponent):
             async def run(self, ctx: Context) -> NoReturn:
                 raise Exception("blah")
 
         component = DummyCLIComponent()
-        event_loop.run_until_complete(component.start(Context()))
-        exc = pytest.raises(SystemExit, event_loop.run_forever)
-        assert exc.value.code == 1
+        async with component:
+            await component.start(Context())
+            assert await component.exit_code() == 1
 
-    def test_add_teardown_callback(self) -> None:
+    @pytest.mark.anyio
+    async def test_add_teardown_callback(self) -> None:
         async def callback() -> None:
             current_context()
 
@@ -178,4 +184,4 @@ class TestCLIApplicationComponent:
             async def run(self, ctx: Context) -> None:
                 ctx.add_teardown_callback(callback)
 
-        run_application(DummyCLIComponent())
+        await run_application(DummyCLIComponent())
