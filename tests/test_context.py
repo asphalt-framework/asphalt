@@ -3,7 +3,7 @@ from __future__ import annotations
 import sys
 from collections.abc import AsyncGenerator, Callable
 from itertools import count
-from typing import Any, NoReturn, Optional, Union
+from typing import Any, NoReturn, Optional, Tuple, Union
 
 import pytest
 from anyio import create_task_group, wait_all_tasks_blocked
@@ -449,7 +449,7 @@ class TestDependencyInjection:
         @inject
         async def injected(
             foo: int, bar: str = resource(), *, baz: str = resource("alt")
-        ) -> tuple[int, str, str]:
+        ) -> Tuple[int, str, str]:  # noqa: UP006
             return foo, bar, baz
 
         async with Context() as ctx:
@@ -465,7 +465,7 @@ class TestDependencyInjection:
         @inject
         def injected(
             foo: int, bar: str = resource(), *, baz: str = resource("alt")
-        ) -> tuple[int, str, str]:
+        ) -> Tuple[int, str, str]:  # noqa: UP006
             return foo, bar, baz
 
         async with Context() as ctx:
