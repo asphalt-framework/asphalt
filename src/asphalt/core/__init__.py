@@ -22,7 +22,6 @@ __all__ = (
     "stream_events",
     "wait_event",
     "run_application",
-    "start_component",
     "PluginContainer",
     "callable_name",
     "merge_config",
@@ -35,7 +34,6 @@ from ._component import (
     CLIApplicationComponent,
     Component,
     ContainerComponent,
-    start_component,
 )
 from ._concurrent import start_background_task, start_service_task
 from ._context import (

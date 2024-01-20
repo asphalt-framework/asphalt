@@ -6,17 +6,21 @@ from unittest.mock import Mock
 
 import anyio
 import pytest
+from common import raises_in_exception_group
 
 from asphalt.core import (
     CLIApplicationComponent,
     Component,
     ContainerComponent,
+    Context,
     run_application,
-    start_component,
 )
 from asphalt.core._component import component_types
 
 pytestmark = pytest.mark.anyio()
+
+if sys.version_info < (3, 11):
+    pass
 
 if sys.version_info >= (3, 10):
     from importlib.metadata import EntryPoint
@@ -107,7 +111,9 @@ class TestContainerComponent:
         assert str(exc.value) == 'there is already a child component named "dummy"'
 
     async def test_start(self, container) -> None:
-        await start_component(container)
+        async with Context() as ctx:
+            await container.start(ctx)
+
         assert container.child_components["dummy"].started
 
 
@@ -161,5 +167,5 @@ class TestCLIApplicationComponent:
             async def run(self) -> NoReturn:
                 raise Exception("blah")
 
-        with pytest.raises(Exception, match="blah"):
+        with raises_in_exception_group(Exception, match="blah"):
             await run_application(DummyCLIComponent())

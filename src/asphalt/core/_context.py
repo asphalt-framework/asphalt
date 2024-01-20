@@ -34,7 +34,7 @@ from typing import (
 
 from anyio import get_current_task
 
-from ._event import Event, Signal
+from ._event import Event, Signal, wait_event
 from ._utils import callable_name, qualified_name
 
 if sys.version_info >= (3, 10):
@@ -42,11 +42,14 @@ if sys.version_info >= (3, 10):
 else:
     from typing_extensions import ParamSpec
 
-if sys.version_info < (3, 11):
+if sys.version_info >= (3, 11):
+    from typing import Self
+else:
     from exceptiongroup import BaseExceptionGroup
+    from typing_extensions import Self
 
 logger = logging.getLogger(__name__)
-factory_callback_type = Callable[[], Any]
+factory_callback_type = Callable[["Context"], Any]
 resource_name_re = re.compile(r"\w+")
 T_Resource = TypeVar("T_Resource")
 T_Retval = TypeVar("T_Retval")
@@ -255,7 +258,7 @@ class Context:
         finally:
             self._state = ContextState.closed
 
-    async def __aenter__(self):
+    async def __aenter__(self) -> Self:
         self._check_closed()
         self._host_task = get_current_task()
         self._reset_token = _current_context.set(self)
@@ -263,9 +266,9 @@ class Context:
 
     async def __aexit__(
         self,
-        exc_type: type[BaseException],
-        exc_val: BaseException,
-        exc_tb: TracebackType,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
     ) -> None:
         try:
             await self.close(exc_val)
@@ -280,6 +283,8 @@ class Context:
                     f"you entered the context in an async generator, you should try to "
                     f"defer that to a regular async function."
                 )
+
+        return None
 
     async def add_resource(
         self,
@@ -608,24 +613,51 @@ class Context:
 
         return resource.value_or_factory
 
+    async def request_resource(
+        self, type: type[T_Resource], name: str = "default"
+    ) -> T_Resource:
+        """
+        Look up a resource in the chain of contexts.
+
+        This is like :meth:`get_resource` except that if the resource is not already
+        available, it will wait for one to become available.
+
+        :param type: type of the requested resource
+        :param name: name of the requested resource
+        :return: the requested resource
+
+        """
+        # First try to locate an existing resource in this context and its parents
+        value = self.get_resource_nowait(type, name, optional=True)
+        if value is not None:
+            return value
+
+        # Wait until a matching resource or resource factory is available
+        signals = [ctx.resource_added for ctx in self.context_chain]
+        await wait_event(
+            signals,
+            lambda event: event.resource_name == name and type in event.resource_types,
+        )
+        return self.get_resource_nowait(type, name)
+
 
 @overload
 def context_teardown(
-    func: Callable[[T_Context], AsyncGenerator[None, Exception | None]]
+    func: Callable[[T_Context], AsyncGenerator[None, Exception | None]],
 ) -> Callable[[T_Context], Coroutine[Any, Any, None]]:
     ...
 
 
 @overload
 def context_teardown(
-    func: Callable[[T_Self, T_Context], AsyncGenerator[None, Exception | None]]
+    func: Callable[[T_Self, T_Context], AsyncGenerator[None, Exception | None]],
 ) -> Callable[[T_Self, T_Context], Coroutine[Any, Any, None]]:
     ...
 
 
 def context_teardown(
     func: Callable[[T_Context], AsyncGenerator[None, Exception | None]]
-    | Callable[[T_Self, T_Context], AsyncGenerator[None, Exception | None]]
+    | Callable[[T_Self, T_Context], AsyncGenerator[None, Exception | None]],
 ) -> (
     Callable[[T_Context], Coroutine[Any, Any, None]]
     | Callable[[T_Self, T_Context], Coroutine[Any, Any, None]]
@@ -781,7 +813,7 @@ def resource(name: str = "default") -> Any:
 
 @overload
 def inject(
-    func: Callable[P, Coroutine[Any, Any, T_Retval]]
+    func: Callable[P, Coroutine[Any, Any, T_Retval]],
 ) -> Callable[P, Coroutine[Any, Any, T_Retval]]:
     ...
 
@@ -815,12 +847,10 @@ def inject(func: Callable[P, Any]) -> Callable[P, Any]:
             dependency.cls = type_hints[key]
             origin = get_origin(type_hints[key])
             if origin is Union or (
-                sys.version_info >= (3, 10) and origin is types.UnionType  # noqa: E721
+                sys.version_info >= (3, 10) and origin is types.UnionType
             ):
                 args = [
-                    arg
-                    for arg in get_args(dependency.cls)
-                    if arg is not type(None)  # noqa: E721
+                    arg for arg in get_args(dependency.cls) if arg is not type(None)
                 ]
                 if len(args) == 1:
                     dependency.optional = True

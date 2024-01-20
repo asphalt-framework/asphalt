@@ -45,7 +45,8 @@ def start_background_task(
         ctx = ctx.parent
 
     root_taskgroup = get_resource_nowait(
-        TaskGroup, "root_taskgroup"  # type: ignore[type-abstract]
+        TaskGroup,  # type: ignore[type-abstract]
+        "root_taskgroup",
     )
     root_taskgroup.start_soon(run_background_task, name=name)
 
@@ -96,6 +97,7 @@ def start_service_task(
         ctx = ctx.parent
 
     root_taskgroup = get_resource_nowait(
-        TaskGroup, "root_taskgroup"  # type: ignore[type-abstract]
+        TaskGroup,  # type: ignore[type-abstract]
+        "root_taskgroup",
     )
     root_taskgroup.start_soon(run_service_task, name=name)

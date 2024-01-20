@@ -1,35 +1,30 @@
 from __future__ import annotations
 
-import inspect
 import platform
 import signal
+import sys
+from contextlib import AsyncExitStack
 from logging import INFO, basicConfig, getLogger
 from logging.config import dictConfig
 from typing import Any, cast
 
 import anyio
 from anyio import (
-    Event,
     create_task_group,
+    fail_after,
     get_cancelled_exc_class,
-    get_current_task,
-    get_running_tasks,
-    move_on_after,
     sleep,
     to_thread,
 )
 from anyio.abc import TaskGroup, TaskStatus
+from exceptiongroup import catch
 
-from ._component import Component, component_types, start_component
+from ._component import Component, component_types
 from ._context import Context
 from ._exceptions import ApplicationExit
-from ._utils import get_coro_frames
 
-
-class ApplicationStartTimeoutError(Exception):
-    def __init__(self, tracebacks: list[tuple[str, str]]):
-        super().__init__(tracebacks)
-        self.tracebacks = tracebacks
+if sys.version_info < (3, 11):
+    from exceptiongroup import ExceptionGroup
 
 
 async def handle_signals(*, task_status: TaskStatus) -> None:
@@ -45,37 +40,13 @@ async def handle_signals(*, task_status: TaskStatus) -> None:
             raise ApplicationExit
 
 
-async def fail_on_timeout(
-    start_timeout: float, started_event: Event, *, task_status: TaskStatus
-) -> None:
-    parent_task_id = get_current_task().parent_id
-    existing_task_ids = {
-        task.id for task in get_running_tasks() if task.id != parent_task_id
-    }
-    task_status.started()
-    with move_on_after(start_timeout):
-        await started_event.wait()
-        return
+def handle_application_exit(excgrp: ExceptionGroup) -> None:
+    if len(excgrp.exceptions) > 1:
+        raise RuntimeError("Multiple ApplicationExit exceptions were raised")
 
-    # Execution reaches here if the root component does not start on time
-    tracebacks: list[tuple[str, str]] = []
-    for task in get_running_tasks():
-        if task.id not in existing_task_ids:
-            formatted_frames: list[str] = []
-            for i, frame in enumerate(get_coro_frames(task.coro)):
-                module = inspect.getmodule(frame)
-                sourcelines, start_line = inspect.getsourcelines(frame)
-                sourceline = sourcelines[frame.f_lineno - start_line].strip()
-                formatted_frames.append(
-                    f"  {module.__name__}:{frame.f_lineno} -> {sourceline}"
-                    if module
-                    else "unknown"
-                )
-
-            task_tb = "\n".join(formatted_frames)
-            tracebacks.append((task.name, task_tb))
-
-    raise ApplicationStartTimeoutError(tracebacks)
+    exc = cast(ApplicationExit, excgrp.exceptions[0])
+    if exc.code:
+        raise SystemExit(exc.code).with_traceback(exc.__traceback__) from None
 
 
 async def run_application(
@@ -136,31 +107,21 @@ async def run_application(
 
     logger.info("Starting application")
     try:
-        async with Context() as context, create_task_group() as root_tg:
-            await context.add_resource(root_tg, "root_taskgroup", [TaskGroup])
+        async with AsyncExitStack() as exit_stack:
+            handlers = {ApplicationExit: handle_application_exit}
+            exit_stack.enter_context(catch(handlers))  # type: ignore[arg-type]
+            root_tg = await exit_stack.enter_async_context(create_task_group())
+            ctx = await exit_stack.enter_async_context(Context())
+            await ctx.add_resource(root_tg, "root_taskgroup", [TaskGroup])
             if platform.system() != "Windows":
                 await root_tg.start(handle_signals, name="Asphalt signal handler")
 
             try:
-                async with create_task_group() as startup_tg:
-                    started_event = Event()
-                    await startup_tg.start(
-                        fail_on_timeout, start_timeout, started_event
-                    )
-                    await start_component(component, "default")
-                    started_event.set()
-            except ApplicationStartTimeoutError as exc:
-                joined_tracebacks = "\n".join(
-                    f"Task {task_name!r}:\n{task_tb}"
-                    for task_name, task_tb in exc.tracebacks
-                )
-                logger.error(
-                    "Timeout waiting for the root component to start – exiting.\n"
-                    "Stack traces of %d tasks still running:\n%s",
-                    len(exc.tracebacks),
-                    joined_tracebacks,
-                )
-                raise TimeoutError
+                with fail_after(start_timeout):
+                    await component.start(ctx)
+            except TimeoutError:
+                logger.error("Timeout waiting for the root component to start")
+                raise
             except (ApplicationExit, get_cancelled_exc_class()):
                 logger.error("Application startup interrupted")
                 return
@@ -170,8 +131,5 @@ async def run_application(
 
             logger.info("Application started")
             await sleep(float("inf"))
-    except ApplicationExit as exc:
-        if exc.code:
-            raise SystemExit(exc.code).with_traceback(exc.__traceback__) from None
     finally:
         logger.info("Application stopped")

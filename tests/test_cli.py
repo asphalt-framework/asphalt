@@ -105,18 +105,16 @@ def test_run_bad_path(runner: CliRunner) -> None:
 
 
 def test_run_multiple_configs(runner: CliRunner) -> None:
-    component_class = "{0.__module__}:{0.__name__}".format(DummyComponent)
-    config1 = """\
+    component_class = f"{DummyComponent.__module__}:{DummyComponent.__name__}"
+    config1 = f"""\
 ---
 component:
-  type: {}
+  type: {component_class}
   dummyval1: testval
 logging:
   version: 1
   disable_existing_loggers: false
-""".format(
-        component_class
-    )
+"""
     config2 = """\
 ---
 component:

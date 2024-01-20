@@ -19,16 +19,18 @@ classifiers = [
     "Framework :: AnyIO",
     "Framework :: AsyncIO",
     "Framework :: Trio",
+    "Typing :: Typed",
     "Programming Language :: Python",
     "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.8",
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
 ]
-requires-python = ">=3.9"
+requires-python = ">=3.8"
 dependencies = [
-    "anyio ~= 4.0",
+    "anyio ~= 4.1",
     "importlib_metadata >= 4.4; python_version < '3.10'",
     "typing_extensions; python_version < '3.10'",
     "exceptiongroup; python_version < '3.11'",
@@ -46,14 +48,14 @@ Documentation = "https://asphalt.readthedocs.org/en/latest/"
 
 [project.optional-dependencies]
 test = [
-    "anyio[trio] ~= 4.0",
+    "anyio[trio] ~= 4.1",
     "coverage >= 7",
-    "pytest >= 3.9",
+    "pytest >= 7",
     "uvloop; python_implementation == 'CPython' and platform_system != 'Windows'",
 ]
 doc = [
-    "Sphinx >= 6.0",
-    "sphinx_rtd_theme >= 1.2.0",
+    "Sphinx >= 7.0",
+    "sphinx-rtd-theme >= 1.3.0",
     "sphinx-autodoc-typehints >= 1.22",
 ]
 
@@ -66,9 +68,13 @@ local_scheme = "dirty-tag"
 
 [tool.ruff]
 select = [
-    "E", "F", "W",  # default flake-8
+    "ASYNC",        # flake8-async
+    "E", "F", "W",  # default Flake8
+    "G",            # flake8-logging-format
     "I",            # isort
+    "ISC",          # flake8-implicit-str-concat
     "PGH",          # pygrep-hooks
+    "RUF100",       # unused noqa (yesqa)
     "UP",           # pyupgrade
 ]
 
@@ -94,7 +100,7 @@ show_missing = true
 [tool.tox]
 legacy_tox_ini = """
 [tox]
-envlist = py39, py310, py311, py312, pypy3
+envlist = py38, py39, py310, py311, py312, pypy3
 skip_missing_interpreters = true
 minversion = 4.0
 
@@ -103,24 +109,10 @@ extras = test
 commands = python -m pytest {posargs}
 
 [testenv:pypy3]
-basepython = pypy3.9
-
-[testenv:mypy]
-basepython = python3.9
-commands = mypy src tests examples
-deps =
-  asphalt-mailer
-  httpx
-  mypy
+basepython = pypy3.10
 
 [testenv:docs]
 extras = doc
-commands = sphinx-build docs build/sphinx {posargs}
-
-[gh-actions]
-python =
-    3.9: py39
-    3.10: py310
-    3.11: py311
-    pypy-3: pypy3
+commands = sphinx-build -n docs build/sphinx {posargs}
+package = editable
 """

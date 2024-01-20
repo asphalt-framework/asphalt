@@ -194,7 +194,7 @@ async def stream_events(
             if filter is None or filter(event):
                 yield event
 
-    send, receive = create_memory_object_stream(max_queue_size)
+    send, receive = create_memory_object_stream[T_Event](max_queue_size)
     async with AsyncExitStack() as exit_stack:
         filtered_receive = filter_events()
         exit_stack.push_async_callback(filtered_receive.aclose)

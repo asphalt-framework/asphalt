@@ -166,18 +166,6 @@ class TestContext:
             "characters and underscores"
         )
 
-    async def test_add_resource_parametrized_generic_type(
-        self, context: Context
-    ) -> None:
-        resource = {"a": 1}
-        resource_type = dict[str, int]
-        await context.add_resource(resource, types=[resource_type])
-        assert context.get_resource_nowait(resource_type) is resource
-        assert context.get_resource_nowait(resource_type) is resource
-        assert await context.get_resource(resource_type) is resource
-        assert context.get_resource_nowait(dict, optional=True) is None
-        assert context.get_resource_nowait(dict, optional=True) is None
-
     async def test_add_resource_factory(self, context: Context) -> None:
         """
         Test that resource factory callbacks are only called once for each context.
@@ -193,18 +181,6 @@ class TestContext:
 
         assert context.get_resource_nowait(int) == 1
         assert context.get_resource_nowait(int) == 1
-
-    async def test_add_resource_factory_parametrized_generic_type(
-        self, context: Context
-    ) -> None:
-        resource = {"a": 1}
-        resource_type = dict[str, int]
-        await context.add_resource_factory(lambda ctx: resource, types=[resource_type])
-        assert context.get_resource_nowait(resource_type) is resource
-        assert context.get_resource_nowait(resource_type) is resource
-        assert await context.get_resource(resource_type) is resource
-        assert context.get_resource_nowait(dict, optional=True) is None
-        assert context.get_resource_nowait(dict, optional=True) is None
 
     @pytest.mark.parametrize(
         "name", ["a.b", "a:b", "a b"], ids=["dot", "colon", "space"]
@@ -251,6 +227,7 @@ class TestContext:
             await context.add_resource_factory(factory)
             assert context.get_resource_nowait(str) == "foo"
 
+    @pytest.mark.skipif(sys.version_info < (3, 10), reason="Requires Python 3.10+")
     async def test_add_resource_return_type_union(self, context: Context) -> None:
         def factory(ctx: Context) -> int | float:
             return 5
@@ -271,7 +248,7 @@ class TestContext:
             assert context.get_resource_nowait(float) == 5
 
     async def test_add_resource_return_type_optional(self, context: Context) -> None:
-        def factory(ctx: Context) -> str | None:
+        def factory(ctx: Context) -> Optional[str]:  # noqa: UP007
             return "foo"
 
         async with context:
@@ -368,7 +345,7 @@ class TestContextTeardown:
         exc_info.match("dummy error")
 
     async def test_get_resource_at_teardown(self) -> None:
-        resource: str
+        resource = ""
 
         async def teardown_callback() -> None:
             nonlocal resource
@@ -381,7 +358,7 @@ class TestContextTeardown:
         assert resource == "blah"
 
     async def test_generate_resource_at_teardown(self) -> None:
-        resource: str
+        resource = ""
 
         async def teardown_callback() -> None:
             nonlocal resource
@@ -445,10 +422,13 @@ async def test_get_resource_sync() -> None:
         assert get_resource_nowait(int, optional=True) is None
 
 
-async def test_context_stack_corruption() -> None:
+async def test_context_stack_corruption(anyio_backend_name: str) -> None:
     async def generator() -> AsyncGenerator[None, None]:
         async with Context():
             yield
+
+    if anyio_backend_name == "asyncio":
+        pytest.xfail("Won't work before AnyIO 4.2.1")
 
     gen = generator()
     async with create_task_group() as tg:
@@ -572,7 +552,8 @@ class TestDependencyInjection:
 
     def test_resource_function_not_called(self) -> None:
         async def injected(
-            foo: int, bar: str = resource  # type: ignore[assignment]
+            foo: int,
+            bar: str = resource,  # type: ignore[assignment]
         ) -> None:
             pass
 
