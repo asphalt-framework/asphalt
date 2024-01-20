@@ -3,7 +3,7 @@ from __future__ import annotations
 import sys
 from collections.abc import AsyncGenerator, Callable
 from itertools import count
-from typing import Any, NoReturn, Optional
+from typing import Any, NoReturn, Optional, Union
 
 import pytest
 from anyio import create_task_group, wait_all_tasks_blocked
@@ -227,9 +227,8 @@ class TestContext:
             await context.add_resource_factory(factory)
             assert context.get_resource_nowait(str) == "foo"
 
-    @pytest.mark.skipif(sys.version_info < (3, 10), reason="Requires Python 3.10+")
     async def test_add_resource_return_type_union(self, context: Context) -> None:
-        def factory(ctx: Context) -> int | float:
+        def factory(ctx: Context) -> Union[int, float]:  # noqa: UP007
             return 5
 
         async with context:
