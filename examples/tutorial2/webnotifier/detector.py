@@ -16,7 +16,7 @@ from asphalt.core import (
     Event,
     Signal,
     context_teardown,
-    start_service_task,
+    start_background_task,
 )
 
 logger = logging.getLogger(__name__)
@@ -67,7 +67,7 @@ class ChangeDetectorComponent(Component):
     async def start(self, ctx: Context) -> AsyncGenerator[None, Exception | None]:
         detector = Detector(self.url, self.delay)
         await ctx.add_resource(detector)
-        start_service_task(detector.run, "Web page change detector")
+        await start_background_task(detector.run, "Web page change detector")
         logging.info(
             'Started web page change detector for url "%s" with a delay of %d seconds',
             self.url,

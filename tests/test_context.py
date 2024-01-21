@@ -2,11 +2,13 @@ from __future__ import annotations
 
 import sys
 from collections.abc import AsyncGenerator, Callable
+from contextlib import ExitStack
 from itertools import count
 from typing import Any, NoReturn, Optional, Tuple, Union
 
 import pytest
-from anyio import create_task_group, wait_all_tasks_blocked
+from anyio import create_task_group
+from common import raises_in_exception_group
 
 from asphalt.core import (
     Context,
@@ -28,8 +30,9 @@ pytestmark = pytest.mark.anyio()
 
 
 @pytest.fixture
-def context() -> Context:
-    return Context()
+async def context() -> AsyncGenerator[Context, None]:
+    async with Context() as ctx:
+        yield ctx
 
 
 class TestContext:
@@ -46,7 +49,7 @@ class TestContext:
     @pytest.mark.parametrize(
         "exception", [None, Exception("foo")], ids=["noexception", "exception"]
     )
-    async def test_close(self, context: Context, exception: Exception | None) -> None:
+    async def test_close(self, exception: Exception | None) -> None:
         """
         Test that teardown callbacks are called in reverse order when a context is
         closed.
@@ -60,26 +63,17 @@ class TestContext:
             called_functions.append((async_callback, exception))
 
         called_functions: list[tuple[Callable, BaseException | None]] = []
-        context.add_teardown_callback(callback, pass_exception=True)
-        context.add_teardown_callback(async_callback, pass_exception=True)
-        await context.close(exception)
+        with ExitStack() as exit_stack:
+            async with Context() as context:
+                context.add_teardown_callback(callback, pass_exception=True)
+                context.add_teardown_callback(async_callback, pass_exception=True)
+                if exception:
+                    exit_stack.enter_context(pytest.raises(ExceptionGroup))
+                    raise exception
 
         assert called_functions == [(async_callback, exception), (callback, exception)]
 
-    async def test_close_while_running_teardown(self, context: Context) -> None:
-        """
-        Test that trying to close the context from a teardown callback raises a
-        RuntimeError.
-        """
-
-        async def try_close_context() -> None:
-            with pytest.raises(RuntimeError, match="this context is already closing"):
-                await context.close()
-
-        context.add_teardown_callback(try_close_context)
-        await context.close()
-
-    async def test_teardown_callback_exception(self, context: Context) -> None:
+    async def test_teardown_callback_exception(self) -> None:
         """
         Test that all callbacks are called even when some teardown callbacks raise
         exceptions, and that those exceptions are reraised in such a case.
@@ -92,26 +86,17 @@ class TestContext:
         def callback2() -> NoReturn:
             raise Exception("foo")
 
-        context.add_teardown_callback(callback1)
-        context.add_teardown_callback(callback2)
-        context.add_teardown_callback(callback1)
-        context.add_teardown_callback(callback2)
         items: list[int] = []
         with pytest.raises(ExceptionGroup) as exc:
-            await context.close()
+            async with Context() as context:
+                context.add_teardown_callback(callback1)
+                context.add_teardown_callback(callback2)
+                context.add_teardown_callback(callback1)
+                context.add_teardown_callback(callback2)
 
-        assert len(exc.value.exceptions) == 2
-
-    async def test_close_closed(self, context: Context) -> None:
-        """Test that closing an already closed context raises a RuntimeError."""
-        assert not context.closed
-        await context.close()
-        assert context.closed
-
-        with pytest.raises(RuntimeError) as exc:
-            await context.close()
-
-        exc.match("this context has already been closed")
+        assert len(exc.value.exceptions) == 1
+        assert isinstance(exc.value.exceptions[0], ExceptionGroup)
+        assert len(exc.value.exceptions[0].exceptions) == 2
 
     @pytest.mark.parametrize("types", [int, (int,), ()], ids=["type", "tuple", "empty"])
     async def test_add_resource(self, context, types):
@@ -215,7 +200,7 @@ class TestContext:
         """
         await context.add_resource_factory(id, types=[int])
 
-        async with context, Context() as subcontext:
+        async with Context() as subcontext:
             assert context.get_resource_nowait(int) == id(context)
             assert subcontext.get_resource_nowait(int) == id(subcontext)
 
@@ -223,41 +208,37 @@ class TestContext:
         def factory(ctx: Context) -> str:
             return "foo"
 
-        async with context:
-            await context.add_resource_factory(factory)
-            assert context.get_resource_nowait(str) == "foo"
+        await context.add_resource_factory(factory)
+        assert context.get_resource_nowait(str) == "foo"
 
     async def test_add_resource_return_type_union(self, context: Context) -> None:
         def factory(ctx: Context) -> Union[int, float]:  # noqa: UP007
             return 5
 
-        async with context:
-            await context.add_resource_factory(factory)
-            assert context.get_resource_nowait(int) == 5
-            assert context.get_resource_nowait(float) == 5
+        await context.add_resource_factory(factory)
+        assert context.get_resource_nowait(int) == 5
+        assert context.get_resource_nowait(float) == 5
 
     @pytest.mark.skipif(sys.version_info < (3, 10), reason="Requires Python 3.10+")
     async def test_add_resource_return_type_uniontype(self, context: Context) -> None:
         def factory(ctx: Context) -> int | float:
             return 5
 
-        async with context:
-            await context.add_resource_factory(factory)
-            assert context.get_resource_nowait(int) == 5
-            assert context.get_resource_nowait(float) == 5
+        await context.add_resource_factory(factory)
+        assert context.get_resource_nowait(int) == 5
+        assert context.get_resource_nowait(float) == 5
 
     async def test_add_resource_return_type_optional(self, context: Context) -> None:
         def factory(ctx: Context) -> Optional[str]:  # noqa: UP007
             return "foo"
 
-        async with context:
-            await context.add_resource_factory(factory)
-            assert context.get_resource_nowait(str) == "foo"
+        await context.add_resource_factory(factory)
+        assert context.get_resource_nowait(str) == "foo"
 
     async def test_get_static_resources(self, context: Context) -> None:
         await context.add_resource(9, "foo")
         await context.add_resource_factory(lambda ctx: 7, "bar", types=[int])
-        async with context, Context() as subctx:
+        async with Context() as subctx:
             await subctx.add_resource(1, "bar")
             await subctx.add_resource(4, "foo")
             assert subctx.get_static_resources(int) == {1, 4, 9}
@@ -266,7 +247,7 @@ class TestContext:
         await context.add_resource(1)
         assert context.get_resource_nowait(int) == 1
 
-    def test_require_resource_not_found(self, context: Context) -> None:
+    async def test_require_resource_not_found(self, context: Context) -> None:
         """
         Test that ResourceNotFound is raised when a required resource is not found.
 
@@ -292,11 +273,14 @@ class TestContextTeardown:
             phase = "finished"
             received_exception = exc
 
-        context = Context()
-        await start(context)
-        assert phase == "started"
+        with ExitStack() as exit_stack:
+            async with Context() as context:
+                await start(context)
+                assert phase == "started"
+                if expected_exc:
+                    exit_stack.enter_context(pytest.raises(ExceptionGroup))
+                    raise expected_exc
 
-        await context.close(expected_exc)
         assert phase == "finished"
         assert received_exception == expected_exc
 
@@ -315,11 +299,14 @@ class TestContextTeardown:
                 phase = "finished"
                 received_exception = exc
 
-        context = Context()
-        await SomeComponent().start(context)
-        assert phase == "started"
+        with ExitStack() as exit_stack:
+            async with Context() as context:
+                await SomeComponent().start(context)
+                assert phase == "started"
+                if expected_exc:
+                    exit_stack.enter_context(pytest.raises(ExceptionGroup))
+                    raise expected_exc
 
-        await context.close(expected_exc)
         assert phase == "finished"
         assert received_exception == expected_exc
 
@@ -385,11 +372,14 @@ class TestContextFinisher:
             phase = "finished"
             received_exception = exc
 
-        context = Context()
-        await start(context)
-        assert phase == "started"
+        with ExitStack() as exit_stack:
+            async with Context() as context:
+                await start(context)
+                assert phase == "started"
+                if expected_exc:
+                    exit_stack.enter_context(pytest.raises(ExceptionGroup))
+                    raise expected_exc
 
-        await context.close(expected_exc)
         assert phase == "finished"
         assert received_exception == expected_exc
 
@@ -419,29 +409,6 @@ async def test_get_resource_sync() -> None:
         await ctx.add_resource("foo")
         assert get_resource_nowait(str) == "foo"
         assert get_resource_nowait(int, optional=True) is None
-
-
-async def test_context_stack_corruption(anyio_backend_name: str) -> None:
-    async def generator() -> AsyncGenerator[None, None]:
-        async with Context():
-            yield
-
-    if anyio_backend_name == "asyncio":
-        pytest.xfail("Won't work before AnyIO 4.2.1")
-
-    gen = generator()
-    async with create_task_group() as tg:
-        tg.start_soon(gen.asend, None)  # type: ignore[arg-type]
-        await wait_all_tasks_blocked()
-        with pytest.warns(
-            UserWarning, match="Potential context stack corruption detected"
-        ):
-            try:
-                await gen.asend(None)
-            except StopAsyncIteration:
-                pass
-
-    pytest.raises(NoCurrentContext, current_context)
 
 
 class TestDependencyInjection:
@@ -494,7 +461,7 @@ class TestDependencyInjection:
         async def injected(foo: int, bar: str = resource()) -> None:
             pass
 
-        with pytest.raises(ResourceNotFound) as exc:
+        with raises_in_exception_group(ResourceNotFound) as exc:
             async with Context():
                 await injected(2)
 

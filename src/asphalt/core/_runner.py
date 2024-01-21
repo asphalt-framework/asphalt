@@ -13,10 +13,9 @@ from anyio import (
     create_task_group,
     fail_after,
     get_cancelled_exc_class,
-    sleep,
     to_thread,
 )
-from anyio.abc import TaskGroup, TaskStatus
+from anyio.abc import TaskStatus
 from exceptiongroup import catch
 
 from ._component import Component, component_types
@@ -41,12 +40,16 @@ async def handle_signals(*, task_status: TaskStatus) -> None:
 
 
 def handle_application_exit(excgrp: ExceptionGroup) -> None:
-    if len(excgrp.exceptions) > 1:
-        raise RuntimeError("Multiple ApplicationExit exceptions were raised")
+    exc: Exception = excgrp
+    while isinstance(exc, ExceptionGroup):
+        if len(exc.exceptions) > 1:
+            raise RuntimeError("Multiple ApplicationExit exceptions were raised")
 
-    exc = cast(ApplicationExit, excgrp.exceptions[0])
-    if exc.code:
-        raise SystemExit(exc.code).with_traceback(exc.__traceback__) from None
+        exc = exc.exceptions[0]
+
+    exit_exc = cast(ApplicationExit, exc)
+    if exit_exc.code:
+        raise SystemExit(exit_exc.code).with_traceback(exc.__traceback__) from None
 
 
 async def run_application(
@@ -110,10 +113,9 @@ async def run_application(
         async with AsyncExitStack() as exit_stack:
             handlers = {ApplicationExit: handle_application_exit}
             exit_stack.enter_context(catch(handlers))  # type: ignore[arg-type]
-            root_tg = await exit_stack.enter_async_context(create_task_group())
             ctx = await exit_stack.enter_async_context(Context())
-            await ctx.add_resource(root_tg, "root_taskgroup", [TaskGroup])
             if platform.system() != "Windows":
+                root_tg = await exit_stack.enter_async_context(create_task_group())
                 await root_tg.start(handle_signals, name="Asphalt signal handler")
 
             try:
@@ -130,6 +132,5 @@ async def run_application(
                 raise
 
             logger.info("Application started")
-            await sleep(float("inf"))
     finally:
         logger.info("Application stopped")

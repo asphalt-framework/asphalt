@@ -11,7 +11,7 @@ from asphalt.core import (
     Context,
     context_teardown,
     run_application,
-    start_service_task,
+    start_background_task,
 )
 
 
@@ -27,7 +27,7 @@ class ServerComponent(Component):
         async with await anyio.create_tcp_listener(
             local_host="localhost", local_port=64100
         ) as listener:
-            start_service_task(lambda: listener.serve(handle), "Echo server")
+            await start_background_task(lambda: listener.serve(handle), "Echo server")
             yield
 
 

@@ -16,9 +16,12 @@ This library adheres to `Semantic Versioning 2.0 <http://semver.org/>`_.
   worker threads (``Context.call_async()``, ``Context.call_in_executor()``,
   ``Context.threadpool()``)
 - **BACKWARD INCOMPATIBLE** Dropped the ``Context.loop`` attribute
+- **BACKWARD INCOMPATIBLE** Dropped the ``Context.close()`` method (``Context`` objects
+  are now required to be used as context managers)
 - **BACKWARD INCOMPATIBLE** Dropped the deprecated ability to use a ``Context`` as a
   synchronous context manager
 - **BACKWARD INCOMPATIBLE** Dropped the deprecated ``parent`` argument to ``Context``
+- **BACKWARD INCOMPATIBLE** Dropped the deprecated ``Dependency()`` marker
 - **BACKWARD INCOMPATIBLE** Dropped support for context attributes
 - **BACKWARD INCOMPATIBLE** Dropped the ``ctx`` parameter from
   ``CLIApplicationComponent.run()``
@@ -32,7 +35,6 @@ This library adheres to `Semantic Versioning 2.0 <http://semver.org/>`_.
 - **BACKWARD INCOMPATIBLE** Moved all exported functions and classes directly to
   ``asphalt.core`` and made submodules private
 - Dropped support for Python 3.7
-- Dropped the deprecated ``Dependency()`` marker
 
 **4.12.0**
 

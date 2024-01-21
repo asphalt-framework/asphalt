@@ -6,6 +6,7 @@ import sys
 import types
 import warnings
 from collections.abc import AsyncGenerator, Coroutine, Sequence
+from contextlib import AsyncExitStack
 from contextvars import ContextVar, Token
 from dataclasses import dataclass, field
 from enum import Enum, auto
@@ -32,9 +33,12 @@ from typing import (
     overload,
 )
 
-from anyio import get_current_task
+import anyio
+from anyio import CancelScope, create_task_group, get_current_task
+from anyio.abc import TaskGroup
 
 from ._event import Event, Signal, wait_event
+from ._exceptions import ApplicationExit
 from ._utils import callable_name, qualified_name
 
 if sys.version_info >= (3, 10):
@@ -136,6 +140,7 @@ class NoCurrentContext(Exception):
 
 
 class ContextState(Enum):
+    inactive = auto()
     open = auto()
     closing = auto()
     closed = auto()
@@ -155,11 +160,13 @@ class Context:
 
     resource_added = Signal(ResourceEvent)
 
+    _task_group: TaskGroup
     _reset_token: Token
+    _exit_stack: AsyncExitStack
 
     def __init__(self) -> None:
         self._parent = _current_context.get(None)
-        self._state = ContextState.open
+        self._state = ContextState.inactive
         self._resources: dict[tuple[type, str], ResourceContainer] = {}
         self._resource_factories: dict[tuple[type, str], ResourceContainer] = {}
         self._teardown_callbacks: list[tuple[Callable, bool]] = []
@@ -187,11 +194,44 @@ class Context:
         otherwise.
 
         """
-        return self._state is not ContextState.open
+        return self._state in (ContextState.closing, ContextState.closed)
 
-    def _check_closed(self) -> None:
-        if self._state is ContextState.closed:
+    def _ensure_state(self, *allowed_states: ContextState) -> None:
+        if self._state in allowed_states:
+            return
+
+        if self._state is ContextState.inactive:
+            raise RuntimeError("this context has not been entered yet")
+        elif self._state is ContextState.open:
+            raise RuntimeError("this context has already been entered")
+        elif self._state is ContextState.closed:
             raise RuntimeError("this context has already been closed")
+        else:
+            assert self._state is ContextState.closing
+            raise RuntimeError("this context is being torn down")
+
+    async def _run_teardown_callbacks(self) -> None:
+        original_exception = sys.exc_info()[1]
+        exceptions: list[BaseException] = []
+        while self._teardown_callbacks:
+            callback, pass_exception = self._teardown_callbacks.pop()
+            try:
+                if pass_exception:
+                    retval = callback(original_exception)
+                else:
+                    retval = callback()
+
+                if isawaitable(retval):
+                    await retval
+            except BaseException as e:
+                exceptions.append(e)
+
+        if exceptions:
+            excgrp = BaseExceptionGroup(
+                "Exceptions were raised during context teardown", exceptions
+            )
+            del exceptions
+            raise excgrp from original_exception
 
     def add_teardown_callback(
         self, callback: Callable, pass_exception: bool = False
@@ -212,56 +252,30 @@ class Context:
             this context (or ``None`` if the context ended cleanly)
 
         """
-        self._check_closed()
+        self._ensure_state(ContextState.open, ContextState.closing)
+        if not callable(callback):
+            raise TypeError("callback must be a callable")
+
         self._teardown_callbacks.append((callback, pass_exception))
 
-    async def close(self, exception: BaseException | None = None) -> None:
-        """
-        Close this context and call any necessary resource teardown callbacks.
-
-        If a teardown callback returns an awaitable, the return value is awaited on
-        before calling any further teardown callbacks.
-
-        All callbacks will be processed, even if some of them raise exceptions. If at
-        least one callback raised an error, those exceptions are reraised in an
-        exception group at the end.
-
-        After this method has been called, resources can no longer be requested or
-        published on this context.
-
-        :param exception: the exception, if any, that caused this context to be closed
-
-        """
-        self._check_closed()
-        if self._state is ContextState.closing:
-            raise RuntimeError("this context is already closing")
-
-        self._state = ContextState.closing
-
-        try:
-            exceptions = []
-            while self._teardown_callbacks:
-                callbacks, self._teardown_callbacks = self._teardown_callbacks, []
-                for callback, pass_exception in reversed(callbacks):
-                    try:
-                        retval = callback(exception) if pass_exception else callback()
-                        if isawaitable(retval):
-                            await retval
-                    except Exception as e:
-                        exceptions.append(e)
-
-            del self._teardown_callbacks
-            if exceptions:
-                raise BaseExceptionGroup(
-                    "Exceptions were raised during context teardown", exceptions
-                )
-        finally:
-            self._state = ContextState.closed
-
     async def __aenter__(self) -> Self:
-        self._check_closed()
-        self._host_task = get_current_task()
-        self._reset_token = _current_context.set(self)
+        self._ensure_state(ContextState.inactive)
+        self._state = ContextState.open
+        try:
+            async with AsyncExitStack() as exit_stack:
+                self._host_task = get_current_task()
+                exit_stack.callback(delattr, self, "_host_task")
+                _reset_token = _current_context.set(self)
+                exit_stack.callback(_current_context.reset, _reset_token)
+                self._task_group = await exit_stack.enter_async_context(
+                    create_task_group()
+                )
+                exit_stack.push_async_callback(self._run_teardown_callbacks)
+                self._exit_stack = exit_stack.pop_all()
+        except BaseException:
+            self._state = ContextState.inactive
+            raise
+
         return self
 
     async def __aexit__(
@@ -270,21 +284,11 @@ class Context:
         exc_val: BaseException | None,
         exc_tb: TracebackType | None,
     ) -> None:
+        self._state = ContextState.closing
         try:
-            await self.close(exc_val)
+            await self._exit_stack.__aexit__(exc_type, exc_val, exc_tb)
         finally:
-            try:
-                _current_context.reset(self._reset_token)
-            except ValueError:
-                warnings.warn(
-                    f"Potential context stack corruption detected. This context "
-                    f"({hex(id(self))}) was entered in task {self._host_task} and "
-                    f"exited in task {get_current_task()}. If this happened because "
-                    f"you entered the context in an async generator, you should try to "
-                    f"defer that to a regular async function."
-                )
-
-        return None
+            self._state = ContextState.closed
 
     async def add_resource(
         self,
@@ -310,7 +314,7 @@ class Context:
             existing one in any way
 
         """
-        self._check_closed()
+        self._ensure_state(ContextState.open, ContextState.closing)
         types_: tuple[type, ...]
         if types:
             if (
@@ -393,7 +397,7 @@ class Context:
         """
         import types as stdlib_types
 
-        self._check_closed()
+        self._ensure_state(ContextState.open)
         if not resource_name_re.fullmatch(name):
             raise ValueError(
                 '"name" must be a nonempty string consisting only of alphanumeric '
@@ -451,7 +455,7 @@ class Context:
     def _get_resource(
         self, type: type[T_Resource], name: str
     ) -> ResourceContainer | None:
-        self._check_closed()
+        self._ensure_state(ContextState.open, ContextState.closing)
         key = (type, name)
 
         # First check if there's already a matching resource in this context
@@ -640,6 +644,66 @@ class Context:
         )
         return self.get_resource_nowait(type, name)
 
+    async def start_background_task(
+        self,
+        func: Callable[..., Coroutine[Any, Any, Any]],
+        name: str,
+        *,
+        cancel_on_exit: bool = True,
+    ) -> None:
+        """
+        Start a task that runs independently on the background.
+
+        The task runs in its own context, inherited from the root context.
+        If the task raises an exception (inherited from :exc:`Exception`), it is logged
+        with a descriptive message containing the task's name.
+
+        To pass arguments to the target callable, pass them via lambda (e.g.
+        ``lambda: yourfunc(arg1, arg2, kw=val)``)
+
+        :param func: the coroutine function to run
+        :param name: descriptive name for the task
+        :param cancel_on_exit: whether to cancel the task when the context is exited
+            (``False`` means that the task will be allowed to run to its completion
+            before the context can finish)
+
+        """
+        finished_event = anyio.Event()
+        cancel_scope = CancelScope()
+
+        async def run_background_task() -> None:
+            nonlocal cancel_scope
+            __tracebackhide__ = True  # trick supported by certain debugger frameworks
+            logger.debug("Background task (%s) starting", name)
+            with cancel_scope:
+                async with Context():
+                    try:
+                        await func()
+                    except ApplicationExit:
+                        logger.debug(
+                            "Background task (%s) triggered application exit", name
+                        )
+                        raise
+                    except Exception:
+                        logger.exception("Background task (%s) crashed", name)
+                        raise
+                    else:
+                        logger.debug("Background task (%s) finished", name)
+                    finally:
+                        finished_event.set()
+
+        async def finalize_task() -> None:
+            if cancel_on_exit:
+                logger.debug("Cancelling background task (%s)", name)
+                cancel_scope.cancel()
+
+            logger.debug("Waiting for background task (%s) to finish", name)
+            await finished_event.wait()
+
+        # await self._task_group.start(run_background_task)
+        self._task_group.start_soon(run_background_task)
+        self._exit_stack.push_async_callback(finalize_task)
+
 
 @overload
 def context_teardown(
@@ -786,6 +850,18 @@ async def get_resource(
         return await current_context().get_resource(type, name, optional=True)
     else:
         return await current_context().get_resource(type, name, optional=False)
+
+
+async def start_background_task(
+    func: Callable[..., Coroutine[Any, Any, Any]],
+    name: str,
+    *,
+    cancel_on_exit: bool = True,
+) -> None:
+    """Shortcut for ``current_context().start_background_task(...)``."""
+    await current_context().start_background_task(
+        func, name, cancel_on_exit=cancel_on_exit
+    )
 
 
 @dataclass
