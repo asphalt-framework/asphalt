@@ -111,7 +111,7 @@ class TestContainerComponent:
         assert str(exc.value) == 'there is already a child component named "dummy"'
 
     async def test_start(self, container) -> None:
-        async with Context() as ctx:
+        async with Context() as ctx, container:
             await container.start(ctx)
 
         assert container.child_components["dummy"].started

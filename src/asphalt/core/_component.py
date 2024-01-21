@@ -2,13 +2,14 @@ from __future__ import annotations
 
 from abc import ABCMeta, abstractmethod
 from collections import OrderedDict
+from contextlib import AsyncExitStack
 from typing import Any
 from warnings import warn
 
 from anyio import create_task_group
+from anyio.abc import TaskGroup
 from anyio.lowlevel import cancel_shielded_checkpoint
 
-from ._concurrent import start_service_task
 from ._context import Context
 from ._exceptions import ApplicationExit
 from ._utils import PluginContainer, merge_config, qualified_name
@@ -17,7 +18,25 @@ from ._utils import PluginContainer, merge_config, qualified_name
 class Component(metaclass=ABCMeta):
     """This is the base class for all Asphalt components."""
 
-    __slots__ = ()
+    _task_group: TaskGroup | None = None
+
+    async def __aenter__(self) -> Component:
+        if self._task_group is not None:
+            raise RuntimeError("Component already entered")
+
+        async with AsyncExitStack() as exit_stack:
+            tg = create_task_group()
+            self._task_group = await exit_stack.enter_async_context(tg)
+            self._exit_stack = exit_stack.pop_all()
+
+        return self
+
+    async def __aexit__(self, exc_type, exc_value, exc_tb):
+        if self._task_group is None:
+            raise RuntimeError("Component not entered")
+
+        self._task_group = None
+        return await self._exit_stack.__aexit__(exc_type, exc_value, exc_tb)
 
     @abstractmethod
     async def start(self, ctx: Context) -> None:
@@ -37,6 +56,16 @@ class Component(metaclass=ABCMeta):
 
         :param ctx: the containing context for this component
         """
+
+    @property
+    def task_group(self) -> TaskGroup:
+        if self._task_group is None:
+            raise RuntimeError(
+                "Component has no task group, did you forget to use: "
+                "async with component ?"
+            )
+        else:
+            return self._task_group
 
 
 class ContainerComponent(Component):
@@ -111,9 +140,9 @@ class ContainerComponent(Component):
             if alias not in self.child_components:
                 self.add_component(alias)
 
-        async with create_task_group() as tg:
-            for alias, component in self.child_components.items():
-                tg.start_soon(component.start, ctx)
+        for component in self.child_components.values():
+            component._task_group = self._task_group
+            self.task_group.start_soon(component.start, ctx)
 
 
 class CLIApplicationComponent(ContainerComponent):
@@ -156,7 +185,7 @@ class CLIApplicationComponent(ContainerComponent):
                 raise ApplicationExit
 
         await super().start(ctx)
-        start_service_task(run, "Main task")
+        self.task_group.start_soon(run)
 
     @abstractmethod
     async def run(self) -> int | None:

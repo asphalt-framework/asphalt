@@ -4,7 +4,6 @@ __all__ = (
     "Component",
     "ContainerComponent",
     "start_background_task",
-    "start_service_task",
     "Context",
     "ResourceConflict",
     "ResourceEvent",
@@ -35,7 +34,6 @@ from ._component import (
     Component,
     ContainerComponent,
 )
-from ._concurrent import start_background_task, start_service_task
 from ._context import (
     Context,
     NoCurrentContext,
