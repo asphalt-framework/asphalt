@@ -112,7 +112,6 @@ For this purpose, we will use AnyIO's :func:`~anyio.create_tcp_listener` functio
         Context,
         context_teardown,
         run_application,
-        start_service_task,
     )
 
 
@@ -128,7 +127,7 @@ For this purpose, we will use AnyIO's :func:`~anyio.create_tcp_listener` functio
             async with await anyio.create_tcp_listener(
                 local_host="localhost", local_port=64100
             ) as listener:
-                start_service_task(lambda: listener.serve(handle), "Echo server")
+                self.task_group.start_soon(lambda: listener.serve(handle))
                 yield
 
     if __name__ == '__main__':

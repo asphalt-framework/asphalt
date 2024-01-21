@@ -275,7 +275,7 @@ Asphalt application::
         async def start(self, ctx: Context) -> None:
             detector = Detector(self.url, self.delay)
             await ctx.add_resource(detector)
-            start_service_task(detector.run, "Web page change detector")
+            self.task_group.start_soon(detector.run)
             logging.info(
                 'Started web page change detector for url "%s" with a delay of %d seconds',
                 self.url,

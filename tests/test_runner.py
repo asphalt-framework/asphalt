@@ -17,7 +17,6 @@ from asphalt.core import (
     Component,
     Context,
     run_application,
-    start_service_task,
 )
 
 pytestmark = pytest.mark.anyio()
@@ -52,7 +51,7 @@ class ShutdownComponent(Component):
         if self.method == "timeout":
             await anyio.sleep(1)
         else:
-            start_service_task(self.stop_app, name="Application terminator")
+            self.task_group.start_soon(self.stop_app)
 
 
 class CrashComponent(Component):

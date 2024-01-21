@@ -16,7 +16,7 @@ from anyio import (
     sleep,
     to_thread,
 )
-from anyio.abc import TaskGroup, TaskStatus
+from anyio.abc import TaskStatus
 from exceptiongroup import catch
 
 from ._component import Component, component_types
@@ -112,7 +112,7 @@ async def run_application(
             exit_stack.enter_context(catch(handlers))  # type: ignore[arg-type]
             root_tg = await exit_stack.enter_async_context(create_task_group())
             ctx = await exit_stack.enter_async_context(Context())
-            await ctx.add_resource(root_tg, "root_taskgroup", [TaskGroup])
+            component._task_group = root_tg
             if platform.system() != "Windows":
                 await root_tg.start(handle_signals, name="Asphalt signal handler")
 
