@@ -18,8 +18,8 @@ from asphalt.core import (
     context_teardown,
     current_context,
     get_resource,
-    get_resource_nowait,
     inject,
+    require_resource,
     resource,
 )
 
@@ -112,7 +112,7 @@ class TestContext:
         assert event.resource_types == (int,)
         assert event.resource_name == "foo"
         assert not event.is_factory
-        assert context.get_resource_nowait(int, "foo") == 6
+        assert context.require_resource(int, "foo") == 6
 
     async def test_add_resource_name_conflict(self, context: Context) -> None:
         """Test that adding a resource won't replace any existing resources."""
@@ -164,8 +164,8 @@ class TestContext:
         counter = count(1)
         await context.add_resource_factory(factory, types=[int])
 
-        assert context.get_resource_nowait(int) == 1
-        assert context.get_resource_nowait(int) == 1
+        assert context.require_resource(int) == 1
+        assert context.require_resource(int) == 1
 
     @pytest.mark.parametrize(
         "name", ["a.b", "a:b", "a b"], ids=["dot", "colon", "space"]
@@ -201,23 +201,23 @@ class TestContext:
         await context.add_resource_factory(id, types=[int])
 
         async with Context() as subcontext:
-            assert context.get_resource_nowait(int) == id(context)
-            assert subcontext.get_resource_nowait(int) == id(subcontext)
+            assert context.require_resource(int) == id(context)
+            assert subcontext.require_resource(int) == id(subcontext)
 
     async def test_add_resource_return_type_single(self, context: Context) -> None:
         def factory(ctx: Context) -> str:
             return "foo"
 
         await context.add_resource_factory(factory)
-        assert context.get_resource_nowait(str) == "foo"
+        assert context.require_resource(str) == "foo"
 
     async def test_add_resource_return_type_union(self, context: Context) -> None:
         def factory(ctx: Context) -> Union[int, float]:  # noqa: UP007
             return 5
 
         await context.add_resource_factory(factory)
-        assert context.get_resource_nowait(int) == 5
-        assert context.get_resource_nowait(float) == 5
+        assert context.require_resource(int) == 5
+        assert context.require_resource(float) == 5
 
     @pytest.mark.skipif(sys.version_info < (3, 10), reason="Requires Python 3.10+")
     async def test_add_resource_return_type_uniontype(self, context: Context) -> None:
@@ -225,15 +225,15 @@ class TestContext:
             return 5
 
         await context.add_resource_factory(factory)
-        assert context.get_resource_nowait(int) == 5
-        assert context.get_resource_nowait(float) == 5
+        assert context.require_resource(int) == 5
+        assert context.require_resource(float) == 5
 
     async def test_add_resource_return_type_optional(self, context: Context) -> None:
         def factory(ctx: Context) -> Optional[str]:  # noqa: UP007
             return "foo"
 
         await context.add_resource_factory(factory)
-        assert context.get_resource_nowait(str) == "foo"
+        assert context.require_resource(str) == "foo"
 
     async def test_get_static_resources(self, context: Context) -> None:
         await context.add_resource(9, "foo")
@@ -245,14 +245,14 @@ class TestContext:
 
     async def test_require_resource(self, context: Context) -> None:
         await context.add_resource(1)
-        assert context.get_resource_nowait(int) == 1
+        assert context.require_resource(int) == 1
 
     async def test_require_resource_not_found(self, context: Context) -> None:
         """
         Test that ResourceNotFound is raised when a required resource is not found.
 
         """
-        exc = pytest.raises(ResourceNotFound, context.get_resource_nowait, int, "foo")
+        exc = pytest.raises(ResourceNotFound, context.require_resource, int, "foo")
         exc.match("no matching resource was found for type=int name='foo'")
         assert exc.value.type == int
         assert exc.value.name == "foo"
@@ -335,7 +335,7 @@ class TestContextTeardown:
 
         async def teardown_callback() -> None:
             nonlocal resource
-            resource = await get_resource(str)
+            resource = require_resource(str)
 
         async with Context() as ctx:
             await ctx.add_resource("blah")
@@ -348,7 +348,7 @@ class TestContextTeardown:
 
         async def teardown_callback() -> None:
             nonlocal resource
-            resource = await get_resource(str)
+            resource = require_resource(str)
 
         async with Context() as ctx:
             await ctx.add_resource_factory(lambda context: "blah", types=[str])
@@ -400,15 +400,15 @@ async def test_current_context() -> None:
 async def test_get_resource() -> None:
     async with Context() as ctx:
         await ctx.add_resource("foo")
-        assert await get_resource(str) == "foo"
-        assert await get_resource(int, optional=True) is None
+        assert get_resource(str) == "foo"
+        assert get_resource(int) is None
 
 
-async def test_get_resource_sync() -> None:
+async def test_require_resource() -> None:
     async with Context() as ctx:
         await ctx.add_resource("foo")
-        assert get_resource_nowait(str) == "foo"
-        assert get_resource_nowait(int, optional=True) is None
+        assert require_resource(str) == "foo"
+        pytest.raises(ResourceNotFound, require_resource, int)
 
 
 class TestDependencyInjection:
