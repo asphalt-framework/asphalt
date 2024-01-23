@@ -76,7 +76,7 @@ class BoundSignal(Generic[T_Event]):
         event.topic = self.topic
         event.time = stdlib_time()
 
-        for stream in self._send_streams:
+        for stream in list(self._send_streams):
             try:
                 await stream.send(event)
             except BrokenResourceError:
