@@ -25,6 +25,7 @@ __all__ = (
     "callable_name",
     "merge_config",
     "qualified_name",
+    "resolve_reference",
 )
 
 from typing import Any
@@ -52,7 +53,13 @@ from ._context import (
 from ._event import Event, Signal, stream_events, wait_event
 from ._exceptions import ApplicationExit
 from ._runner import run_application
-from ._utils import PluginContainer, callable_name, merge_config, qualified_name
+from ._utils import (
+    PluginContainer,
+    callable_name,
+    merge_config,
+    qualified_name,
+    resolve_reference,
+)
 
 # Re-export imports so they look like they live directly in this package
 key: str
