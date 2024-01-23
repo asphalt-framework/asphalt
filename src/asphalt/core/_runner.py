@@ -13,6 +13,7 @@ from anyio import (
     create_task_group,
     fail_after,
     get_cancelled_exc_class,
+    sleep,
     to_thread,
 )
 from anyio.abc import TaskStatus
@@ -113,28 +114,26 @@ async def run_application(
         async with AsyncExitStack() as exit_stack:
             handlers = {ApplicationExit: handle_application_exit}
             exit_stack.enter_context(catch(handlers))  # type: ignore[arg-type]
-            # if platform.system() != "Windows":
-            # root_tg = await exit_stack.enter_async_context(create_task_group())
-            # await root_tg.start(handle_signals, name="Asphalt signal handler")
-            # exit_stack.callback(root_tg.cancel_scope.cancel)
+            if platform.system() != "Windows":
+                root_tg = await exit_stack.enter_async_context(create_task_group())
+                await root_tg.start(handle_signals, name="Asphalt signal handler")
+                exit_stack.callback(root_tg.cancel_scope.cancel)
 
-            # ctx = await exit_stack.enter_async_context(Context())
-            async with create_task_group() as root_tg, Context() as ctx:
-                if platform.system() != "Windows":
-                    await root_tg.start(handle_signals, name="Asphalt signal handler")
-                try:
-                    with fail_after(start_timeout):
-                        await component.start(ctx)
-                except TimeoutError:
-                    logger.error("Timeout waiting for the root component to start")
-                    raise
-                except (ApplicationExit, get_cancelled_exc_class()):
-                    logger.error("Application startup interrupted")
-                    return
-                except BaseException:
-                    logger.exception("Error during application startup")
-                    raise
+            ctx = await exit_stack.enter_async_context(Context())
+            try:
+                with fail_after(start_timeout):
+                    await component.start(ctx)
+            except TimeoutError:
+                logger.error("Timeout waiting for the root component to start")
+                raise
+            except (ApplicationExit, get_cancelled_exc_class()):
+                logger.error("Application startup interrupted")
+                return
+            except BaseException:
+                logger.exception("Error during application startup")
+                raise
 
             logger.info("Application started")
+            await sleep(float("inf"))
     finally:
         logger.info("Application stopped")
