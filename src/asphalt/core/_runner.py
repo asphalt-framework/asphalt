@@ -14,7 +14,6 @@ from anyio import (
     create_task_group,
     fail_after,
     get_cancelled_exc_class,
-    sleep,
     to_thread,
 )
 from anyio.abc import TaskStatus
@@ -118,7 +117,9 @@ async def run_application(
             event = Event()
             if platform.system() != "Windows":
                 root_tg = await exit_stack.enter_async_context(create_task_group())
-                await root_tg.start(handle_signals, event, name="Asphalt signal handler")
+                await root_tg.start(
+                    handle_signals, event, name="Asphalt signal handler"
+                )
                 exit_stack.callback(root_tg.cancel_scope.cancel)
 
             ctx = await exit_stack.enter_async_context(Context())
