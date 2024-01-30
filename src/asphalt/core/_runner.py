@@ -10,10 +10,10 @@ from typing import Any, cast
 
 import anyio
 from anyio import (
+    Event,
     create_task_group,
     fail_after,
     get_cancelled_exc_class,
-    sleep,
     to_thread,
 )
 from anyio.abc import TaskStatus
@@ -27,7 +27,7 @@ if sys.version_info < (3, 11):
     from exceptiongroup import ExceptionGroup
 
 
-async def handle_signals(*, task_status: TaskStatus) -> None:
+async def handle_signals(event, *, task_status: TaskStatus) -> None:
     logger = getLogger(__name__)
     with anyio.open_signal_receiver(signal.SIGTERM, signal.SIGINT) as signals:
         task_status.started()
@@ -37,7 +37,7 @@ async def handle_signals(*, task_status: TaskStatus) -> None:
                 "Received signal (%s) – terminating application",
                 signal_name.split(":", 1)[0],  # macOS has ": <signum>" after the name
             )
-            raise ApplicationExit
+            event.set()
 
 
 def handle_application_exit(excgrp: ExceptionGroup) -> None:
@@ -114,9 +114,12 @@ async def run_application(
         async with AsyncExitStack() as exit_stack:
             handlers = {ApplicationExit: handle_application_exit}
             exit_stack.enter_context(catch(handlers))  # type: ignore[arg-type]
+            event = Event()
             if platform.system() != "Windows":
                 root_tg = await exit_stack.enter_async_context(create_task_group())
-                await root_tg.start(handle_signals, name="Asphalt signal handler")
+                await root_tg.start(
+                    handle_signals, event, name="Asphalt signal handler"
+                )
                 exit_stack.callback(root_tg.cancel_scope.cancel)
 
             ctx = await exit_stack.enter_async_context(Context())
@@ -134,6 +137,7 @@ async def run_application(
                 raise
 
             logger.info("Application started")
-            await sleep(float("inf"))
+
+            await event.wait()
     finally:
         logger.info("Application stopped")
