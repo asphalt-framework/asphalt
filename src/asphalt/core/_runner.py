@@ -27,6 +27,18 @@ if sys.version_info < (3, 11):
     from exceptiongroup import ExceptionGroup
 
 
+def handle_application_exit(excgrp: ExceptionGroup) -> None:
+    while len(excgrp.exceptions) == 1 and isinstance(
+        excgrp.exceptions[0], ExceptionGroup
+    ):
+        excgrp = excgrp.exceptions[0]
+
+    if len(excgrp.exceptions) == 1:
+        assert isinstance(excgrp.exceptions[0], ApplicationExit)
+        if excgrp.exceptions[0].code:
+            raise excgrp.exceptions[0]
+
+
 async def handle_signals(event, *, task_status: TaskStatus) -> None:
     logger = getLogger(__name__)
     with anyio.open_signal_receiver(signal.SIGTERM, signal.SIGINT) as signals:
@@ -38,19 +50,6 @@ async def handle_signals(event, *, task_status: TaskStatus) -> None:
                 signal_name.split(":", 1)[0],  # macOS has ": <signum>" after the name
             )
             event.set()
-
-
-def handle_application_exit(excgrp: ExceptionGroup) -> None:
-    exc: Exception = excgrp
-    while isinstance(exc, ExceptionGroup):
-        if len(exc.exceptions) > 1:
-            raise RuntimeError("Multiple ApplicationExit exceptions were raised")
-
-        exc = exc.exceptions[0]
-
-    exit_exc = cast(ApplicationExit, exc)
-    if exit_exc.code:
-        raise SystemExit(exit_exc.code).with_traceback(exc.__traceback__) from None
 
 
 async def run_application(
@@ -112,11 +111,13 @@ async def run_application(
     logger.info("Starting application")
     try:
         async with AsyncExitStack() as exit_stack:
+            event = Event()
             handlers = {ApplicationExit: handle_application_exit}
             exit_stack.enter_context(catch(handlers))  # type: ignore[arg-type]
-            event = Event()
+            root_tg = await exit_stack.enter_async_context(create_task_group())
+
+            # Set up a signal handler on platforms that support signals
             if platform.system() != "Windows":
-                root_tg = await exit_stack.enter_async_context(create_task_group())
                 await root_tg.start(
                     handle_signals, event, name="Asphalt signal handler"
                 )

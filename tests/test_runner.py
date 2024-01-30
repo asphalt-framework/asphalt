@@ -237,7 +237,7 @@ async def test_dict_config(caplog):
 
 async def test_run_cli_application(caplog):
     caplog.set_level(logging.INFO)
-    with pytest.raises(SystemExit) as exc:
+    with pytest.raises(ApplicationExit) as exc:
         await run_application(DummyCLIApp())
 
     assert exc.value.code == 20

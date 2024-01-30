@@ -9,6 +9,7 @@ import pytest
 from common import raises_in_exception_group
 
 from asphalt.core import (
+    ApplicationExit,
     CLIApplicationComponent,
     Component,
     ContainerComponent,
@@ -131,7 +132,7 @@ class TestCLIApplicationComponent:
             async def run(self) -> int:
                 return 5
 
-        with pytest.raises(SystemExit) as exc:
+        with pytest.raises(ApplicationExit) as exc:
             await run_application(DummyCLIComponent())
 
         assert exc.value.code == 5
@@ -141,7 +142,7 @@ class TestCLIApplicationComponent:
             async def run(self) -> int:
                 return 128
 
-        with pytest.raises(SystemExit) as exc:
+        with pytest.raises(ApplicationExit) as exc:
             with pytest.warns(UserWarning) as record:
                 await run_application(DummyCLIComponent())
 
@@ -154,7 +155,7 @@ class TestCLIApplicationComponent:
             async def run(self) -> int:
                 return "foo"  # type: ignore[return-value]
 
-        with pytest.raises(SystemExit) as exc:
+        with pytest.raises(ApplicationExit) as exc:
             with pytest.warns(UserWarning) as record:
                 await run_application(DummyCLIComponent())
 

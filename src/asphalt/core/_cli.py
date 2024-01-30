@@ -11,6 +11,7 @@ import click
 from ruamel.yaml import YAML, ScalarNode
 from ruamel.yaml.loader import Loader
 
+from . import ApplicationExit
 from ._runner import run_application
 from ._utils import merge_config, qualified_name
 
@@ -132,8 +133,11 @@ def run(configfile, service: str | None, set_: list[str]) -> None:
     # Start the application
     backend = config.pop("backend", "asyncio")
     backend_options = config.pop("backend_options", {})
-    anyio.run(
-        lambda: run_application(**config),
-        backend=backend,
-        backend_options=backend_options,
-    )
+    try:
+        anyio.run(
+            lambda: run_application(**config),
+            backend=backend,
+            backend_options=backend_options,
+        )
+    except ApplicationExit as exc:
+        raise SystemExit(exc.code).with_traceback(exc.__traceback__)
