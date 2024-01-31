@@ -51,7 +51,7 @@ else:
     from exceptiongroup import BaseExceptionGroup
     from typing_extensions import Self
 
-application_stopped_event = anyio.Event()
+application_stopped_event_var: ContextVar = ContextVar("application_stopped_event")
 logger = logging.getLogger(__name__)
 factory_callback_type = Callable[["Context"], Any]
 resource_name_re = re.compile(r"\w+")
@@ -678,6 +678,7 @@ class Context:
                 tg.cancel_scope.cancel()
 
             async def wait_for_application_stopped(tg):
+                application_stopped_event = application_stopped_event_var.get()
                 await application_stopped_event.wait()
                 tg.cancel_scope.cancel()
 
