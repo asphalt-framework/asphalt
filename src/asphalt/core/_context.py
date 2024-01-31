@@ -51,6 +51,7 @@ else:
     from exceptiongroup import BaseExceptionGroup
     from typing_extensions import Self
 
+application_stopped_event = anyio.Event()
 logger = logging.getLogger(__name__)
 factory_callback_type = Callable[["Context"], Any]
 resource_name_re = re.compile(r"\w+")
@@ -641,7 +642,7 @@ class Context:
             before the context can finish)
 
         """
-        finished_event = anyio.Event()
+        task_finished_event = anyio.Event()
         cancel_scope = CancelScope()
 
         async def run_background_task() -> None:
@@ -663,7 +664,7 @@ class Context:
                     else:
                         logger.debug("Background task (%s) finished", name)
                     finally:
-                        finished_event.set()
+                        task_finished_event.set()
 
         async def finalize_task() -> None:
             if cancel_on_exit:
@@ -671,7 +672,18 @@ class Context:
                 cancel_scope.cancel()
 
             logger.debug("Waiting for background task (%s) to finish", name)
-            await finished_event.wait()
+
+            async def wait_for_task_finished(tg):
+                await task_finished_event.wait()
+                tg.cancel_scope.cancel()
+
+            async def wait_for_application_stopped(tg):
+                await application_stopped_event.wait()
+                tg.cancel_scope.cancel()
+
+            async with create_task_group() as tg:
+                tg.start_soon(wait_for_task_finished, tg)
+                tg.start_soon(wait_for_application_stopped, tg)
 
         # await self._task_group.start(run_background_task)
         self._task_group.start_soon(run_background_task)
