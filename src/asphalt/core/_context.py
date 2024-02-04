@@ -671,7 +671,7 @@ class Context:
         :param name: descriptive name for the task
         :param teardown_action: the action to take when the context is being shut down:
             ``None`` means no action, ``'cancel'`` means cancel the task, or you can
-            supply a callback that is called instead
+            supply a callback (can be asynchronous) that is called instead
 
         """
         finished_event = anyio.Event()
