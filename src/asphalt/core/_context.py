@@ -23,6 +23,7 @@ from types import TracebackType
 from typing import (
     Any,
     Callable,
+    Literal,
     TypeVar,
     Union,
     cast,
@@ -291,11 +292,12 @@ class Context:
 
     async def add_resource(
         self,
-        value,
+        value: T_Resource,
         name: str = "default",
         types: type | Sequence[type] = (),
         *,
         description: str | None = None,
+        teardown_callback: Callable[[], Any] | None = None,
     ) -> None:
         """
         Add a resource to this context.
@@ -309,6 +311,8 @@ class Context:
             ``value``)
         :param description: an optional free-form description, for
             introspection/debugging
+        :param teardown_callback: callable that is called to perform cleanup on this
+            resource when the context is being shut down
         :raises asphalt.core.context.ResourceConflict: if the resource conflicts with an
             existing one in any way
 
@@ -349,6 +353,10 @@ class Context:
         container = ResourceContainer(value, types_, name, description, False)
         for type_ in types_:
             self._resources[(type_, name)] = container
+
+        # Add the teardown callback, if any
+        if teardown_callback is not None:
+            self.add_teardown_callback(teardown_callback)
 
         # Notify listeners that a new resource has been made available
         await self.resource_added.dispatch(ResourceEvent(types_, name, False))
@@ -622,7 +630,7 @@ class Context:
         func: Callable[..., Coroutine[Any, Any, Any]],
         name: str,
         *,
-        cancel_on_exit: bool = True,
+        teardown_action: Callable[[], Any] | None | Literal["cancel"] = "cancel",
     ) -> None:
         """
         Start a task that runs independently on the background.
@@ -636,9 +644,9 @@ class Context:
 
         :param func: the coroutine function to run
         :param name: descriptive name for the task
-        :param cancel_on_exit: whether to cancel the task when the context is exited
-            (``False`` means that the task will be allowed to run to its completion
-            before the context can finish)
+        :param teardown_action: the action to take when the context is being shut down:
+            ``None`` means no action, ``'cancel'`` means cancel the task, or you can
+            supply a callback that is called instead
 
         """
         finished_event = anyio.Event()
@@ -666,9 +674,18 @@ class Context:
                         finished_event.set()
 
         async def finalize_task() -> None:
-            if cancel_on_exit:
+            if teardown_action == "cancel":
                 logger.debug("Cancelling background task (%s)", name)
                 cancel_scope.cancel()
+            elif teardown_action:
+                logger.debug(
+                    "Calling teardown callback (%s) for background task (%s)",
+                    callable_name(teardown_action),
+                    name,
+                )
+                retval = teardown_action()
+                if isawaitable(retval):
+                    await retval
 
             logger.debug("Waiting for background task (%s) to finish", name)
             await finished_event.wait()
@@ -791,11 +808,11 @@ async def start_background_task(
     func: Callable[..., Coroutine[Any, Any, Any]],
     name: str,
     *,
-    cancel_on_exit: bool = True,
+    teardown_action: Callable[[], Any] | None | Literal["cancel"] = "cancel",
 ) -> None:
     """Shortcut for ``current_context().start_background_task(...)``."""
     await current_context().start_background_task(
-        func, name, cancel_on_exit=cancel_on_exit
+        func, name, teardown_action=teardown_action
     )
 
 

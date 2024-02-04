@@ -53,7 +53,7 @@ class ShutdownComponent(Component):
             await anyio.sleep(1)
         else:
             await start_background_task(
-                self.stop_app, "Application terminator", cancel_on_exit=False
+                self.stop_app, "Application terminator", teardown_action=None
             )
 
 

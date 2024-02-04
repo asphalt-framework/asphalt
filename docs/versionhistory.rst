@@ -34,6 +34,9 @@ This library adheres to `Semantic Versioning 2.0 <http://semver.org/>`_.
     ``super().__init__()`` anymore
 - **BACKWARD INCOMPATIBLE** Moved all exported functions and classes directly to
   ``asphalt.core`` and made submodules private
+- Added the ``start_background_task()`` Context method (with a free-function variant
+  for convenience) that handles startup and shutdown of context-bound background tasks
+  for various purposes
 - Dropped support for Python 3.7
 
 **4.12.0**
