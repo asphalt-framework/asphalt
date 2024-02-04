@@ -481,7 +481,6 @@ class Context:
         if isinstance(retval, GeneratedResource):
             resource = retval.resource
             if retval.teardown_callback is not None:
-                print("Adding teardown callback to context", hex(id(self)))
                 self.add_teardown_callback(retval.teardown_callback)
         else:
             resource = retval
