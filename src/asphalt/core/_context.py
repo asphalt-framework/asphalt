@@ -715,7 +715,13 @@ class Context:
             logger.debug("Waiting for background task (%s) to finish", name)
             await finished_event.wait()
 
-        # await self._task_group.start(run_background_task)
+        if (
+            teardown_action is not None
+            and not callable(teardown_action)
+            and teardown_action != "cancel"
+        ):
+            raise ValueError("teardown_action must be a callable, 'cancel' or None")
+
         self._task_group.start_soon(run_background_task)
         self._exit_stack.push_async_callback(finalize_task)
 
