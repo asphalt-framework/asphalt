@@ -80,22 +80,23 @@ def merge_config(
     This similar to what :meth:`dict.update` does, but when a dictionary is about to be
     replaced with another dictionary, it instead merges the contents.
 
-    If a key in ``overrides`` is a dotted path (ie. ``foo.bar.baz: value``), it is
-    assumed to be a shorthand for ``foo: {bar: {baz: value}}``.
-
     :param original: a configuration dictionary (or ``None``)
     :param overrides: a dictionary containing overriding values to the configuration
         (or ``None``)
     :return: the merge result
 
+    .. versionchanged:: 5.0
+        Previously, if a key in ``overrides`` was a dotted path (ie.
+        ``foo.bar.baz: value``), it was assumed to be a shorthand for
+        ``foo: {bar: {baz: value}}``. In v5.0, this feature was removed, as it turned
+        out to be a problem with logging configuration, as it was not possible to
+        configure any logging that had a dot in its name (as is the case with most
+        loggers).
+
     """
     copied = original.copy() if original else {}
     if overrides:
         for key, value in overrides.items():
-            if "." in key:
-                key, rest = key.split(".", 1)
-                value = {rest: value}
-
             orig_value = copied.get(key)
             if isinstance(orig_value, dict) and isinstance(value, dict):
                 copied[key] = merge_config(orig_value, value)

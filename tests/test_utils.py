@@ -25,18 +25,10 @@ class DummyPlugin(BaseDummyPlugin):
         self.kwargs = kwargs
 
 
-@pytest.mark.parametrize(
-    "overrides",
-    [
-        {"a": 2, "foo": 6, "b": {"x": 5, "z": {"r": "bar", "s": [6, 7]}}},
-        {"a": 2, "foo": 6, "b.x": 5, "b.z": {"r": "bar", "s": [6, 7]}},
-        {"a": 2, "foo": 6, "b.x": 5, "b.z.r": "bar", "b.z.s": [6, 7]},
-    ],
-    ids=["nested_dicts", "part_nested", "dotted_paths"],
-)
-def test_merge_config(overrides) -> None:
-    original = {"a": 1, "b": {"x": 2, "y": 3, "z": {"r": [1, 2], "s": [3, 4]}}}
-    expected = {"a": 2, "foo": 6, "b": {"x": 5, "y": 3, "z": {"r": "bar", "s": [6, 7]}}}
+def test_merge_config() -> None:
+    original = {"a": 1, "b": 2.5, "x.y.z": [3, 4]}
+    overrides = {"a": 2, "foo": 6, "x.y.z": [6, 7]}
+    expected = {"a": 2, "b": 2.5, "foo": 6, "x.y.z": [6, 7]}
     assert merge_config(original, overrides) == expected
 
 
