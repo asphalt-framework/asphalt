@@ -191,20 +191,6 @@ tests against your application. For example, you might want to use the ``mock`` 
 suite configuration to test that the application correctly sends out emails (and to prevent them
 from actually being sent to recipients!).
 
-There is another neat trick that lets you easily modify a specific key in the configuration.
-By using dotted notation in a configuration key, you can target a specific key arbitrarily deep in
-the configuration structure. For example, to override the logging level for the root logger in the
-configuration above, you could use an override configuration such as::
-
-    ---
-    logging.root.level: DEBUG
-
-The keys don't need to be on the top level either, so the following has the same effect::
-
-    ---
-    logging:
-        root.level: DEBUG
-
 Defining multiple services
 --------------------------
 

@@ -34,6 +34,11 @@ This library adheres to `Semantic Versioning 2.0 <http://semver.org/>`_.
     ``super().__init__()`` anymore
 - **BACKWARD INCOMPATIBLE** Moved all exported functions and classes directly to
   ``asphalt.core`` and made submodules private
+- **BACKWARD INCOMPATIBLE** Changed configuration parsing to no longer treat dotted keys
+  in configuration overrides to be interpreted as structural shortcuts (i.e.
+  ``foo.bar.baz`` interpreted as a shortcut for a structure 3 levels deep:
+  ``foo: {bar: {baz: ...}}``), as this prevented proper configuration for loggers that
+  have dots in their names
 - Dropped support for Python 3.7
 
 **4.12.0**
