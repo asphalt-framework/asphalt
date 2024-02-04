@@ -23,6 +23,7 @@ from types import TracebackType
 from typing import (
     Any,
     Callable,
+    Generic,
     Literal,
     TypeVar,
     Union,
@@ -101,6 +102,12 @@ class ResourceEvent(Event):
     resource_types: tuple[type, ...]
     resource_name: str
     is_factory: bool
+
+
+@dataclass(frozen=True)
+class GeneratedResource(Generic[T_Resource]):
+    resource: T_Resource
+    teardown_callback: Callable[[], None | Coroutine] | None
 
 
 class AwaitableResourceError(Exception):
@@ -428,10 +435,20 @@ class Context:
                 )
 
             origin = get_origin(return_type_hint)
+            if origin is GeneratedResource:
+                args = get_args(return_type_hint)
+                if len(args) != 1:
+                    raise ValueError(
+                        f"GeneratedResource must specify exactly one parameter, got "
+                        f"{len(args)}"
+                    )
+
+                return_type_hint = args[0]
+
             if origin is Union or (
                 sys.version_info >= (3, 10) and origin is stdlib_types.UnionType
             ):
-                resource_types = return_type_hint.__args__
+                resource_types = get_args(return_type_hint)
             else:
                 resource_types = (return_type_hint,)
 
@@ -460,14 +477,22 @@ class Context:
         await self.resource_added.dispatch(ResourceEvent(resource_types, name, True))
 
     def _generate_resource_from_factory(self, factory: ResourceContainer) -> Any:
-        value = factory.value_or_factory(self)
+        retval = factory.value_or_factory(self)
+        if isinstance(retval, GeneratedResource):
+            resource = retval.resource
+            if retval.teardown_callback is not None:
+                print("Adding teardown callback to context", hex(id(self)))
+                self.add_teardown_callback(retval.teardown_callback)
+        else:
+            resource = retval
+
         container = ResourceContainer(
-            value, factory.types, factory.name, factory.description, False
+            resource, factory.types, factory.name, factory.description, False
         )
         for type_ in factory.types:
             self._resources[(type_, factory.name)] = container
 
-        return value
+        return resource
 
     def get_static_resources(self, type: type[T_Resource]) -> set[T_Resource]:
         """

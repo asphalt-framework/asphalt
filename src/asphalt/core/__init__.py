@@ -5,6 +5,7 @@ __all__ = (
     "ContainerComponent",
     "start_background_task",
     "Context",
+    "GeneratedResource",
     "ResourceConflict",
     "ResourceEvent",
     "ResourceNotFound",
@@ -37,6 +38,7 @@ from ._component import (
 )
 from ._context import (
     Context,
+    GeneratedResource,
     NoCurrentContext,
     ResourceConflict,
     ResourceEvent,
