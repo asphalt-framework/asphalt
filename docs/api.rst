@@ -23,6 +23,9 @@ Contexts and resources
 .. autoclass:: ResourceEvent
 .. autofunction:: current_context
 .. autofunction:: context_teardown
+.. autofunction:: add_resource
+.. autofunction:: get_resource
+.. autofunction:: require_resource
 .. autofunction:: inject
 .. autofunction:: resource
 .. autoexception:: NoCurrentContext

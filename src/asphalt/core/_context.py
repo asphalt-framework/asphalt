@@ -814,6 +814,19 @@ def current_context() -> Context:
     return ctx
 
 
+async def add_resource(
+    value: T_Resource,
+    name: str = "default",
+    types: type | Sequence[type] = (),
+    *,
+    description: str | None = None,
+    teardown_callback: Callable[[], Any] | None = None,
+) -> None:
+    await current_context().add_resource(
+        value, name, types, description=description, teardown_callback=teardown_callback
+    )
+
+
 def get_resources(type: type[T_Resource]) -> set[T_Resource]:
     """Shortcut for ``current_context().get_resources(...)``."""
     return current_context().get_resources(type)
