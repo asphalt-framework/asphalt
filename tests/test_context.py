@@ -6,8 +6,9 @@ from contextlib import ExitStack
 from itertools import count
 from typing import Any, NoReturn, Optional, Tuple, Union
 
+import anyio
 import pytest
-from anyio import create_task_group
+from anyio import create_task_group, fail_after, sleep, wait_all_tasks_blocked
 from common import raises_in_exception_group
 
 from asphalt.core import (
@@ -256,6 +257,59 @@ class TestContext:
         exc.match("no matching resource was found for type=int name='foo'")
         assert exc.value.type == int
         assert exc.value.name == "foo"
+
+    async def test_start_background_task_cancel_on_exit(self) -> None:
+        started = False
+        finished = False
+
+        async def taskfunc() -> None:
+            nonlocal started, finished
+            started = True
+            await sleep(3)
+            finished = True
+
+        async with Context() as ctx:
+            await ctx.start_background_task(taskfunc, "taskfunc")
+
+        assert started
+        assert not finished
+
+    async def test_start_background_task_custom_teardown_callback(self) -> None:
+        started = False
+        finished = False
+        event = anyio.Event()
+
+        async def taskfunc() -> None:
+            nonlocal started, finished
+            started = True
+            with fail_after(3):
+                await event.wait()
+
+            finished = True
+
+        async with Context() as ctx:
+            await ctx.start_background_task(
+                taskfunc, "taskfunc", teardown_action=event.set
+            )
+
+        assert started
+        assert finished
+
+    async def test_start_background_task_no_teardown_action(self) -> None:
+        started = False
+        finished = False
+
+        async def taskfunc() -> None:
+            nonlocal started, finished
+            started = True
+            await wait_all_tasks_blocked()
+            finished = True
+
+        async with Context() as ctx:
+            await ctx.start_background_task(taskfunc, "taskfunc", teardown_action=None)
+
+        assert started
+        assert finished
 
 
 class TestContextTeardown:

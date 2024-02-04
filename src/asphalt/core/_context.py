@@ -23,6 +23,8 @@ from types import TracebackType
 from typing import (
     Any,
     Callable,
+    Generic,
+    Literal,
     TypeVar,
     Union,
     cast,
@@ -100,6 +102,12 @@ class ResourceEvent(Event):
     resource_types: tuple[type, ...]
     resource_name: str
     is_factory: bool
+
+
+@dataclass(frozen=True)
+class GeneratedResource(Generic[T_Resource]):
+    resource: T_Resource
+    teardown_callback: Callable[[], None | Coroutine] | None
 
 
 class AwaitableResourceError(Exception):
@@ -291,11 +299,12 @@ class Context:
 
     async def add_resource(
         self,
-        value,
+        value: T_Resource,
         name: str = "default",
         types: type | Sequence[type] = (),
         *,
         description: str | None = None,
+        teardown_callback: Callable[[], Any] | None = None,
     ) -> None:
         """
         Add a resource to this context.
@@ -309,6 +318,8 @@ class Context:
             ``value``)
         :param description: an optional free-form description, for
             introspection/debugging
+        :param teardown_callback: callable that is called to perform cleanup on this
+            resource when the context is being shut down
         :raises asphalt.core.context.ResourceConflict: if the resource conflicts with an
             existing one in any way
 
@@ -349,6 +360,10 @@ class Context:
         container = ResourceContainer(value, types_, name, description, False)
         for type_ in types_:
             self._resources[(type_, name)] = container
+
+        # Add the teardown callback, if any
+        if teardown_callback is not None:
+            self.add_teardown_callback(teardown_callback)
 
         # Notify listeners that a new resource has been made available
         await self.resource_added.dispatch(ResourceEvent(types_, name, False))
@@ -420,10 +435,20 @@ class Context:
                 )
 
             origin = get_origin(return_type_hint)
+            if origin is GeneratedResource:
+                args = get_args(return_type_hint)
+                if len(args) != 1:
+                    raise ValueError(
+                        f"GeneratedResource must specify exactly one parameter, got "
+                        f"{len(args)}"
+                    )
+
+                return_type_hint = args[0]
+
             if origin is Union or (
                 sys.version_info >= (3, 10) and origin is stdlib_types.UnionType
             ):
-                resource_types = return_type_hint.__args__
+                resource_types = get_args(return_type_hint)
             else:
                 resource_types = (return_type_hint,)
 
@@ -452,14 +477,22 @@ class Context:
         await self.resource_added.dispatch(ResourceEvent(resource_types, name, True))
 
     def _generate_resource_from_factory(self, factory: ResourceContainer) -> Any:
-        value = factory.value_or_factory(self)
+        retval = factory.value_or_factory(self)
+        if isinstance(retval, GeneratedResource):
+            resource = retval.resource
+            if retval.teardown_callback is not None:
+                print("Adding teardown callback to context", hex(id(self)))
+                self.add_teardown_callback(retval.teardown_callback)
+        else:
+            resource = retval
+
         container = ResourceContainer(
-            value, factory.types, factory.name, factory.description, False
+            resource, factory.types, factory.name, factory.description, False
         )
         for type_ in factory.types:
             self._resources[(type_, factory.name)] = container
 
-        return value
+        return resource
 
     def get_static_resources(self, type: type[T_Resource]) -> set[T_Resource]:
         """
@@ -622,7 +655,7 @@ class Context:
         func: Callable[..., Coroutine[Any, Any, Any]],
         name: str,
         *,
-        cancel_on_exit: bool = True,
+        teardown_action: Callable[[], Any] | None | Literal["cancel"] = "cancel",
     ) -> None:
         """
         Start a task that runs independently on the background.
@@ -636,9 +669,9 @@ class Context:
 
         :param func: the coroutine function to run
         :param name: descriptive name for the task
-        :param cancel_on_exit: whether to cancel the task when the context is exited
-            (``False`` means that the task will be allowed to run to its completion
-            before the context can finish)
+        :param teardown_action: the action to take when the context is being shut down:
+            ``None`` means no action, ``'cancel'`` means cancel the task, or you can
+            supply a callback (can be asynchronous) that is called instead
 
         """
         finished_event = anyio.Event()
@@ -666,14 +699,29 @@ class Context:
                         finished_event.set()
 
         async def finalize_task() -> None:
-            if cancel_on_exit:
+            if teardown_action == "cancel":
                 logger.debug("Cancelling background task (%s)", name)
                 cancel_scope.cancel()
+            elif teardown_action:
+                logger.debug(
+                    "Calling teardown callback (%s) for background task (%s)",
+                    callable_name(teardown_action),
+                    name,
+                )
+                retval = teardown_action()
+                if isawaitable(retval):
+                    await retval
 
             logger.debug("Waiting for background task (%s) to finish", name)
             await finished_event.wait()
 
-        # await self._task_group.start(run_background_task)
+        if (
+            teardown_action is not None
+            and not callable(teardown_action)
+            and teardown_action != "cancel"
+        ):
+            raise ValueError("teardown_action must be a callable, 'cancel' or None")
+
         self._task_group.start_soon(run_background_task)
         self._exit_stack.push_async_callback(finalize_task)
 
@@ -772,6 +820,19 @@ def current_context() -> Context:
     return ctx
 
 
+async def add_resource(
+    value: T_Resource,
+    name: str = "default",
+    types: type | Sequence[type] = (),
+    *,
+    description: str | None = None,
+    teardown_callback: Callable[[], Any] | None = None,
+) -> None:
+    await current_context().add_resource(
+        value, name, types, description=description, teardown_callback=teardown_callback
+    )
+
+
 def get_resources(type: type[T_Resource]) -> set[T_Resource]:
     """Shortcut for ``current_context().get_resources(...)``."""
     return current_context().get_resources(type)
@@ -791,11 +852,11 @@ async def start_background_task(
     func: Callable[..., Coroutine[Any, Any, Any]],
     name: str,
     *,
-    cancel_on_exit: bool = True,
+    teardown_action: Callable[[], Any] | None | Literal["cancel"] = "cancel",
 ) -> None:
     """Shortcut for ``current_context().start_background_task(...)``."""
     await current_context().start_background_task(
-        func, name, cancel_on_exit=cancel_on_exit
+        func, name, teardown_action=teardown_action
     )
 
 

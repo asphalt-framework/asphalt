@@ -39,6 +39,9 @@ This library adheres to `Semantic Versioning 2.0 <http://semver.org/>`_.
   ``foo.bar.baz`` interpreted as a shortcut for a structure 3 levels deep:
   ``foo: {bar: {baz: ...}}``), as this prevented proper configuration for loggers that
   have dots in their names
+- Added the ``start_background_task()`` Context method (with a free-function variant
+  for convenience) that handles startup and shutdown of context-bound background tasks
+  for various purposes
 - Dropped support for Python 3.7
 
 **4.12.0**
