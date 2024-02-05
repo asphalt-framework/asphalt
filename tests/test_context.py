@@ -100,7 +100,7 @@ class TestContext:
         assert len(exc.value.exceptions[0].exceptions) == 2
 
     @pytest.mark.parametrize("types", [int, (int,), ()], ids=["type", "tuple", "empty"])
-    async def test_add_resource(self, context, types):
+    async def test_add_resource(self, context: Context, types):
         """
         Test that a resource is properly added in the context and listeners are
         notified.
@@ -143,7 +143,7 @@ class TestContext:
     @pytest.mark.parametrize(
         "name", ["a.b", "a:b", "a b"], ids=["dot", "colon", "space"]
     )
-    async def test_add_resource_bad_name(self, context, name):
+    async def test_add_resource_bad_name(self, context: Context, name: str) -> None:
         with pytest.raises(ValueError) as exc:
             await context.add_resource(1, name)
 
@@ -158,12 +158,11 @@ class TestContext:
 
         """
 
-        def factory(ctx):
-            assert ctx is context
+        def factory() -> int:
             return next(counter)
 
         counter = count(1)
-        await context.add_resource_factory(factory, types=[int])
+        await context.add_resource_factory(factory)
 
         assert context.require_resource(int) == 1
         assert context.require_resource(int) == 1
@@ -171,9 +170,11 @@ class TestContext:
     @pytest.mark.parametrize(
         "name", ["a.b", "a:b", "a b"], ids=["dot", "colon", "space"]
     )
-    async def test_add_resource_factory_bad_name(self, context, name):
+    async def test_add_resource_factory_bad_name(
+        self, context: Context, name: str
+    ) -> None:
         with pytest.raises(ValueError) as exc:
-            await context.add_resource_factory(lambda ctx: 1, name, types=[int])
+            await context.add_resource_factory(lambda: 1, name, types=[int])
 
         exc.match(
             '"name" must be a nonempty string consisting only of alphanumeric '
@@ -182,14 +183,14 @@ class TestContext:
 
     async def test_add_resource_factory_empty_types(self, context: Context) -> None:
         with pytest.raises(ValueError) as exc:
-            await context.add_resource_factory(lambda ctx: 1, types=())
+            await context.add_resource_factory(lambda: 1, types=())
 
         exc.match("no resource types were specified")
 
     async def test_add_resource_factory_type_conflict(self, context: Context) -> None:
-        await context.add_resource_factory(lambda ctx: None, types=(str, int))
+        await context.add_resource_factory(lambda: None, types=(str, int))
         with pytest.raises(ResourceConflict) as exc:
-            await context.add_resource_factory(lambda ctx: None, types=[int])
+            await context.add_resource_factory(lambda: None, types=[int])
 
         exc.match("this context already contains a resource factory for the type int")
 
@@ -199,21 +200,28 @@ class TestContext:
         if a parent context has one already.
 
         """
-        await context.add_resource_factory(id, types=[int])
 
+        def factory() -> int:
+            return next(counter)
+
+        counter = count(1)
+        await context.add_resource_factory(factory)
+
+        assert context.require_resource(int) == 1
+        assert context.require_resource(int) == 1
         async with Context() as subcontext:
-            assert context.require_resource(int) == id(context)
-            assert subcontext.require_resource(int) == id(subcontext)
+            assert subcontext.require_resource(int) == 2
+            assert subcontext.require_resource(int) == 2
 
     async def test_add_resource_return_type_single(self, context: Context) -> None:
-        def factory(ctx: Context) -> str:
+        def factory() -> str:
             return "foo"
 
         await context.add_resource_factory(factory)
         assert context.require_resource(str) == "foo"
 
     async def test_add_resource_return_type_union(self, context: Context) -> None:
-        def factory(ctx: Context) -> Union[int, float]:  # noqa: UP007
+        def factory() -> Union[int, float]:  # noqa: UP007
             return 5
 
         await context.add_resource_factory(factory)
@@ -222,7 +230,7 @@ class TestContext:
 
     @pytest.mark.skipif(sys.version_info < (3, 10), reason="Requires Python 3.10+")
     async def test_add_resource_return_type_uniontype(self, context: Context) -> None:
-        def factory(ctx: Context) -> int | float:
+        def factory() -> int | float:
             return 5
 
         await context.add_resource_factory(factory)
@@ -230,7 +238,7 @@ class TestContext:
         assert context.require_resource(float) == 5
 
     async def test_add_resource_return_type_optional(self, context: Context) -> None:
-        def factory(ctx: Context) -> Optional[str]:  # noqa: UP007
+        def factory() -> Optional[str]:  # noqa: UP007
             return "foo"
 
         await context.add_resource_factory(factory)
@@ -238,7 +246,7 @@ class TestContext:
 
     async def test_get_static_resources(self, context: Context) -> None:
         await context.add_resource(9, "foo")
-        await context.add_resource_factory(lambda ctx: 7, "bar", types=[int])
+        await context.add_resource_factory(lambda: 7, "bar", types=[int])
         async with Context() as subctx:
             await subctx.add_resource(1, "bar")
             await subctx.add_resource(4, "foo")
@@ -374,13 +382,13 @@ class TestContextTeardown:
 
     async def test_exception(self) -> None:
         @context_teardown
-        async def start(ctx: Context) -> AsyncGenerator[None, Any]:
+        async def start() -> AsyncGenerator[None, Any]:
             raise Exception("dummy error")
             yield
 
-        context = Context()
-        with pytest.raises(Exception) as exc_info:
-            await start(context)
+        async with Context():
+            with pytest.raises(Exception) as exc_info:
+                await start()
 
         exc_info.match("dummy error")
 
@@ -405,7 +413,7 @@ class TestContextTeardown:
             resource = require_resource(str)
 
         async with Context() as ctx:
-            await ctx.add_resource_factory(lambda context: "blah", types=[str])
+            await ctx.add_resource_factory(lambda: "blah", types=[str])
             ctx.add_teardown_callback(teardown_callback)
 
         assert resource == "blah"
@@ -419,7 +427,7 @@ class TestContextFinisher:
         phase = received_exception = None
 
         @context_teardown
-        async def start(ctx: Context) -> AsyncGenerator[None, Any]:
+        async def start() -> AsyncGenerator[None, Any]:
             nonlocal phase, received_exception
             phase = "started"
             exc = yield
@@ -427,8 +435,8 @@ class TestContextFinisher:
             received_exception = exc
 
         with ExitStack() as exit_stack:
-            async with Context() as context:
-                await start(context)
+            async with Context():
+                await start()
                 assert phase == "started"
                 if expected_exc:
                     exit_stack.enter_context(pytest.raises(ExceptionGroup))

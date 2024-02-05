@@ -14,7 +14,6 @@ Concurrency
 -----------
 
 .. autofunction:: start_background_task
-.. autofunction:: start_service_task
 
 Contexts and resources
 ----------------------
@@ -24,6 +23,8 @@ Contexts and resources
 .. autofunction:: current_context
 .. autofunction:: context_teardown
 .. autofunction:: add_resource
+.. autofunction:: add_resource_factory
+.. autofunction:: add_teardown_callback
 .. autofunction:: get_resource
 .. autofunction:: require_resource
 .. autofunction:: inject
@@ -35,7 +36,7 @@ Contexts and resources
 Events
 ------
 
-.. autoclass:: ResourceEvent
+.. autoclass:: Event
 .. autoclass:: Signal
 .. autofunction:: stream_events
 .. autofunction:: wait_event
@@ -52,3 +53,4 @@ Utilities
 .. autofunction:: callable_name
 .. autofunction:: merge_config
 .. autofunction:: qualified_name
+.. autofunction:: resolve_reference

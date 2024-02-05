@@ -12,11 +12,11 @@ import anyio
 import httpx
 from asphalt.core import (
     Component,
-    Context,
     Event,
     Signal,
     context_teardown,
     start_background_task,
+    add_resource,
 )
 
 logger = logging.getLogger(__name__)
@@ -64,9 +64,9 @@ class ChangeDetectorComponent(Component):
         self.delay = delay
 
     @context_teardown
-    async def start(self, ctx: Context) -> AsyncGenerator[None, Exception | None]:
+    async def start(self) -> AsyncGenerator[None, Exception | None]:
         detector = Detector(self.url, self.delay)
-        await ctx.add_resource(detector)
+        await add_resource(detector)
         await start_background_task(detector.run, "Web page change detector")
         logging.info(
             'Started web page change detector for url "%s" with a delay of %d seconds',

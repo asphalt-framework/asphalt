@@ -15,7 +15,8 @@ from asphalt.core import (
     ApplicationExit,
     CLIApplicationComponent,
     Component,
-    Context,
+    add_teardown_callback,
+    request_resource,
     run_application,
     start_background_task,
 )
@@ -47,8 +48,8 @@ class ShutdownComponent(Component):
         elif self.method == "exception":
             raise RuntimeError("this should crash the application")
 
-    async def start(self, ctx: Context) -> None:
-        ctx.add_teardown_callback(self.teardown_callback, pass_exception=True)
+    async def start(self) -> None:
+        add_teardown_callback(self.teardown_callback, pass_exception=True)
         if self.method == "timeout":
             await anyio.sleep(1)
         else:
@@ -61,7 +62,7 @@ class CrashComponent(Component):
     def __init__(self, method: str = "exit"):
         self.method = method
 
-    async def start(self, ctx: Context) -> None:
+    async def start(self) -> None:
         if self.method == "keyboard":
             raise KeyboardInterrupt
         elif self.method == "sigterm":
@@ -198,9 +199,9 @@ async def test_start_timeout(caplog):
     """
 
     class StallingComponent(Component):
-        async def start(self, ctx: Context) -> None:
+        async def start(self) -> None:
             # Wait forever for a non-existent resource
-            await ctx.request_resource(float)
+            await request_resource(float)
 
     caplog.set_level(logging.INFO)
     component = StallingComponent()

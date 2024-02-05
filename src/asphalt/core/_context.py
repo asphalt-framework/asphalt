@@ -54,7 +54,7 @@ else:
     from typing_extensions import Self
 
 logger = logging.getLogger(__name__)
-factory_callback_type = Callable[["Context"], Any]
+factory_callback_type = Callable[[], Any]
 resource_name_re = re.compile(r"\w+")
 T_Resource = TypeVar("T_Resource")
 T_Retval = TypeVar("T_Retval")
@@ -320,8 +320,8 @@ class Context:
             introspection/debugging
         :param teardown_callback: callable that is called to perform cleanup on this
             resource when the context is being shut down
-        :raises asphalt.core.context.ResourceConflict: if the resource conflicts with an
-            existing one in any way
+        :raises ResourceConflict: if the resource conflicts with an existing one in any
+            way
 
         """
         self._ensure_state(ContextState.open, ContextState.closing)
@@ -405,8 +405,8 @@ class Context:
             annotation)
         :param description: an optional free-form description, for
             introspection/debugging
-        :raises asphalt.core.context.ResourceConflict: if there is an existing resource
-            factory for the given type/name combinations or the given context variable
+        :raises ResourceConflict: if there is an existing resource factory for the given
+            type/name combinations or the given context variable
 
         """
         import types as stdlib_types
@@ -477,7 +477,7 @@ class Context:
         await self.resource_added.dispatch(ResourceEvent(resource_types, name, True))
 
     def _generate_resource_from_factory(self, factory: ResourceContainer) -> Any:
-        retval = factory.value_or_factory(self)
+        retval = factory.value_or_factory()
         if isinstance(retval, GeneratedResource):
             resource = retval.resource
             if retval.teardown_callback is not None:
@@ -612,8 +612,7 @@ class Context:
         :param type: type of the requested resource
         :param name: name of the requested resource
         :return: the requested resource
-        :raises asphalt.core.context.ResourceNotFound: if a resource of the given type
-            and name was not found
+        :raises ResourceNotFound: if a resource of the given type and name was not found
 
         """
         resource = self.get_resource(type, name)
@@ -725,27 +724,9 @@ class Context:
         self._exit_stack.push_async_callback(finalize_task)
 
 
-@overload
 def context_teardown(
-    func: Callable[[T_Context], AsyncGenerator[None, Exception | None]],
-) -> Callable[[T_Context], Coroutine[Any, Any, None]]:
-    ...
-
-
-@overload
-def context_teardown(
-    func: Callable[[T_Self, T_Context], AsyncGenerator[None, Exception | None]],
-) -> Callable[[T_Self, T_Context], Coroutine[Any, Any, None]]:
-    ...
-
-
-def context_teardown(
-    func: Callable[[T_Context], AsyncGenerator[None, Exception | None]]
-    | Callable[[T_Self, T_Context], AsyncGenerator[None, Exception | None]],
-) -> (
-    Callable[[T_Context], Coroutine[Any, Any, None]]
-    | Callable[[T_Self, T_Context], Coroutine[Any, Any, None]]
-):
+    func: Callable[P, AsyncGenerator[None, Exception | None]],
+) -> Callable[P, Coroutine[Any, Any, None]]:
     """
     Wrap an async generator function to execute the rest of the function at context
     teardown.
@@ -759,7 +740,7 @@ def context_teardown(
 
         class SomeComponent(Component):
             @context_teardown
-            async def start(self, ctx: Context):
+            async def start(self):
                 service = SomeService()
                 ctx.add_resource(service)
                 exception = yield
@@ -781,7 +762,7 @@ def context_teardown(
                 await generator.aclose()
 
         try:
-            ctx = next(arg for arg in args[:2] if isinstance(arg, Context))
+            ctx = current_context()
         except StopIteration:
             raise RuntimeError(
                 f"the first positional argument to {callable_name(func)}() has to be "
@@ -827,24 +808,81 @@ async def add_resource(
     description: str | None = None,
     teardown_callback: Callable[[], Any] | None = None,
 ) -> None:
+    """
+    Shortcut for ``current_context().add_resource(...)``.
+
+    .. seealso:: :meth:`Context.add_resource`
+    """
     await current_context().add_resource(
         value, name, types, description=description, teardown_callback=teardown_callback
     )
 
 
+async def add_resource_factory(
+    factory_callback: factory_callback_type,
+    name: str = "default",
+    *,
+    types: Sequence[type] | None = None,
+    description: str | None = None,
+) -> None:
+    """
+    Shortcut for ``current_context().add_resource_factory(...)``.
+
+    .. seealso:: :meth:`Context.add_resource_factory`
+
+    """
+    await current_context().add_resource_factory(
+        factory_callback, name, types=types, description=description
+    )
+
+
+def add_teardown_callback(callback: Callable, pass_exception: bool = False) -> None:
+    """
+    Shortcut for ``current_context().add_teardown_callback(...)``.
+
+    .. seealso:: :meth:`Context.add_teardown_callback`
+    """
+    current_context().add_teardown_callback(callback, pass_exception=pass_exception)
+
+
 def get_resources(type: type[T_Resource]) -> set[T_Resource]:
-    """Shortcut for ``current_context().get_resources(...)``."""
+    """
+    Shortcut for ``current_context().get_resources(...)``.
+
+    .. seealso:: :meth:`Context.get_resources`
+
+    """
     return current_context().get_resources(type)
 
 
 def get_resource(type: type[T_Resource], name: str = "default") -> T_Resource | None:
-    """Shortcut for ``current_context().get_resource(...)``."""
+    """
+    Shortcut for ``current_context().get_resource(...)``.
+
+    .. seealso:: :meth:`Context.get_resource`
+
+    """
     return current_context().get_resource(type, name)
 
 
 def require_resource(type: type[T_Resource], name: str = "default") -> T_Resource:
-    """Shortcut for ``current_context().require_resource(...)``."""
+    """
+    Shortcut for ``current_context().require_resource(...)``.
+
+    .. seealso:: :meth:`Context.require_resource`
+
+    """
     return current_context().require_resource(type, name)
+
+
+async def request_resource(type: type[T_Resource], name: str = "default") -> T_Resource:
+    """
+    Shortcut for ``current_context().request_resource(...)``.
+
+    .. seealso:: :meth:`Context.request_resource`
+
+    """
+    return await current_context().request_resource(type, name)
 
 
 async def start_background_task(
@@ -853,7 +891,12 @@ async def start_background_task(
     *,
     teardown_action: Callable[[], Any] | None | Literal["cancel"] = "cancel",
 ) -> None:
-    """Shortcut for ``current_context().start_background_task(...)``."""
+    """
+    Shortcut for ``current_context().start_background_task(...)``.
+
+    .. seealso:: :meth:`Context.request_resource`
+
+    """
     await current_context().start_background_task(
         func, name, teardown_action=teardown_action
     )

@@ -2,7 +2,7 @@
 import pytest
 
 from asphalt.core import Context
-from _pytest.capture import CaptureFixture
+from pytest import CaptureFixture
 
 from echo.client import ClientComponent
 from echo.server import ServerComponent
@@ -11,12 +11,12 @@ pytestmark = pytest.mark.anyio
 
 
 async def test_client_and_server(capsys: CaptureFixture[str]) -> None:
-    async with Context() as ctx:
+    async with Context():
         server = ServerComponent()
-        await server.start(ctx)
+        await server.start()
 
         client = ClientComponent("Hello!")
-        await client.start(ctx)
+        await client.start()
 
     # Grab the captured output of sys.stdout and sys.stderr from the capsys fixture
     out, err = capsys.readouterr()
