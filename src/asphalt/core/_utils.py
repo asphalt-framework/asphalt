@@ -1,11 +1,9 @@
 from __future__ import annotations
 
-import gc
 import sys
 from collections.abc import Callable
 from importlib import import_module
 from inspect import isclass
-from types import FrameType
 from typing import Any, TypeVar, overload
 
 if sys.version_info >= (3, 10):
@@ -211,19 +209,3 @@ class PluginContainer:
             f"{self.__class__.__name__}(namespace={self.namespace!r}, "
             f"base_class={qualified_name(self.base_class)})"
         )
-
-
-def get_coro_frames(coro: Any) -> list[FrameType]:
-    """Find the relevant code location from the task's stack."""
-    frames: list[FrameType] = []
-    while coro:
-        while coro.__class__.__name__ == "async_generator_asend":
-            # Hack to get past asend() objects
-            coro = gc.get_referents(coro)[0].ag_await
-
-        if frame := getattr(coro, "cr_frame", None):
-            frames.append(frame)
-
-        coro = getattr(coro, "cr_await", None)
-
-    return frames
