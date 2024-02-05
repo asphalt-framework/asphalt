@@ -1,23 +1,25 @@
 Working with components
 =======================
 
+.. py:currentmodule:: asphalt.core
+
 Components are the basic building blocks of an Asphalt application. They have a narrowly defined
 set of responsibilities:
 
 #. Take in configuration through the constructor
 #. Validate the configuration
-#. Add resources to the context (in :meth:`~asphalt.core.component.Component.start`)
+#. Add resources to the context (in :meth:`Component.start`)
 #. Close/shut down/clean up resources when the context is torn down (by directly adding a callback
-   on the context with :meth:`~asphalt.core.context.Context.add_teardown_callback`, or by using
-   :func:`~asphalt.core.context.context_teardown`)
+   on the context with :meth:`Context.add_teardown_callback`, or by using
+   :func:`context_teardown`)
 
-The :meth:`~asphalt.core.component.Component.start` method is called either by the parent component
-or the application runner with a :class:`~asphalt.core.context.Context` as its only argument.
+The :meth:`Component.start` method is called either by the parent component
+or the application runner with a :class:`Context` as its only argument.
 The component can use the context to add resources for other components and the application
 business logic to use. It can also request resources provided by other components to provide some
 complex service that builds on those resources.
 
-The :meth:`~asphalt.core.component.Component.start` method of a component is only called once,
+The :meth:`Component.start` method of a component is only called once,
 during application startup. When all components have been started, they are disposed of.
 If any of the components raises an exception, the application startup process fails and any context
 teardown callbacks scheduled so far are called before the process is exited.
@@ -49,7 +51,7 @@ The root component of virtually any nontrivial Asphalt application is a containe
 Container components can of course contain other container components and so on.
 
 When the container component starts its child components, each
-:meth:`~asphalt.core.component.Component.start` call is launched in its own task. Therefore all the
+:meth:`Component.start` call is launched in its own task. Therefore all the
 child components start concurrently and cannot rely on the start order. This is by design.
 The only way components should be relying on each other is by the sharing of resources in the
 context.

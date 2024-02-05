@@ -1,6 +1,8 @@
 Configuration and deployment
 ============================
 
+.. py:currentmodule:: asphalt.core
+
 As your application grows more complex, you may find that you need to have different settings for
 your development environment and your production environment. You may even have multiple
 deployments that all need their own custom configuration.
@@ -29,9 +31,9 @@ What this will do is:
 
 #. read all the given configuration files, if any, starting from ``yourconfig.yaml``
 #. read the command line configuration options passed with ``--set``, if any
-#. merge the configuration files' contents and the command line configuration options into a single configuration dictionary using
-   :func:`~asphalt.core.utils.merge_config`.
-#. call :func:`~asphalt.core.runner.run_application` using the configuration dictionary as keyword
+#. merge the configuration files' contents and the command line configuration options
+   into a single configuration dictionary using :func:`merge_config`.
+#. call :func:`run_application` using the configuration dictionary as keyword
    arguments
 
 Writing a configuration file
@@ -86,12 +88,12 @@ You could then write a configuration file like this::
 
 In the above configuration you have three top level configuration keys: ``max_threads``,
 ``component`` and ``logging``, all of which are directly passed to
-:func:`~asphalt.core.runner.run_application` as keyword arguments.
+:func:`run_application` as keyword arguments.
 
 The ``component`` section defines the type of the root component using the specially processed
 ``type`` option. You can either specify a setuptools entry point name (from the
 ``asphalt.components`` namespace) or a text reference like ``module:class`` (see
-:func:`~asphalt.core.utils.resolve_reference` for details). The rest of the keys in this section are
+:func:`resolve_reference` for details). The rest of the keys in this section are
 passed directly to the constructor of the ``MyRootComponent`` class.
 
 The ``components`` section within ``component`` is processed in a similar fashion.
@@ -146,7 +148,7 @@ Configuration overlays
 
 Component configuration can be specified on several levels:
 
-* Hard-coded arguments to :meth:`~asphalt.core.component.ContainerComponent.add_component`
+* Hard-coded arguments to :meth:`ContainerComponent.add_component`
 * First configuration file argument to ``asphalt run``
 * Second configuration file argument to ``asphalt run``
 * ...

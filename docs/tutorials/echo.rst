@@ -69,11 +69,11 @@ directory::
 
     import anyio
 
-    from asphalt.core import Component, Context, run_application
+    from asphalt.core import Component, run_application
 
 
     class ServerComponent(Component):
-        async def start(self, ctx: Context) -> None:
+        async def start(self) -> None:
             print("Hello, world!")
 
     if __name__ == "__main__":
@@ -109,10 +109,9 @@ For this purpose, we will use AnyIO's :func:`~anyio.create_tcp_listener` functio
 
     from asphalt.core import (
         Component,
-        Context,
         context_teardown,
         run_application,
-        start_service_task,
+        start_background_task,
     )
 
 
@@ -124,11 +123,11 @@ For this purpose, we will use AnyIO's :func:`~anyio.create_tcp_listener` functio
 
     class ServerComponent(Component):
         @context_teardown
-        async def start(self, ctx: Context) -> AsyncGenerator[None, Exception | None]:
+        async def start(self) -> AsyncGenerator[None, Exception | None]:
             async with await anyio.create_tcp_listener(
                 local_host="localhost", local_port=64100
             ) as listener:
-                start_service_task(lambda: listener.serve(handle), "Echo server")
+                start_background_task(lambda: listener.serve(handle), "Echo server")
                 yield
 
     if __name__ == '__main__':
@@ -179,7 +178,7 @@ Create the file ``client.py`` file in the ``echo`` package directory as follows:
 
     import anyio
 
-    from asphalt.core import CLIApplicationComponent, Context, run_application
+    from asphalt.core import CLIApplicationComponent, run_application
 
 
     class ClientComponent(CLIApplicationComponent):

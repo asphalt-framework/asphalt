@@ -155,11 +155,11 @@ And to make the the results look nicer in an email message, you can switch to us
 
 
     class ApplicationComponent(CLIApplicationComponent):
-        async def start(self, ctx: Context) -> None:
+        async def start(self) -> None:
             self.add_component(
                 "mailer", backend="smtp", host="your.smtp.server.here",
                 message_defaults={"sender": "your@email.here", "to": "your@email.here"})
-            await super().start(ctx)
+            await super().start()
 
         @inject
         async def run(self, *, mailer: Mailer = resource()) -> None:
@@ -272,7 +272,7 @@ Asphalt application::
             self.delay = delay
 
         @context_teardown
-        async def start(self, ctx: Context) -> None:
+        async def start(self) -> None:
             detector = Detector(self.url, self.delay)
             await ctx.add_resource(detector)
             start_service_task(detector.run, "Web page change detector")
@@ -298,7 +298,7 @@ become somewhat lighter::
 
 
     class ApplicationComponent(CLIApplicationComponent):
-        async def start(self, ctx: Context) -> None:
+        async def start(self) -> None:
             self.add_component("detector", ChangeDetectorComponent, url="http://imgur.com")
             self.add_component(
                 "mailer", backend="smtp", host="your.smtp.server.here",

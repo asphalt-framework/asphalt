@@ -28,19 +28,20 @@ Create a ``tests`` directory at the root of the project directory and create a m
 
     import pytest
     from asphalt.core import Context
+    from pytest import CaptureFixture
 
     from echo.client import ClientComponent
     from echo.server import ServerComponent
 
 
-    def test_client_and_server(event_loop, capsys):
+    async def test_client_and_server(capsys: CaptureFixture[str]) -> None:
         async def run():
-            async with Context() as ctx:
+            async with Context():
                 server = ServerComponent()
-                await server.start(ctx)
+                await server.start()
 
                 client = ClientComponent("Hello!")
-                await client.start(ctx)
+                await client.start()
 
         event_loop.create_task(run())
         with pytest.raises(SystemExit) as exc:
@@ -52,11 +53,9 @@ Create a ``tests`` directory at the root of the project directory and create a m
         out, err = capsys.readouterr()
         assert out == "Message from client: Hello!\nServer responded: Hello!\n"
 
-The test module above contains one test function which uses two fixtures:
-
-* ``event_loop``: comes from pytest-asyncio_; provides an asyncio event loop
-* ``capsys``: captures standard output and error, letting us find out what message the components
-  printed
+The test module above contains one test function which uses one fixture (``capsys``).
+This fixture is provided by ``pytest``, and it captures standard output and error,
+letting us find out what message the components printed.
 
 In the test function (``test_client_and_server()``), the server and client components are
 instantiated and started. Since the client component's
