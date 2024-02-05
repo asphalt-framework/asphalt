@@ -8,7 +8,7 @@ from warnings import warn
 from anyio import create_task_group
 from anyio.lowlevel import cancel_shielded_checkpoint
 
-from ._context import Context, start_background_task
+from ._context import start_background_task
 from ._exceptions import ApplicationExit
 from ._utils import PluginContainer, merge_config, qualified_name
 
@@ -19,22 +19,19 @@ class Component(metaclass=ABCMeta):
     __slots__ = ()
 
     @abstractmethod
-    async def start(self, ctx: Context) -> None:
+    async def start(self) -> None:
         """
         Perform any necessary tasks to start the services provided by this component.
 
         In this method, components typically use the context to:
           * add resources and/or resource factories to it
-            (:meth:`~asphalt.core.context.Context.add_resource` and
-            :meth:`~asphalt.core.context.Context.add_resource_factory`)
+            (:func:`add_resource` and :func:`add_resource_factory`)
           * get resources from it asynchronously
-            (:meth:`~asphalt.core.context.Context.get_resource`)
+            (:func:`get_resource`)
 
         It is advisable for Components to first add all the resources they can to the
         context before requesting any from it. This will speed up the dependency
         resolution and prevent deadlocks.
-
-        :param ctx: the containing context for this component
         """
 
 
@@ -99,7 +96,7 @@ class ContainerComponent(Component):
         component = component_types.create_object(**config)
         self.child_components[alias] = component
 
-    async def start(self, ctx: Context) -> None:
+    async def start(self) -> None:
         """
         Create child components that have been configured but not yet created and then
         calls their :meth:`~Component.start` methods in separate tasks and waits until
@@ -112,7 +109,7 @@ class ContainerComponent(Component):
 
         async with create_task_group() as tg:
             for alias, component in self.child_components.items():
-                tg.start_soon(component.start, ctx)
+                tg.start_soon(component.start)
 
 
 class CLIApplicationComponent(ContainerComponent):
@@ -131,7 +128,7 @@ class CLIApplicationComponent(ContainerComponent):
     it is set to 1 and a warning is emitted.
     """
 
-    async def start(self, ctx: Context) -> None:
+    async def start(self) -> None:
         async def run() -> None:
             retval = await self.run()
 
@@ -154,7 +151,7 @@ class CLIApplicationComponent(ContainerComponent):
             else:
                 raise ApplicationExit
 
-        await super().start(ctx)
+        await super().start()
         await start_background_task(run, "Main task", teardown_action=None)
 
     @abstractmethod

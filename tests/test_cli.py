@@ -7,7 +7,7 @@ import pytest
 from _pytest.monkeypatch import MonkeyPatch
 from click.testing import CliRunner
 
-from asphalt.core import Component, Context, _cli
+from asphalt.core import Component, _cli
 
 pytestmark = pytest.mark.anyio()
 
@@ -17,7 +17,7 @@ class DummyComponent(Component):
         self.dummyval1 = dummyval1
         self.dummyval2 = dummyval2
 
-    async def start(self, ctx: Context) -> None:
+    async def start(self) -> None:
         pass
 
 

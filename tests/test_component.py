@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import sys
-from typing import NoReturn
+from typing import Any, NoReturn
 from unittest.mock import Mock
 
 import anyio
@@ -29,11 +29,11 @@ else:
 
 
 class DummyComponent(Component):
-    def __init__(self, **kwargs):
+    def __init__(self, **kwargs: Any):
         self.kwargs = kwargs
         self.started = False
 
-    async def start(self, ctx):
+    async def start(self) -> None:
         await anyio.sleep(0.1)
         self.started = True
 
@@ -111,8 +111,8 @@ class TestContainerComponent:
         assert str(exc.value) == 'there is already a child component named "dummy"'
 
     async def test_start(self, container) -> None:
-        async with Context() as ctx:
-            await container.start(ctx)
+        async with Context():
+            await container.start()
 
         assert container.child_components["dummy"].started
 

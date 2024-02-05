@@ -8,7 +8,6 @@ from anyio.abc import SocketStream
 
 from asphalt.core import (
     Component,
-    Context,
     context_teardown,
     run_application,
     start_background_task,
@@ -23,7 +22,7 @@ async def handle(stream: SocketStream) -> None:
 
 class ServerComponent(Component):
     @context_teardown
-    async def start(self, ctx: Context) -> AsyncGenerator[None, Exception | None]:
+    async def start(self) -> AsyncGenerator[None, Exception | None]:
         async with await anyio.create_tcp_listener(
             local_host="localhost", local_port=64100
         ) as listener:

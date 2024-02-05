@@ -122,10 +122,10 @@ async def run_application(
                 )
                 exit_stack.callback(root_tg.cancel_scope.cancel)
 
-            ctx = await exit_stack.enter_async_context(Context())
+            await exit_stack.enter_async_context(Context())
             try:
                 with fail_after(start_timeout):
-                    await component.start(ctx)
+                    await component.start()
             except TimeoutError:
                 logger.error("Timeout waiting for the root component to start")
                 raise

@@ -23,8 +23,11 @@ This library adheres to `Semantic Versioning 2.0 <http://semver.org/>`_.
 - **BACKWARD INCOMPATIBLE** Dropped the deprecated ``parent`` argument to ``Context``
 - **BACKWARD INCOMPATIBLE** Dropped the deprecated ``Dependency()`` marker
 - **BACKWARD INCOMPATIBLE** Dropped support for context attributes
-- **BACKWARD INCOMPATIBLE** Dropped the ``ctx`` parameter from
-  ``CLIApplicationComponent.run()``
+- **BACKWARD INCOMPATIBLE** Dropped the ``ctx`` parameter from all callbacks, including:
+
+  * ``Component.start()``
+  * ``CLIApplicationComponent.run()``
+  * resource factory callbacks
 - **BACKWARD INCOMPATIBLE** Refactored the event system:
 
   * The ``connect()``, ``disconnect()`` and ``dispatch_raw()`` methods were removed
