@@ -152,7 +152,7 @@ async def run_application(
                 logger.error(
                     "Container component %s not started, "
                     "did you forget to await super().start() ?",
-                    component
+                    component,
                 )
                 return
 
