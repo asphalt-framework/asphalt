@@ -19,7 +19,7 @@ from anyio import (
 from anyio.abc import TaskStatus
 from exceptiongroup import catch
 
-from ._component import Component, component_types
+from ._component import Component, ContainerComponent, component_types
 from ._context import Context
 from ._exceptions import ApplicationExit
 
@@ -51,6 +51,17 @@ def handle_application_exit(excgrp: ExceptionGroup) -> None:
     exit_exc = cast(ApplicationExit, exc)
     if exit_exc.code:
         raise SystemExit(exit_exc.code).with_traceback(exc.__traceback__) from None
+
+
+def check_started(component) -> ContainerComponent | None:
+    if isinstance(component, ContainerComponent):
+        for c in component.child_components:
+            unstarted_component = check_started(c)
+            if unstarted_component:
+                return unstarted_component
+        if not component._started:
+            return component
+    return None
 
 
 async def run_application(
@@ -135,6 +146,15 @@ async def run_application(
             except BaseException:
                 logger.exception("Error during application startup")
                 raise
+
+            unstarted_component = check_started(component)
+            if unstarted_component:
+                logger.error(
+                    "Container component %s not started, "
+                    "did you forget to await super().start() ?",
+                    component
+                )
+                return
 
             logger.info("Application started")
 
