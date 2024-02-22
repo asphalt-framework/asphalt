@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import sys
+from asyncio import get_running_loop
 from collections.abc import Callable
 from concurrent.futures import Executor, ThreadPoolExecutor
 from inspect import isawaitable
@@ -176,9 +177,9 @@ class TestContext:
         assert exc.value is exception
 
     @pytest.mark.asyncio
-    async def test_async_contextmanager_exception(self, event_loop, context):
+    async def test_async_contextmanager_exception(self, context):
         """Test that "async with context:" calls close() with the exception raised in the block."""
-        close_future = event_loop.create_future()
+        close_future = get_running_loop().create_future()
         close_future.set_result(None)
         exception = Exception("foo")
         with patch.object(context, "close", return_value=close_future) as close:
@@ -191,9 +192,9 @@ class TestContext:
 
     @pytest.mark.parametrize("types", [int, (int,), ()], ids=["type", "tuple", "empty"])
     @pytest.mark.asyncio
-    async def test_add_resource(self, context, event_loop, types):
+    async def test_add_resource(self, context, types):
         """Test that a resource is properly added in the context and listeners are notified."""
-        event_loop.call_soon(context.add_resource, 6, "foo", None, types)
+        get_running_loop().call_soon(context.add_resource, 6, "foo", None, types)
         event = await context.resource_added.wait_event()
 
         assert event.resource_types == (int,)
@@ -231,7 +232,7 @@ class TestContext:
 
         """
         context.a = 2
-        with pytest.raises(ResourceConflict) as exc, pytest.deprecated_call():
+        with pytest.raises(ResourceConflict) as exc:
             context.add_resource(2, context_attr="a")
 
         exc.match("this context already has an attribute 'a'")
@@ -327,7 +328,7 @@ class TestContext:
         with pytest.deprecated_call():
             context.add_resource_factory(lambda ctx: None, str, context_attr="foo")
 
-        with pytest.raises(ResourceConflict) as exc, pytest.deprecated_call():
+        with pytest.raises(ResourceConflict) as exc:
             await context.add_resource_factory(lambda ctx: None, str, context_attr="foo")
 
         exc.match(
@@ -434,13 +435,14 @@ class TestContext:
         assert exc.value.name == "foo"
 
     @pytest.mark.asyncio
-    async def test_request_resource_parent_add(self, context, event_loop):
+    async def test_request_resource_parent_add(self, context):
         """
         Test that adding a resource to the parent context will satisfy a resource request in a
         child context.
 
         """
         async with context, Context() as child_context:
+            event_loop = get_running_loop()
             task = event_loop.create_task(child_context.request_resource(int))
             event_loop.call_soon(context.add_resource, 6)
             resource = await task
@@ -785,17 +787,17 @@ def test_explicit_parent_deprecation() -> None:
 
 
 @pytest.mark.asyncio
-async def test_context_stack_corruption(event_loop):
+async def test_context_stack_corruption():
     async def generator() -> AsyncGenerator:
         async with Context():
             yield
 
     gen = generator()
-    await event_loop.create_task(gen.asend(None))
+    await get_running_loop().create_task(gen.asend(None))
     async with Context() as ctx:
         with pytest.warns(UserWarning, match="Potential context stack corruption detected"):
             try:
-                await event_loop.create_task(gen.asend(None))
+                await get_running_loop().create_task(gen.asend(None))
             except StopAsyncIteration:
                 pass
 

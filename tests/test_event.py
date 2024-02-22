@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import gc
-from asyncio import AbstractEventLoop, Queue, all_tasks, current_task
+from asyncio import Queue, all_tasks, current_task, get_running_loop
 from datetime import datetime, timedelta, timezone
 from typing import NoReturn
 
@@ -104,9 +104,7 @@ class TestSignal:
         assert events == [event]
 
     @pytest.mark.asyncio
-    async def test_dispatch_log_exceptions(
-        self, event_loop: AbstractEventLoop, source: DummySource, caplog
-    ) -> None:
+    async def test_dispatch_log_exceptions(self, source: DummySource, caplog) -> None:
         """Test that listener exceptions are logged and that dispatch() resolves to ``False``."""
 
         def listener(event) -> NoReturn:
@@ -156,8 +154,8 @@ class TestSignal:
         assert str(exc.value) == "event must be of type test_event.DummyEvent"
 
     @pytest.mark.asyncio
-    async def test_wait_event(self, source: DummySource, event_loop) -> None:
-        event_loop.call_soon(source.event_a.dispatch)
+    async def test_wait_event(self, source: DummySource) -> None:
+        get_running_loop().call_soon(source.event_a.dispatch)
         received_event = await source.event_a.wait_event()
         assert received_event.topic == "event_a"
 
@@ -206,7 +204,7 @@ class TestSignal:
     ids=["nofilter", "filter"],
 )
 @pytest.mark.asyncio
-async def test_wait_event(event_loop, filter, expected_value) -> None:
+async def test_wait_event(filter, expected_value) -> None:
     """
     Test that wait_event returns the first event matched by the filter, or the first event if there
     is no filter.
@@ -214,7 +212,7 @@ async def test_wait_event(event_loop, filter, expected_value) -> None:
     """
     source1 = DummySource()
     for i in range(1, 4):
-        event_loop.call_soon(source1.event_a.dispatch, i)
+        get_running_loop().call_soon(source1.event_a.dispatch, i)
 
     event = await wait_event([source1.event_a], filter)
     assert event.args == (expected_value,)
