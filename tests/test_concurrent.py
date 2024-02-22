@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from asyncio import AbstractEventLoop
 from concurrent.futures import Executor, ThreadPoolExecutor
 from threading import Thread, current_thread
 
@@ -39,7 +38,7 @@ async def test_executor_special(
 
 
 @pytest.mark.asyncio
-async def test_executor_default(event_loop: AbstractEventLoop, context: Context) -> None:
+async def test_executor_default(context: Context) -> None:
     @executor
     def check_thread(ctx: Context) -> None:
         assert current_thread() is not event_loop_thread
@@ -51,7 +50,6 @@ async def test_executor_default(event_loop: AbstractEventLoop, context: Context)
 
 @pytest.mark.asyncio
 async def test_executor_worker_thread(
-    event_loop: AbstractEventLoop,
     context: Context,
     special_executor: ThreadPoolExecutor,
 ) -> None:
@@ -74,7 +72,7 @@ async def test_executor_worker_thread(
 
 
 @pytest.mark.asyncio
-async def test_executor_missing_context(event_loop: AbstractEventLoop, context: Context) -> None:
+async def test_executor_missing_context(context: Context) -> None:
     @executor("special")
     def runs_in_default_worker() -> None:
         pass
