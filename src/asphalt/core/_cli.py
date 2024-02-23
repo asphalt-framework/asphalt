@@ -56,7 +56,7 @@ def main() -> None:
     help="set configuration",
 )
 def run(configfile, service: str | None, set_: list[str]) -> None:
-    yaml = YAML(typ="unsafe")
+    yaml = YAML()
     yaml.constructor.add_constructor("!Env", env_constructor)
     yaml.constructor.add_constructor("!TextFile", text_file_constructor)
     yaml.constructor.add_constructor("!BinaryFile", binary_file_constructor)
