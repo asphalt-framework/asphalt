@@ -45,6 +45,7 @@ This library adheres to `Semantic Versioning 2.0 <http://semver.org/>`_.
 - Added the ``start_background_task()`` Context method (with a free-function variant
   for convenience) that handles startup and shutdown of context-bound background tasks
   for various purposes
+- Switched from ruamel.yaml to PyYAML as the backing YAML library
 - Dropped support for Python 3.7
 
 **4.12.0**

@@ -4,8 +4,8 @@ from pathlib import Path
 from unittest.mock import patch
 
 import pytest
-from _pytest.monkeypatch import MonkeyPatch
 from click.testing import CliRunner
+from pytest import MonkeyPatch
 
 from asphalt.core import Component, _cli
 

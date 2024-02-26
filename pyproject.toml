@@ -34,7 +34,7 @@ dependencies = [
     "importlib_metadata >= 4.4; python_version < '3.10'",
     "typing_extensions; python_version < '3.10'",
     "exceptiongroup >= 1.2.0",
-    "ruamel.yaml >= 0.15",
+    "pyyaml ~= 6.0",
     "click >= 6.6"
 ]
 dynamic = ["version"]

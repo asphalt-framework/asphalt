@@ -30,3 +30,4 @@ repos:
         additional_dependencies:
           - anyio
           - pytest
+          - types-PyYAML

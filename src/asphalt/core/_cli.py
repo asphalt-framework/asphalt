@@ -8,26 +8,32 @@ from typing import Any
 
 import anyio
 import click
-from ruamel.yaml import YAML, ScalarNode
-from ruamel.yaml.loader import Loader
+import yaml
+from yaml import Loader, ScalarNode
 
 from ._runner import run_application
 from ._utils import merge_config, qualified_name
 
 
 def env_constructor(loader: Loader, node: ScalarNode) -> str | None:
-    value = loader.construct_scalar(node)
-    return os.getenv(value)
+    return os.getenv(node.value)
 
 
 def text_file_constructor(loader: Loader, node: ScalarNode) -> str:
-    value = loader.construct_scalar(node)
-    return Path(value).read_text()
+    return Path(node.value).read_text()
 
 
 def binary_file_constructor(loader: Loader, node: ScalarNode) -> bytes:
-    value = loader.construct_scalar(node)
-    return Path(value).read_bytes()
+    return Path(node.value).read_bytes()
+
+
+class AsphaltLoader(Loader):
+    pass
+
+
+AsphaltLoader.add_constructor("!Env", env_constructor)
+AsphaltLoader.add_constructor("!TextFile", text_file_constructor)
+AsphaltLoader.add_constructor("!BinaryFile", binary_file_constructor)
 
 
 @click.group()
@@ -56,15 +62,10 @@ def main() -> None:
     help="set configuration",
 )
 def run(configfile, service: str | None, set_: list[str]) -> None:
-    yaml = YAML()
-    yaml.constructor.add_constructor("!Env", env_constructor)
-    yaml.constructor.add_constructor("!TextFile", text_file_constructor)
-    yaml.constructor.add_constructor("!BinaryFile", binary_file_constructor)
-
     # Read the configuration from the supplied YAML files
     config: dict[str, Any] = {}
     for path in configfile:
-        config_data = yaml.load(path)
+        config_data = yaml.load(path, AsphaltLoader)
         assert isinstance(
             config_data, dict
         ), "the document root element must be a dictionary"
@@ -78,7 +79,7 @@ def run(configfile, service: str | None, set_: list[str]) -> None:
             )
 
         key, value = override.split("=", 1)
-        parsed_value = yaml.load(value)
+        parsed_value = yaml.load(value, AsphaltLoader)
         keys = [k.replace(r"\.", ".") for k in re.split(r"(?<!\\)\.", key)]
         section = config
         for i, part_key in enumerate(keys[:-1]):
