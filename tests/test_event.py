@@ -3,8 +3,10 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 from anyio import create_task_group, fail_after
+from anyio.abc import TaskStatus
+from anyio.lowlevel import checkpoint
 
-from asphalt.core import Event, Signal, stream_events, wait_event
+from asphalt.core import Event, Signal, SignalQueueFull, stream_events, wait_event
 
 pytestmark = pytest.mark.anyio()
 
@@ -69,6 +71,33 @@ class TestSignal:
 
         """
         source.event_a.dispatch(DummyEvent())
+
+    async def test_dispatch_event_buffer_overflow(self, source):
+        """
+        Test that dispatching to a subscriber that has a full queue raises the
+        SignalQueueFull warning.
+
+        """
+        received_events = []
+
+        async def receive_events(task_status: TaskStatus[None]) -> None:
+            async with source.event_a.stream_events(max_queue_size=1) as stream:
+                task_status.started()
+                async for event in stream:
+                    received_events.append(event)
+
+        async with create_task_group() as tg:
+            await tg.start(receive_events)
+            source.event_a.dispatch(DummyEvent(1))
+            with pytest.warns(SignalQueueFull):
+                source.event_a.dispatch(DummyEvent(2))
+                source.event_a.dispatch(DummyEvent(3))
+
+            # Give the task a chance to run, then cancel
+            await checkpoint()
+            tg.cancel_scope.cancel()
+
+        assert len(received_events) == 1
 
     @pytest.mark.parametrize(
         "filter, expected_value",
