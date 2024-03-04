@@ -53,6 +53,7 @@ else:
     from exceptiongroup import BaseExceptionGroup
     from typing_extensions import Self
 
+application_stopped_event_var: ContextVar = ContextVar("application_stopped_event")
 logger = logging.getLogger(__name__)
 factory_callback_type = Callable[[], Any]
 resource_name_re = re.compile(r"\w+")
@@ -672,7 +673,7 @@ class Context:
             supply a callback (can be asynchronous) that is called instead
 
         """
-        finished_event = anyio.Event()
+        task_finished_event = anyio.Event()
         cancel_scope = CancelScope()
 
         async def run_background_task() -> None:
@@ -694,7 +695,7 @@ class Context:
                     else:
                         logger.debug("Background task (%s) finished", name)
                     finally:
-                        finished_event.set()
+                        task_finished_event.set()
 
         async def finalize_task() -> None:
             if teardown_action == "cancel":
@@ -711,7 +712,19 @@ class Context:
                     await retval
 
             logger.debug("Waiting for background task (%s) to finish", name)
-            await finished_event.wait()
+
+            async def wait_for_task_finished(tg):
+                await task_finished_event.wait()
+                tg.cancel_scope.cancel()
+
+            async def wait_for_application_stopped(tg):
+                application_stopped_event = application_stopped_event_var.get()
+                await application_stopped_event.wait()
+                tg.cancel_scope.cancel()
+
+            async with create_task_group() as tg:
+                tg.start_soon(wait_for_task_finished, tg)
+                tg.start_soon(wait_for_application_stopped, tg)
 
         if (
             teardown_action is not None
