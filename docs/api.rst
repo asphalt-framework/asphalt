@@ -38,6 +38,7 @@ Events
 
 .. autoclass:: Event
 .. autoclass:: Signal
+.. autoclass:: SignalQueueFull
 .. autofunction:: stream_events
 .. autofunction:: wait_event
 
