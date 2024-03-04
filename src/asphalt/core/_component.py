@@ -49,13 +49,14 @@ class ContainerComponent(Component):
     :vartype component_configs: Dict[str, Optional[Dict[str, Any]]]
     """
 
-    __slots__ = "child_components", "component_configs"
+    __slots__ = "child_components", "component_configs", "_started"
 
     def __init__(
         self, components: dict[str, dict[str, Any] | None] | None = None
     ) -> None:
         self.child_components: OrderedDict[str, Component] = OrderedDict()
         self.component_configs = components or {}
+        self._started = False
 
     def add_component(
         self, alias: str, type: str | type | None = None, **config: Any
@@ -103,6 +104,8 @@ class ContainerComponent(Component):
         they have completed.
 
         """
+        self._started = True
+
         for alias in self.component_configs:
             if alias not in self.child_components:
                 self.add_component(alias)
