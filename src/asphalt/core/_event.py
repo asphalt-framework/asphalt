@@ -12,12 +12,20 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from time import time as stdlib_time
 from typing import Any, Generic, TypeVar, overload
+from warnings import warn
 from weakref import WeakKeyDictionary
 
-from anyio import BrokenResourceError, create_memory_object_stream
-from anyio.abc import ObjectSendStream
+from anyio import BrokenResourceError, WouldBlock, create_memory_object_stream
+from anyio.streams.memory import MemoryObjectSendStream
 
 from ._utils import qualified_name
+
+
+class SignalQueueFull(UserWarning):
+    """
+    Warning about signal delivery failing due to a subscriber's queue being full
+    because the subscriber could not receive the events quickly enough.
+    """
 
 
 class Event:
@@ -60,11 +68,11 @@ class BoundSignal(Generic[T_Event]):
     instance: weakref.ReferenceType[Any]
     topic: str
 
-    _send_streams: list[ObjectSendStream[T_Event]] = field(
+    _send_streams: list[MemoryObjectSendStream[T_Event]] = field(
         init=False, default_factory=list
     )
 
-    async def dispatch(self, event: T_Event) -> None:
+    def dispatch(self, event: T_Event) -> None:
         """Dispatch an event."""
         if not isinstance(event, self.event_class):
             raise TypeError(
@@ -78,12 +86,19 @@ class BoundSignal(Generic[T_Event]):
 
         for stream in list(self._send_streams):
             try:
-                await stream.send(event)
+                stream.send_nowait(event)
             except BrokenResourceError:
                 pass
+            except WouldBlock:
+                warn(
+                    f"Queue full ({stream.statistics().max_buffer_size}) when trying "
+                    f"to send dispatched event to subscriber",
+                    SignalQueueFull,
+                    stacklevel=2,
+                )
 
     @contextmanager
-    def _subscribe(self, send: ObjectSendStream[T_Event]) -> Iterator[None]:
+    def _subscribe(self, send: MemoryObjectSendStream[T_Event]) -> Iterator[None]:
         self._send_streams.append(send)
         yield None
         self._send_streams.remove(send)
@@ -225,5 +240,5 @@ async def wait_event(
         any of the signals
 
     """
-    async with stream_events(signals, filter, max_queue_size=1) as stream:
+    async with stream_events(signals, filter) as stream:
         return await stream.__anext__()

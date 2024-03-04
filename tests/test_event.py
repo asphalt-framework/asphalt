@@ -2,7 +2,7 @@ import gc
 from datetime import datetime, timedelta, timezone
 
 import pytest
-from anyio import create_task_group
+from anyio import create_task_group, fail_after
 
 from asphalt.core import Event, Signal, stream_events, wait_event
 
@@ -61,14 +61,14 @@ class TestSignal:
             f"{__name__}.DummyEvent"
         )
         with pytest.raises(TypeError, match=pattern):
-            await source.event_a.dispatch("foo")
+            source.event_a.dispatch("foo")
 
     async def test_dispatch_event_no_listeners(self, source):
         """
         Test that dispatching an event when there are no listeners will still work.
 
         """
-        await source.event_a.dispatch(DummyEvent())
+        source.event_a.dispatch(DummyEvent())
 
     @pytest.mark.parametrize(
         "filter, expected_value",
@@ -80,11 +80,12 @@ class TestSignal:
     async def test_wait_event(self, source, filter, expected_value):
         async def dispatch_events() -> None:
             for i in range(1, 4):
-                await source.event_a.dispatch(DummyEvent(i))
+                source.event_a.dispatch(DummyEvent(i))
 
         async with create_task_group() as tg:
             tg.start_soon(dispatch_events)
-            event = await wait_event([source.event_a], filter)
+            with fail_after(1):
+                event = await wait_event([source.event_a], filter)
 
         assert event.args == (expected_value,)
 
@@ -99,7 +100,7 @@ class TestSignal:
         values = []
         async with source.event_a.stream_events(filter) as stream:
             for i in range(1, 4):
-                await source.event_a.dispatch(DummyEvent(i))
+                source.event_a.dispatch(DummyEvent(i))
 
             async for event in stream:
                 values.append(event.args[0])
@@ -144,11 +145,12 @@ async def test_wait_event(source, filter, expected_value):
 
     async def dispatch_events() -> None:
         for i in range(1, 4):
-            await source.event_a.dispatch(DummyEvent(i))
+            source.event_a.dispatch(DummyEvent(i))
 
     async with create_task_group() as tg:
         tg.start_soon(dispatch_events)
-        event = await wait_event([source.event_a], filter)
+        with fail_after(1):
+            event = await wait_event([source.event_a], filter)
 
     assert event.args == (expected_value,)
 
@@ -166,9 +168,9 @@ async def test_stream_events(filter, expected_values):
     async with stream_events([source1.event_a, source2.event_b], filter) as stream:
         for signal in [source1.event_a, source2.event_b]:
             for i in range(1, 4):
-                await signal.dispatch(DummyEvent(i))
+                signal.dispatch(DummyEvent(i))
 
-        await signal.dispatch(DummyEvent(None))
+        signal.dispatch(DummyEvent(None))
 
         async for event in stream:
             if event.args[0] is None:

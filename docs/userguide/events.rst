@@ -3,15 +3,15 @@ Working with signals and events
 
 .. py:currentmodule:: asphalt.core
 
-Events are a handy way to make your code react to changes in another part of the application.
-To dispatch and listen to events, you first need to have one or more
+Events are a handy way to make your code react to changes in another part of the
+application. To dispatch and listen to events, you first need to have one or more
 :class:`Signal` instances as attributes of some class. Each signal needs to be
 associated with some :class:`Event` class. Then, when you dispatch a new event
 by calling :meth:`Signal.dispatch`, a new instance of this event class will be
 constructed and passed to all listener callbacks.
 
-To listen to events dispatched from a signal, you need to have a function or any other callable
-that accepts a single positional argument. You then pass this callable to
+To listen to events dispatched from a signal, you need to have a function or any other
+callable that accepts a single positional argument. You then pass this callable to
 :meth:`Signal.connect`. That's it!
 
 To disconnect the callback, simply call :meth:`Signal.disconnect` with whatever
@@ -34,11 +34,11 @@ Here's how it works::
 
 
     def plain_listener(event):
-        print('received event: %s' % event)
+        print(f'received event: {event}')
 
 
     async def coro_listener(event):
-        print('coroutine listeners are fine too: %s' % event)
+        print(f'coroutine listeners are fine too: {event}')
 
 
     async def some_handler():
@@ -49,16 +49,17 @@ Here's how it works::
         # Dispatches an Event instance
         source.somesignal.dispatch()
 
-        # Dispatches a CustomEvent instance (the extra argument is passed to its constructor)
+        # Dispatches a CustomEvent instance (the extra argument is passed to its
+        # constructor)
         source.customsignal.dispatch('extra argument here')
 
 Exception handling
 ------------------
 
-Any exceptions raised by the listener callbacks are logged to the ``asphalt.core.event`` logger.
-Additionally, the future returned by :meth:`Signal.dispatch` resolves to
-``True`` if no exceptions were raised during the processing of listeners. This was meant as a
-convenience for use with tests where you can just do
+Any exceptions raised by the listener callbacks are logged to the ``asphalt.core.event``
+logger. Additionally, the future returned by :meth:`Signal.dispatch` resolves to
+``True`` if no exceptions were raised during the processing of listeners. This was meant
+as a convenience for use with tests where you can just do
 ``assert await thing.some_signal.dispatch('foo')``.
 
 Waiting for a single event
@@ -78,15 +79,19 @@ You can even wait for the next event dispatched from any of several signals usin
 
 
     async def print_next_event(source1, source2, source3):
-        event = await wait_event(source1.some_signal, source2.another_signal, source3.some_signal)
+        event = await wait_event(
+            [source1.some_signal, source2.another_signal, source3.some_signal]
+        )
         print(event)
 
 As a convenience, you can provide a filter callback that will cause the call to only return when
 the callback returns ``True``::
 
     async def print_next_matching_event(source1, source2, source3):
-        event = await wait_event(source1.some_signal, source2.another_signal, source3.some_signal,
-                                 lambda event: event.myrandomproperty == 'foo')
+        event = await wait_event(
+            [source1.some_signal, source2.another_signal, source3.some_signal],
+            lambda event: event.myrandomproperty == 'foo'
+        )
         print(event)
 
 Receiving events iteratively
@@ -95,11 +100,8 @@ Receiving events iteratively
 With :meth:`Signal.stream_events`, you can even asynchronously iterate over
 events dispatched from a signal::
 
-    from contextlib import aclosing  # on Python < 3.10, import from async_generator or contextlib2
-
-
     async def listen_to_events(source):
-        async with aclosing(source.somesignal.stream_events()) as stream:
+        async with source.somesignal.stream_events() as stream:
             async for event in stream:
                 print(event)
 
@@ -109,16 +111,18 @@ Using :func:`stream_events`, you can stream events from multiple signals::
 
 
     async def listen_to_events(source1, source2, source3):
-        stream = stream_events(source1.some_signal, source2.another_signal, source3.some_signal)
-        async with aclosing(stream):
+        async with stream_events(
+            [source1.some_signal, source2.another_signal, source3.some_signal]
+        ) as stream:
             async for event in stream:
                 print(event)
 
 The filtering capability of :func:`wait_event` works here too::
 
     async def listen_to_events(source1, source2, source3):
-        stream = stream_events(source1.some_signal, source2.another_signal, source3.some_signal,
-                               lambda event: event.randomproperty == 'foo')
-        async with aclosing(stream):
+        async with stream_events(
+            [source1.some_signal, source2.another_signal, source3.some_signal],
+            lambda event: event.randomproperty == 'foo'
+        ) as stream:
             async for event in stream:
                 print(event)

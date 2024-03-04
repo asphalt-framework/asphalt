@@ -297,7 +297,7 @@ class Context:
         finally:
             self._state = ContextState.closed
 
-    async def add_resource(
+    def add_resource(
         self,
         value: T_Resource,
         name: str = "default",
@@ -366,9 +366,9 @@ class Context:
             self.add_teardown_callback(teardown_callback)
 
         # Notify listeners that a new resource has been made available
-        await self.resource_added.dispatch(ResourceEvent(types_, name, False))
+        self.resource_added.dispatch(ResourceEvent(types_, name, False))
 
-    async def add_resource_factory(
+    def add_resource_factory(
         self,
         factory_callback: factory_callback_type,
         name: str = "default",
@@ -474,7 +474,7 @@ class Context:
             self._resource_factories[(type_, name)] = resource
 
         # Notify listeners that a new resource has been made available
-        await self.resource_added.dispatch(ResourceEvent(resource_types, name, True))
+        self.resource_added.dispatch(ResourceEvent(resource_types, name, True))
 
     def _generate_resource_from_factory(self, factory: ResourceContainer) -> Any:
         retval = factory.value_or_factory()
@@ -800,7 +800,7 @@ def current_context() -> Context:
     return ctx
 
 
-async def add_resource(
+def add_resource(
     value: T_Resource,
     name: str = "default",
     types: type | Sequence[type] = (),
@@ -813,12 +813,12 @@ async def add_resource(
 
     .. seealso:: :meth:`Context.add_resource`
     """
-    await current_context().add_resource(
+    current_context().add_resource(
         value, name, types, description=description, teardown_callback=teardown_callback
     )
 
 
-async def add_resource_factory(
+def add_resource_factory(
     factory_callback: factory_callback_type,
     name: str = "default",
     *,
@@ -831,7 +831,7 @@ async def add_resource_factory(
     .. seealso:: :meth:`Context.add_resource_factory`
 
     """
-    await current_context().add_resource_factory(
+    current_context().add_resource_factory(
         factory_callback, name, types=types, description=description
     )
 

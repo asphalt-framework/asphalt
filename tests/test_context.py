@@ -106,9 +106,15 @@ class TestContext:
         notified.
 
         """
+
+        async def resource_adder() -> None:
+            await wait_all_tasks_blocked()
+            context.add_resource(6, "foo", types)
+
         async with create_task_group() as tg:
-            tg.start_soon(context.add_resource, 6, "foo", types)
-            event = await context.resource_added.wait_event()
+            tg.start_soon(resource_adder)
+            with fail_after(1):
+                event = await context.resource_added.wait_event()
 
         assert event.resource_types == (int,)
         assert event.resource_name == "foo"
@@ -117,9 +123,9 @@ class TestContext:
 
     async def test_add_resource_name_conflict(self, context: Context) -> None:
         """Test that adding a resource won't replace any existing resources."""
-        await context.add_resource(5, "foo")
+        context.add_resource(5, "foo")
         with pytest.raises(ResourceConflict) as exc:
-            await context.add_resource(4, "foo")
+            context.add_resource(4, "foo")
 
         exc.match(
             "this context already contains a resource of type int using the name 'foo'"
@@ -128,12 +134,12 @@ class TestContext:
     async def test_add_resource_none_value(self, context: Context) -> None:
         """Test that None is not accepted as a resource value."""
         with pytest.raises(ValueError, match='"value" must not be None'):
-            await context.add_resource(None)
+            context.add_resource(None)
 
     async def test_add_resource_type_conflict(self, context: Context) -> None:
-        await context.add_resource(5)
+        context.add_resource(5)
         with pytest.raises(ResourceConflict) as exc:
-            await context.add_resource(6)
+            context.add_resource(6)
 
         exc.match(
             "this context already contains a resource of type int using the name "
@@ -145,7 +151,7 @@ class TestContext:
     )
     async def test_add_resource_bad_name(self, context: Context, name: str) -> None:
         with pytest.raises(ValueError) as exc:
-            await context.add_resource(1, name)
+            context.add_resource(1, name)
 
         exc.match(
             '"name" must be a nonempty string consisting only of alphanumeric '
@@ -162,7 +168,7 @@ class TestContext:
             return next(counter)
 
         counter = count(1)
-        await context.add_resource_factory(factory)
+        context.add_resource_factory(factory)
 
         assert context.require_resource(int) == 1
         assert context.require_resource(int) == 1
@@ -174,7 +180,7 @@ class TestContext:
         self, context: Context, name: str
     ) -> None:
         with pytest.raises(ValueError) as exc:
-            await context.add_resource_factory(lambda: 1, name, types=[int])
+            context.add_resource_factory(lambda: 1, name, types=[int])
 
         exc.match(
             '"name" must be a nonempty string consisting only of alphanumeric '
@@ -183,14 +189,14 @@ class TestContext:
 
     async def test_add_resource_factory_empty_types(self, context: Context) -> None:
         with pytest.raises(ValueError) as exc:
-            await context.add_resource_factory(lambda: 1, types=())
+            context.add_resource_factory(lambda: 1, types=())
 
         exc.match("no resource types were specified")
 
     async def test_add_resource_factory_type_conflict(self, context: Context) -> None:
-        await context.add_resource_factory(lambda: None, types=(str, int))
+        context.add_resource_factory(lambda: None, types=(str, int))
         with pytest.raises(ResourceConflict) as exc:
-            await context.add_resource_factory(lambda: None, types=[int])
+            context.add_resource_factory(lambda: None, types=[int])
 
         exc.match("this context already contains a resource factory for the type int")
 
@@ -205,7 +211,7 @@ class TestContext:
             return next(counter)
 
         counter = count(1)
-        await context.add_resource_factory(factory)
+        context.add_resource_factory(factory)
 
         assert context.require_resource(int) == 1
         assert context.require_resource(int) == 1
@@ -217,14 +223,14 @@ class TestContext:
         def factory() -> str:
             return "foo"
 
-        await context.add_resource_factory(factory)
+        context.add_resource_factory(factory)
         assert context.require_resource(str) == "foo"
 
     async def test_add_resource_return_type_union(self, context: Context) -> None:
         def factory() -> Union[int, float]:  # noqa: UP007
             return 5
 
-        await context.add_resource_factory(factory)
+        context.add_resource_factory(factory)
         assert context.require_resource(int) == 5
         assert context.require_resource(float) == 5
 
@@ -233,7 +239,7 @@ class TestContext:
         def factory() -> int | float:
             return 5
 
-        await context.add_resource_factory(factory)
+        context.add_resource_factory(factory)
         assert context.require_resource(int) == 5
         assert context.require_resource(float) == 5
 
@@ -241,19 +247,19 @@ class TestContext:
         def factory() -> Optional[str]:  # noqa: UP007
             return "foo"
 
-        await context.add_resource_factory(factory)
+        context.add_resource_factory(factory)
         assert context.require_resource(str) == "foo"
 
     async def test_get_static_resources(self, context: Context) -> None:
-        await context.add_resource(9, "foo")
-        await context.add_resource_factory(lambda: 7, "bar", types=[int])
+        context.add_resource(9, "foo")
+        context.add_resource_factory(lambda: 7, "bar", types=[int])
         async with Context() as subctx:
-            await subctx.add_resource(1, "bar")
-            await subctx.add_resource(4, "foo")
+            subctx.add_resource(1, "bar")
+            subctx.add_resource(4, "foo")
             assert subctx.get_static_resources(int) == {1, 4, 9}
 
     async def test_require_resource(self, context: Context) -> None:
-        await context.add_resource(1)
+        context.add_resource(1)
         assert context.require_resource(int) == 1
 
     async def test_require_resource_not_found(self, context: Context) -> None:
@@ -400,7 +406,7 @@ class TestContextTeardown:
             resource = require_resource(str)
 
         async with Context() as ctx:
-            await ctx.add_resource("blah")
+            ctx.add_resource("blah")
             ctx.add_teardown_callback(teardown_callback)
 
         assert resource == "blah"
@@ -413,7 +419,7 @@ class TestContextTeardown:
             resource = require_resource(str)
 
         async with Context() as ctx:
-            await ctx.add_resource_factory(lambda: "blah", types=[str])
+            ctx.add_resource_factory(lambda: "blah", types=[str])
             ctx.add_teardown_callback(teardown_callback)
 
         assert resource == "blah"
@@ -461,14 +467,14 @@ async def test_current_context() -> None:
 
 async def test_get_resource() -> None:
     async with Context() as ctx:
-        await ctx.add_resource("foo")
+        ctx.add_resource("foo")
         assert get_resource(str) == "foo"
         assert get_resource(int) is None
 
 
 async def test_require_resource() -> None:
     async with Context() as ctx:
-        await ctx.add_resource("foo")
+        ctx.add_resource("foo")
         assert require_resource(str) == "foo"
         pytest.raises(ResourceNotFound, require_resource, int)
 
@@ -482,8 +488,8 @@ class TestDependencyInjection:
             return foo, bar, baz
 
         async with Context() as ctx:
-            await ctx.add_resource("bar_test")
-            await ctx.add_resource("baz_test", "alt")
+            ctx.add_resource("bar_test")
+            ctx.add_resource("baz_test", "alt")
             foo, bar, baz = await injected(2)
 
         assert foo == 2
@@ -498,8 +504,8 @@ class TestDependencyInjection:
             return foo, bar, baz
 
         async with Context() as ctx:
-            await ctx.add_resource("bar_test")
-            await ctx.add_resource("baz_test", "alt")
+            ctx.add_resource("bar_test")
+            ctx.add_resource("baz_test", "alt")
             foo, bar, baz = injected(2)
 
         assert foo == 2
@@ -574,7 +580,7 @@ class TestDependencyInjection:
         async with Context() as ctx:
             retval: Any = injected() if sync else (await injected())
             assert retval is None
-            await ctx.add_resource("hello")
+            ctx.add_resource("hello")
             retval = injected() if sync else (await injected())
             assert retval == "hello"
 
