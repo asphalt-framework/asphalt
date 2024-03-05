@@ -23,6 +23,7 @@ from ._context import resource as resource
 from ._context import start_background_task as start_background_task
 from ._event import Event as Event
 from ._event import Signal as Signal
+from ._event import SignalQueueFull as SignalQueueFull
 from ._event import stream_events as stream_events
 from ._event import wait_event as wait_event
 from ._exceptions import ApplicationExit as ApplicationExit

@@ -2,9 +2,11 @@ import gc
 from datetime import datetime, timedelta, timezone
 
 import pytest
-from anyio import create_task_group
+from anyio import create_task_group, fail_after
+from anyio.abc import TaskStatus
+from anyio.lowlevel import checkpoint
 
-from asphalt.core import Event, Signal, stream_events, wait_event
+from asphalt.core import Event, Signal, SignalQueueFull, stream_events, wait_event
 
 pytestmark = pytest.mark.anyio()
 
@@ -61,14 +63,41 @@ class TestSignal:
             f"{__name__}.DummyEvent"
         )
         with pytest.raises(TypeError, match=pattern):
-            await source.event_a.dispatch("foo")
+            source.event_a.dispatch("foo")
 
     async def test_dispatch_event_no_listeners(self, source):
         """
         Test that dispatching an event when there are no listeners will still work.
 
         """
-        await source.event_a.dispatch(DummyEvent())
+        source.event_a.dispatch(DummyEvent())
+
+    async def test_dispatch_event_buffer_overflow(self, source):
+        """
+        Test that dispatching to a subscriber that has a full queue raises the
+        SignalQueueFull warning.
+
+        """
+        received_events = []
+
+        async def receive_events(task_status: TaskStatus[None]) -> None:
+            async with source.event_a.stream_events(max_queue_size=1) as stream:
+                task_status.started()
+                async for event in stream:
+                    received_events.append(event)
+
+        async with create_task_group() as tg:
+            await tg.start(receive_events)
+            source.event_a.dispatch(DummyEvent(1))
+            with pytest.warns(SignalQueueFull):
+                source.event_a.dispatch(DummyEvent(2))
+                source.event_a.dispatch(DummyEvent(3))
+
+            # Give the task a chance to run, then cancel
+            await checkpoint()
+            tg.cancel_scope.cancel()
+
+        assert len(received_events) == 1
 
     @pytest.mark.parametrize(
         "filter, expected_value",
@@ -80,11 +109,12 @@ class TestSignal:
     async def test_wait_event(self, source, filter, expected_value):
         async def dispatch_events() -> None:
             for i in range(1, 4):
-                await source.event_a.dispatch(DummyEvent(i))
+                source.event_a.dispatch(DummyEvent(i))
 
         async with create_task_group() as tg:
             tg.start_soon(dispatch_events)
-            event = await wait_event([source.event_a], filter)
+            with fail_after(1):
+                event = await wait_event([source.event_a], filter)
 
         assert event.args == (expected_value,)
 
@@ -99,7 +129,7 @@ class TestSignal:
         values = []
         async with source.event_a.stream_events(filter) as stream:
             for i in range(1, 4):
-                await source.event_a.dispatch(DummyEvent(i))
+                source.event_a.dispatch(DummyEvent(i))
 
             async for event in stream:
                 values.append(event.args[0])
@@ -144,11 +174,12 @@ async def test_wait_event(source, filter, expected_value):
 
     async def dispatch_events() -> None:
         for i in range(1, 4):
-            await source.event_a.dispatch(DummyEvent(i))
+            source.event_a.dispatch(DummyEvent(i))
 
     async with create_task_group() as tg:
         tg.start_soon(dispatch_events)
-        event = await wait_event([source.event_a], filter)
+        with fail_after(1):
+            event = await wait_event([source.event_a], filter)
 
     assert event.args == (expected_value,)
 
@@ -166,9 +197,9 @@ async def test_stream_events(filter, expected_values):
     async with stream_events([source1.event_a, source2.event_b], filter) as stream:
         for signal in [source1.event_a, source2.event_b]:
             for i in range(1, 4):
-                await signal.dispatch(DummyEvent(i))
+                signal.dispatch(DummyEvent(i))
 
-        await signal.dispatch(DummyEvent(None))
+        signal.dispatch(DummyEvent(None))
 
         async for event in stream:
             if event.args[0] is None:

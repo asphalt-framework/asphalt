@@ -96,6 +96,9 @@ branch = true
 
 [tool.coverage.report]
 show_missing = true
+exclude_also = [
+    "@overload"
+]
 
 [tool.tox]
 legacy_tox_ini = """
