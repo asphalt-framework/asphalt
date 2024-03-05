@@ -110,12 +110,9 @@ minversion = 4.0
 [testenv]
 extras = test
 commands = python -m pytest {posargs}
-
-[testenv:pypy3]
-basepython = pypy3.10
+package = editable
 
 [testenv:docs]
 extras = doc
-commands = sphinx-build -n docs build/sphinx {posargs}
-package = editable
+commands = sphinx-build -W docs build/sphinx {posargs}
 """
