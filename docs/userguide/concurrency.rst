@@ -33,6 +33,8 @@ otherwise block the event loop for long periods of time.
 To help with this, Asphalt contains functionality with which you can easily run code in thread
 pools or call asynchronous code from worker threads.
 
+.. _Trio: https://github.com/python-trio/trio
+
 Examples
 --------
 
