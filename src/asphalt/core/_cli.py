@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import os
 import re
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
@@ -61,7 +61,7 @@ def main() -> None:
     type=str,
     help="set configuration",
 )
-def run(configfile, service: str | None, set_: list[str]) -> None:
+def run(configfile: Sequence[str], service: str | None, set_: list[str]) -> None:
     # Read the configuration from the supplied YAML files
     config: dict[str, Any] = {}
     for path in configfile:

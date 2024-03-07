@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import sys
 from collections.abc import AsyncGenerator, Callable
-from contextlib import ExitStack
+from contextlib import AsyncExitStack, ExitStack
 from itertools import count
 from typing import Any, NoReturn, Optional, Tuple, Union
 
@@ -40,8 +40,8 @@ class TestContext:
     async def test_parent(self) -> None:
         """
         Test that the parent property points to the parent context instance, if any.
-
         """
+
         async with Context() as parent:
             async with Context() as child:
                 assert parent.parent is None
@@ -54,23 +54,24 @@ class TestContext:
         """
         Test that teardown callbacks are called in reverse order when a context is
         closed.
-
         """
 
-        def callback(exception=None):
+        def callback(exception: BaseException | None = None) -> None:
             called_functions.append((callback, exception))
 
-        async def async_callback(exception=None):
+        async def async_callback(exception: BaseException | None = None) -> None:
             called_functions.append((async_callback, exception))
 
-        called_functions: list[tuple[Callable, BaseException | None]] = []
-        with ExitStack() as exit_stack:
-            async with Context() as context:
-                context.add_teardown_callback(callback, pass_exception=True)
-                context.add_teardown_callback(async_callback, pass_exception=True)
-                if exception:
-                    exit_stack.enter_context(pytest.raises(ExceptionGroup))
-                    raise exception
+        called_functions: list[
+            tuple[Callable[[BaseException | None], Any], BaseException | None]
+        ] = []
+        async with AsyncExitStack() as exit_stack:
+            context = await exit_stack.enter_async_context(Context())
+            context.add_teardown_callback(callback, pass_exception=True)
+            context.add_teardown_callback(async_callback, pass_exception=True)
+            if exception:
+                exit_stack.enter_context(pytest.raises(ExceptionGroup))
+                raise exception
 
         assert called_functions == [(async_callback, exception), (callback, exception)]
 
@@ -78,7 +79,6 @@ class TestContext:
         """
         Test that all callbacks are called even when some teardown callbacks raise
         exceptions, and that those exceptions are reraised in such a case.
-
         """
 
         def callback1() -> None:
@@ -100,11 +100,12 @@ class TestContext:
         assert len(exc.value.exceptions[0].exceptions) == 2
 
     @pytest.mark.parametrize("types", [int, (int,), ()], ids=["type", "tuple", "empty"])
-    async def test_add_resource(self, context: Context, types):
+    async def test_add_resource(
+        self, context: Context, types: type | tuple[type, ...]
+    ) -> None:
         """
         Test that a resource is properly added in the context and listeners are
         notified.
-
         """
 
         async def resource_adder() -> None:
@@ -379,7 +380,7 @@ class TestContextTeardown:
         assert received_exception == expected_exc
 
     def test_plain_function(self) -> None:
-        def start(ctx) -> None:
+        def start() -> None:
             pass
 
         pytest.raises(TypeError, context_teardown, start).match(
@@ -513,7 +514,7 @@ class TestDependencyInjection:
         assert baz == "baz_test"
 
     async def test_missing_annotation(self) -> None:
-        async def injected(
+        async def injected(  # type: ignore[no-untyped-def]
             foo: int, bar: str = resource(), *, baz=resource("alt")
         ) -> None:
             pass
@@ -613,8 +614,8 @@ class TestDependencyInjection:
             r"forget to add the @inject decorator\?"
         )
 
-    def test_posonly_argument(self):
-        def injected(foo: int, bar: str = resource(), /):
+    def test_posonly_argument(self) -> None:
+        def injected(foo: int, bar: str = resource(), /) -> None:
             pass
 
         pytest.raises(TypeError, inject, injected).match(

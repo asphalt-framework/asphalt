@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import sys
-from typing import Any, NoReturn
+from typing import Any, NoReturn, cast
 from unittest.mock import Mock
 
 import anyio
 import pytest
 from common import raises_in_exception_group
+from pytest import MonkeyPatch
 
 from asphalt.core import (
     CLIApplicationComponent,
@@ -18,9 +19,6 @@ from asphalt.core import (
 from asphalt.core._component import component_types
 
 pytestmark = pytest.mark.anyio()
-
-if sys.version_info < (3, 11):
-    pass
 
 if sys.version_info >= (3, 10):
     from importlib.metadata import EntryPoint
@@ -39,7 +37,7 @@ class DummyComponent(Component):
 
 
 @pytest.fixture(autouse=True)
-def monkeypatch_plugins(monkeypatch):
+def monkeypatch_plugins(monkeypatch: MonkeyPatch) -> None:
     entrypoint = Mock(EntryPoint)
     entrypoint.load.configure_mock(return_value=DummyComponent)
     monkeypatch.setattr(component_types, "_entrypoints", {"dummy": entrypoint})
@@ -105,16 +103,17 @@ class TestContainerComponent:
         exc = pytest.raises(exc_cls, container.add_component, alias, cls)
         assert str(exc.value) == message
 
-    def test_add_duplicate_component(self, container) -> None:
+    def test_add_duplicate_component(self, container: ContainerComponent) -> None:
         container.add_component("dummy")
         exc = pytest.raises(ValueError, container.add_component, "dummy")
         assert str(exc.value) == 'there is already a child component named "dummy"'
 
-    async def test_start(self, container) -> None:
+    async def test_start(self, container: ContainerComponent) -> None:
         async with Context():
             await container.start()
 
-        assert container.child_components["dummy"].started
+        dummy = cast(DummyComponent, container.child_components["dummy"])
+        assert dummy.started
 
 
 class TestCLIApplicationComponent:

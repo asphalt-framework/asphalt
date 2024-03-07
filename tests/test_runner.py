@@ -3,10 +3,12 @@ from __future__ import annotations
 import logging
 import platform
 import signal
+from typing import Any
 from unittest.mock import patch
 
 import anyio
 import pytest
+from _pytest.logging import LogCaptureFixture
 from anyio import to_thread
 from anyio.lowlevel import checkpoint
 from common import raises_in_exception_group
@@ -33,7 +35,7 @@ class ShutdownComponent(Component):
         self.teardown_callback_called = False
         self.exception: BaseException | None = None
 
-    def teardown_callback(self, exception: BaseException) -> None:
+    def teardown_callback(self, exception: BaseException | None) -> None:
         self.teardown_callback_called = True
         self.exception = exception
 
@@ -78,10 +80,15 @@ class DummyCLIApp(CLIApplicationComponent):
 
 @pytest.mark.parametrize(
     "logging_config",
-    [None, logging.INFO, {"version": 1, "loggers": {"asphalt": {"level": "INFO"}}}],
-    ids=["disabled", "loglevel", "dictconfig"],
+    [
+        pytest.param(None, id="disabled"),
+        pytest.param(logging.INFO, id="loglevel"),
+        pytest.param(
+            {"version": 1, "loggers": {"asphalt": {"level": "INFO"}}}, id="dictconfig"
+        ),
+    ],
 )
-async def test_run_logging_config(logging_config):
+async def test_run_logging_config(logging_config: dict[str, Any] | int | None) -> None:
     """Test that logging initialization happens as expected."""
     with patch("asphalt.core._runner.basicConfig") as basicConfig, patch(
         "asphalt.core._runner.dictConfig"
@@ -93,7 +100,7 @@ async def test_run_logging_config(logging_config):
 
 
 @pytest.mark.parametrize("max_threads", [None, 3])
-async def test_run_max_threads(max_threads):
+async def test_run_max_threads(max_threads: int | None) -> None:
     """
     Test that a new default executor is installed if and only if the max_threads
     argument is given.
@@ -106,7 +113,7 @@ async def test_run_max_threads(max_threads):
     assert limiter.total_tokens == expected_total_tokens
 
 
-async def test_run_callbacks(caplog):
+async def test_run_callbacks(caplog: LogCaptureFixture) -> None:
     """
     Test that the teardown callbacks are run when the application is started and shut
     down properly and that the proper logging messages are emitted.
@@ -145,7 +152,9 @@ async def test_run_callbacks(caplog):
         ),
     ],
 )
-async def test_clean_exit(caplog, method: str, expected_stop_message: str | None):
+async def test_clean_exit(
+    caplog: LogCaptureFixture, method: str, expected_stop_message: str | None
+) -> None:
     """
     Test that when application termination is explicitly requested either externally or
     directly from a service task, it exits cleanly.
@@ -168,7 +177,7 @@ async def test_clean_exit(caplog, method: str, expected_stop_message: str | None
         assert records[3].message == expected_stop_message
 
 
-async def test_start_exception(caplog):
+async def test_start_exception(caplog: LogCaptureFixture) -> None:
     """
     Test that an exception caught during the application initialization is put into the
     application context and made available to teardown callbacks.
@@ -191,7 +200,7 @@ async def test_start_exception(caplog):
     assert records[3].message == "Application stopped"
 
 
-async def test_start_timeout(caplog):
+async def test_start_timeout(caplog: LogCaptureFixture) -> None:
     """
     Test that when the root component takes too long to start up, the runner exits and
     logs the appropriate error message.
@@ -221,7 +230,7 @@ async def test_start_timeout(caplog):
     assert records[3].message == "Application stopped"
 
 
-async def test_dict_config(caplog):
+async def test_dict_config(caplog: LogCaptureFixture) -> None:
     """Test that component configuration passed as a dictionary works."""
     caplog.set_level(logging.INFO)
     await run_application(component={"type": ShutdownComponent})
@@ -236,7 +245,7 @@ async def test_dict_config(caplog):
     assert records[3].message == "Application stopped"
 
 
-async def test_run_cli_application(caplog):
+async def test_run_cli_application(caplog: LogCaptureFixture) -> None:
     caplog.set_level(logging.INFO)
     with pytest.raises(SystemExit) as exc:
         await run_application(DummyCLIApp())

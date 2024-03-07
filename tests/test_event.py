@@ -1,5 +1,9 @@
+from __future__ import annotations
+
 import gc
+from collections.abc import Callable
 from datetime import datetime, timedelta, timezone
+from typing import Any
 
 import pytest
 from anyio import create_task_group, fail_after
@@ -12,7 +16,7 @@ pytestmark = pytest.mark.anyio()
 
 
 class DummyEvent(Event):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args: Any, **kwargs: Any):
         self.args = args
         self.kwargs = kwargs
 
@@ -23,19 +27,19 @@ class DummySource:
 
 
 @pytest.fixture
-def source():
+def source() -> DummySource:
     return DummySource()
 
 
 class TestEvent:
-    def test_utc_timestamp(self, source):
+    def test_utc_timestamp(self, source: DummySource) -> None:
         timestamp = datetime.now(timezone(timedelta(hours=2)))
         event = Event()
         event.time = timestamp.timestamp()
         assert event.utc_timestamp == timestamp
         assert event.utc_timestamp.tzinfo == timezone.utc
 
-    def test_event_repr(self, source):
+    def test_event_repr(self, source: DummySource) -> None:
         event = Event()
         event.source = source
         event.topic = "sometopic"
@@ -43,7 +47,7 @@ class TestEvent:
 
 
 class TestSignal:
-    def test_class_attribute_access(self):
+    def test_class_attribute_access(self) -> None:
         """
         Test that accessing the descriptor on the class level returns the same signal
         instance.
@@ -56,23 +60,23 @@ class TestSignal:
 
         assert EventSource.dummysignal is signal
 
-    async def test_dispatch_event_type_mismatch(self, source):
+    async def test_dispatch_event_type_mismatch(self, source: DummySource) -> None:
         """Test that trying to dispatch an event of the wrong type raises TypeError."""
         pattern = (
             f"Event type mismatch: event \\(str\\) is not a subclass of "
             f"{__name__}.DummyEvent"
         )
         with pytest.raises(TypeError, match=pattern):
-            source.event_a.dispatch("foo")
+            source.event_a.dispatch("foo")  # type: ignore[arg-type]
 
-    async def test_dispatch_event_no_listeners(self, source):
+    async def test_dispatch_event_no_listeners(self, source: DummySource) -> None:
         """
         Test that dispatching an event when there are no listeners will still work.
 
         """
         source.event_a.dispatch(DummyEvent())
 
-    async def test_dispatch_event_buffer_overflow(self, source):
+    async def test_dispatch_event_buffer_overflow(self, source: DummySource) -> None:
         """
         Test that dispatching to a subscriber that has a full queue raises the
         SignalQueueFull warning.
@@ -106,7 +110,12 @@ class TestSignal:
             pytest.param(lambda event: event.args[0] == 3, 3, id="filter"),
         ],
     )
-    async def test_wait_event(self, source, filter, expected_value):
+    async def test_wait_event(
+        self,
+        source: DummySource,
+        filter: Callable[[Event], bool] | None,
+        expected_value: int,
+    ) -> None:
         async def dispatch_events() -> None:
             for i in range(1, 4):
                 source.event_a.dispatch(DummyEvent(i))
@@ -125,7 +134,12 @@ class TestSignal:
             pytest.param(lambda event: event.args[0] in (3, None), [3], id="filter"),
         ],
     )
-    async def test_stream_events(self, source, filter, expected_values):
+    async def test_stream_events(
+        self,
+        source: DummySource,
+        filter: Callable[[DummyEvent], bool] | None,
+        expected_values: list[int],
+    ) -> None:
         values = []
         async with source.event_a.stream_events(filter) as stream:
             for i in range(1, 4):
@@ -138,7 +152,7 @@ class TestSignal:
 
         assert values == expected_values
 
-    def test_memory_leak(self):
+    def test_memory_leak(self) -> None:
         """
         Test that activating a Signal does not prevent its owner object from being
         garbage collected.
@@ -165,7 +179,11 @@ class TestSignal:
         pytest.param(lambda event: event.args[0] == 3, 3, id="filter"),
     ],
 )
-async def test_wait_event(source, filter, expected_value):
+async def test_wait_event(
+    source: DummySource,
+    filter: Callable[[DummyEvent], bool] | None,
+    expected_value: int,
+) -> None:
     """
     Test that wait_event returns the first event matched by the filter, or the first
     event if there is no filter.
@@ -191,7 +209,9 @@ async def test_wait_event(source, filter, expected_value):
         pytest.param(lambda event: event.args[0] in (3, None), [3, 3], id="filter"),
     ],
 )
-async def test_stream_events(filter, expected_values):
+async def test_stream_events(
+    filter: Callable[[DummyEvent], bool] | None, expected_values: list[int]
+) -> None:
     source1, source2 = DummySource(), DummySource()
     values = []
     async with stream_events([source1.event_a, source2.event_b], filter) as stream:

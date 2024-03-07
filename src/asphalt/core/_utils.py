@@ -46,7 +46,7 @@ def resolve_reference(ref: object) -> Any:
         raise LookupError(f"error resolving reference {ref}: error looking up object")
 
 
-def qualified_name(obj) -> str:
+def qualified_name(obj: object) -> str:
     """
     Return the qualified name (e.g. package.module.Type) for the given object.
 
@@ -119,7 +119,7 @@ class PluginContainer:
     def __init__(self, namespace: str, base_class: type | None = None) -> None:
         self.namespace = namespace
         self.base_class = base_class
-        group = entry_points(group=namespace)  # type: ignore[attr-defined]
+        group = entry_points(group=namespace)
         self._entrypoints = {ep.name: ep for ep in group}
         self._resolved: dict[str, Any] = {}
 
@@ -159,7 +159,7 @@ class PluginContainer:
         value = self._resolved[obj] = value.load()
         return value
 
-    def create_object(self, type: type | str, **constructor_kwargs) -> Any:
+    def create_object(self, type: type | str, **constructor_kwargs: Any) -> Any:
         """
         Instantiate a plugin.
 
@@ -204,7 +204,7 @@ class PluginContainer:
 
         return values
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return (
             f"{self.__class__.__name__}(namespace={self.namespace!r}, "
             f"base_class={qualified_name(self.base_class)})"

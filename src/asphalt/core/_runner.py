@@ -27,7 +27,7 @@ if sys.version_info < (3, 11):
     from exceptiongroup import ExceptionGroup
 
 
-async def handle_signals(event, *, task_status: TaskStatus) -> None:
+async def handle_signals(event: Event, *, task_status: TaskStatus[None]) -> None:
     logger = getLogger(__name__)
     with anyio.open_signal_receiver(signal.SIGTERM, signal.SIGINT) as signals:
         task_status.started()
@@ -40,7 +40,7 @@ async def handle_signals(event, *, task_status: TaskStatus) -> None:
             event.set()
 
 
-def handle_application_exit(excgrp: ExceptionGroup) -> None:
+def handle_application_exit(excgrp: ExceptionGroup[ApplicationExit]) -> None:
     exc: Exception = excgrp
     while isinstance(exc, ExceptionGroup):
         if len(exc.exceptions) > 1:

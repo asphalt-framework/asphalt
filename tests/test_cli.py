@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 from unittest.mock import patch
 
 import pytest
@@ -13,7 +14,7 @@ pytestmark = pytest.mark.anyio()
 
 
 class DummyComponent(Component):
-    def __init__(self, dummyval1=None, dummyval2=None):
+    def __init__(self, dummyval1: Any = None, dummyval2: Any = None):
         self.dummyval1 = dummyval1
         self.dummyval2 = dummyval2
 
@@ -31,7 +32,7 @@ def test_run(
     anyio_backend_name: str,
     monkeypatch: MonkeyPatch,
     tmp_path: Path,
-):
+) -> None:
     monkeypatch.setenv("MYENVVAR", "from environment")
     tmp_path = tmp_path.joinpath("tmpfile")
     tmp_path.write_text("Hello, World!")
@@ -304,7 +305,7 @@ logging:
             assert run_app.call_count == 0
             assert result.output == "Error: No services have been defined\n"
 
-    def test_run_only_service(self, runner) -> None:
+    def test_run_only_service(self, runner: CliRunner) -> None:
         with runner.isolated_filesystem(), patch(
             "asphalt.core._cli.run_application"
         ) as run_app:

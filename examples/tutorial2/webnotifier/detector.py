@@ -1,4 +1,5 @@
 """This is the change detector component for the Asphalt webnotifier tutorial."""
+
 from __future__ import annotations
 
 from collections.abc import AsyncGenerator
@@ -64,7 +65,7 @@ class ChangeDetectorComponent(Component):
         self.delay = delay
 
     @context_teardown
-    async def start(self) -> AsyncGenerator[None, Exception | None]:
+    async def start(self) -> AsyncGenerator[None, BaseException | None]:
         detector = Detector(self.url, self.delay)
         add_resource(detector)
         await start_background_task(detector.run, "Web page change detector")

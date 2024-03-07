@@ -25,6 +25,8 @@ from typing import (
     Callable,
     Generic,
     Literal,
+    NoReturn,
+    Optional,
     TypeVar,
     Union,
     cast,
@@ -43,9 +45,9 @@ from ._exceptions import ApplicationExit
 from ._utils import callable_name, qualified_name
 
 if sys.version_info >= (3, 10):
-    from typing import ParamSpec
+    from typing import ParamSpec, TypeAlias
 else:
-    from typing_extensions import ParamSpec
+    from typing_extensions import ParamSpec, TypeAlias
 
 if sys.version_info >= (3, 11):
     from typing import Self
@@ -54,7 +56,11 @@ else:
     from typing_extensions import Self
 
 logger = logging.getLogger(__name__)
-factory_callback_type = Callable[[], Any]
+FactoryCallback: TypeAlias = Callable[[], Any]
+TeardownCallback: TypeAlias = Union[
+    Callable[[], Any], Callable[[Optional[BaseException]], Any]
+]
+
 resource_name_re = re.compile(r"\w+")
 T_Resource = TypeVar("T_Resource")
 T_Retval = TypeVar("T_Retval")
@@ -107,7 +113,7 @@ class ResourceEvent(Event):
 @dataclass(frozen=True)
 class GeneratedResource(Generic[T_Resource]):
     resource: T_Resource
-    teardown_callback: Callable[[], None | Coroutine] | None
+    teardown_callback: Callable[[], None | Coroutine[Any, Any, Any]] | None
 
 
 class AwaitableResourceError(Exception):
@@ -132,7 +138,7 @@ class ResourceNotFound(LookupError):
         self.type = type
         self.name = name
 
-    def __str__(self):
+    def __str__(self) -> str:
         return (
             f"no matching resource was found for type={qualified_name(self.type)} "
             f"name={self.name!r}"
@@ -168,7 +174,7 @@ class Context:
     resource_added = Signal(ResourceEvent)
 
     _task_group: TaskGroup
-    _reset_token: Token
+    _reset_token: Token[Context]
     _exit_stack: AsyncExitStack
 
     def __init__(self) -> None:
@@ -176,7 +182,7 @@ class Context:
         self._state = ContextState.inactive
         self._resources: dict[tuple[type, str], ResourceContainer] = {}
         self._resource_factories: dict[tuple[type, str], ResourceContainer] = {}
-        self._teardown_callbacks: list[tuple[Callable, bool]] = []
+        self._teardown_callbacks: list[tuple[TeardownCallback, bool]] = []
 
     @property
     def context_chain(self) -> list[Context]:
@@ -224,9 +230,11 @@ class Context:
             callback, pass_exception = self._teardown_callbacks.pop()
             try:
                 if pass_exception:
-                    retval = callback(original_exception)
+                    retval = cast(Callable[[Optional[BaseException]], Any], callback)(
+                        original_exception
+                    )
                 else:
-                    retval = callback()
+                    retval = cast(Callable[[], Any], callback)()
 
                 if isawaitable(retval):
                     await retval
@@ -241,7 +249,7 @@ class Context:
             raise excgrp from original_exception
 
     def add_teardown_callback(
-        self, callback: Callable, pass_exception: bool = False
+        self, callback: TeardownCallback, pass_exception: bool = False
     ) -> None:
         """
         Add a callback to be called when this context closes.
@@ -370,7 +378,7 @@ class Context:
 
     def add_resource_factory(
         self,
-        factory_callback: factory_callback_type,
+        factory_callback: FactoryCallback,
         name: str = "default",
         *,
         types: Sequence[type] | None = None,
@@ -530,7 +538,7 @@ class Context:
         # First check if there's already a matching resource in this context
         resource = self._resources.get(key)
         if resource is not None:
-            return resource.value_or_factory
+            return cast(T_Resource, resource.value_or_factory)
 
         # Next, check if there's a resource factory available on the context chain
         factory = next(
@@ -542,7 +550,7 @@ class Context:
             None,
         )
         if factory is not None:
-            return self._generate_resource_from_factory(factory)
+            return cast(T_Resource, self._generate_resource_from_factory(factory))
 
         # Finally, check parents for a matching resource
         return next(
@@ -725,7 +733,7 @@ class Context:
 
 
 def context_teardown(
-    func: Callable[P, AsyncGenerator[None, Exception | None]],
+    func: Callable[P, AsyncGenerator[None, BaseException | None]],
 ) -> Callable[P, Coroutine[Any, Any, None]]:
     """
     Wrap an async generator function to execute the rest of the function at context
@@ -752,8 +760,8 @@ def context_teardown(
     """
 
     @wraps(func)
-    async def wrapper(*args, **kwargs) -> None:
-        async def teardown_callback(exception: Exception | None) -> None:
+    async def wrapper(*args: P.args, **kwargs: P.kwargs) -> None:
+        async def teardown_callback(exception: BaseException | None) -> None:
             try:
                 await generator.asend(exception)
             except StopAsyncIteration:
@@ -819,7 +827,7 @@ def add_resource(
 
 
 def add_resource_factory(
-    factory_callback: factory_callback_type,
+    factory_callback: FactoryCallback,
     name: str = "default",
     *,
     types: Sequence[type] | None = None,
@@ -836,7 +844,9 @@ def add_resource_factory(
     )
 
 
-def add_teardown_callback(callback: Callable, pass_exception: bool = False) -> None:
+def add_teardown_callback(
+    callback: TeardownCallback, pass_exception: bool = False
+) -> None:
     """
     Shortcut for ``current_context().add_teardown_callback(...)``.
 
@@ -908,7 +918,7 @@ class _Dependency:
     cls: type = field(init=False, repr=False)
     optional: bool = field(init=False, default=False)
 
-    def __getattr__(self, item):
+    def __getattr__(self, item: str) -> NoReturn:
         raise AttributeError(
             "Attempted to access an attribute in a resource() marker – did you forget "
             "to add the @inject decorator?"
@@ -928,13 +938,11 @@ def resource(name: str = "default") -> Any:
 @overload
 def inject(
     func: Callable[P, Coroutine[Any, Any, T_Retval]],
-) -> Callable[P, Coroutine[Any, Any, T_Retval]]:
-    ...
+) -> Callable[P, Coroutine[Any, Any, T_Retval]]: ...
 
 
 @overload
-def inject(func: Callable[P, T_Retval]) -> Callable[P, T_Retval]:
-    ...
+def inject(func: Callable[P, T_Retval]) -> Callable[P, T_Retval]: ...
 
 
 def inject(func: Callable[P, Any]) -> Callable[P, Any]:
@@ -979,7 +987,7 @@ def inject(func: Callable[P, Any]) -> Callable[P, Any]:
         forward_refs_resolved = True
 
     @wraps(func)
-    def sync_wrapper(*args, **kwargs) -> Any:
+    def sync_wrapper(*args: P.args, **kwargs: P.kwargs) -> Any:
         if not forward_refs_resolved:
             resolve_forward_refs()
 
@@ -996,7 +1004,7 @@ def inject(func: Callable[P, Any]) -> Callable[P, Any]:
         return func(*args, **kwargs, **resources)
 
     @wraps(func)
-    async def async_wrapper(*args, **kwargs) -> Any:
+    async def async_wrapper(*args: P.args, **kwargs: P.kwargs) -> Any:
         if not forward_refs_resolved:
             resolve_forward_refs()
 

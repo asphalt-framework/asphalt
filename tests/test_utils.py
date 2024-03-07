@@ -21,7 +21,7 @@ class BaseDummyPlugin:
 
 
 class DummyPlugin(BaseDummyPlugin):
-    def __init__(self, **kwargs) -> None:
+    def __init__(self, **kwargs: Any) -> None:
         self.kwargs = kwargs
 
 
@@ -35,32 +35,34 @@ def test_merge_config() -> None:
 @pytest.mark.parametrize(
     "original, overrides",
     [
-        (None, {"a": 1}),
-        ({"a": 1}, None),
+        pytest.param(None, {"a": 1}, id="original_none"),
+        pytest.param({"a": 1}, None, id="override_none"),
     ],
-    ids=["original_none", "override_none"],
 )
-def test_merge_config_none_args(original, overrides) -> None:
+def test_merge_config_none_args(
+    original: dict[str, Any] | None, overrides: dict[str, Any] | None
+) -> None:
     assert merge_config(original, overrides) == {"a": 1}
 
 
 @pytest.mark.parametrize(
     "inputval, expected",
     [
-        (qualified_name, "function"),
-        (asyncio.Event(), "asyncio.locks.Event"),
-        (int, "int"),
+        pytest.param(qualified_name, "function", id="func"),
+        pytest.param(asyncio.Event(), "asyncio.locks.Event", id="instance"),
+        pytest.param(int, "int", id="builtintype"),
     ],
-    ids=["func", "instance", "builtintype"],
 )
-def test_qualified_name(inputval, expected) -> None:
+def test_qualified_name(inputval: object, expected: str) -> None:
     assert qualified_name(inputval) == expected
 
 
 @pytest.mark.parametrize(
     "inputval, expected",
-    [(qualified_name, "asphalt.core.qualified_name"), (len, "len")],
-    ids=["python", "builtin"],
+    [
+        pytest.param(qualified_name, "asphalt.core.qualified_name", id="python"),
+        pytest.param(len, "len", id="builtin"),
+    ],
 )
 def test_callable_name(inputval: Callable[..., Any], expected: str) -> None:
     assert callable_name(inputval) == expected
@@ -84,15 +86,15 @@ class TestPluginContainer:
             pytest.param(DummyPlugin, id="arbitrary_object"),
         ],
     )
-    def test_resolve(self, container: PluginContainer, inputvalue) -> None:
+    def test_resolve(self, container: PluginContainer, inputvalue: type | str) -> None:
         assert container.resolve(inputvalue) is DummyPlugin
 
-    def test_resolve_bad_entrypoint(self, container):
-        exc = pytest.raises(LookupError, container.resolve, "blah")
-        assert (
-            str(exc.value)
-            == "no such entry point in asphalt.core.test_plugin_container: blah"
-        )
+    def test_resolve_bad_entrypoint(self, container: PluginContainer) -> None:
+        with pytest.raises(
+            LookupError,
+            match="no such entry point in asphalt.core.test_plugin_container: blah",
+        ):
+            container.resolve("blah")
 
     @pytest.mark.parametrize(
         "argument",
@@ -101,7 +103,9 @@ class TestPluginContainer:
             pytest.param("dummy", id="entrypoint"),
         ],
     )
-    def test_create_object(self, container: PluginContainer, argument) -> None:
+    def test_create_object(
+        self, container: PluginContainer, argument: type | str
+    ) -> None:
         """
         Test that create_object works with all three supported ways of passing a plugin
         class reference.
@@ -112,7 +116,7 @@ class TestPluginContainer:
         assert isinstance(component, DummyPlugin)
         assert component.kwargs == {"a": 5, "b": 2}
 
-    def test_create_object_bad_type(self, container) -> None:
+    def test_create_object_bad_type(self, container: PluginContainer) -> None:
         exc = pytest.raises(TypeError, container.create_object, int)
         assert str(exc.value) == "int is not a subclass of test_utils.BaseDummyPlugin"
 
@@ -128,7 +132,7 @@ class TestPluginContainer:
         assert container.all() == [DummyPlugin]
         assert container.all() == [DummyPlugin]
 
-    def test_repr(self, container) -> None:
+    def test_repr(self, container: PluginContainer) -> None:
         assert repr(container) == (
             "PluginContainer(namespace='asphalt.core.test_plugin_container', "
             "base_class=test_utils.BaseDummyPlugin)"

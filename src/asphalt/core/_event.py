@@ -52,7 +52,7 @@ class Event:
         """
         return datetime.fromtimestamp(self.time, timezone.utc)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return (
             f"{self.__class__.__name__}(source={self.source!r}, "
             f"topic={self.topic!r})"
@@ -151,14 +151,14 @@ class Signal(Generic[T_Event]):
     _topic: str = field(init=False)
 
     @overload
-    def __get__(self, instance: None, owner: Any) -> Signal[T_Event]:
-        ...
+    def __get__(self, instance: None, owner: Any) -> Signal[T_Event]: ...
 
     @overload
-    def __get__(self, instance: Any, owner: Any) -> BoundSignal[T_Event]:
-        ...
+    def __get__(self, instance: Any, owner: Any) -> BoundSignal[T_Event]: ...
 
-    def __get__(self, instance, owner) -> Signal[T_Event] | BoundSignal[T_Event]:
+    def __get__(
+        self, instance: Any, owner: Any
+    ) -> Signal[T_Event] | BoundSignal[T_Event]:
         if instance is None:
             return self
 
@@ -171,13 +171,13 @@ class Signal(Generic[T_Event]):
             self._bound_signals[instance] = bound_signal
             return bound_signal
 
-    def __set_name__(self, owner, name: str) -> None:
+    def __set_name__(self, owner: Any, name: str) -> None:
         self._topic = name
 
 
 @asynccontextmanager
 async def stream_events(
-    signals: Sequence[BoundSignal],
+    signals: Sequence[BoundSignal[T_Event]],
     filter: Callable[[T_Event], bool] | None = None,
     *,
     max_queue_size: int = 50,

@@ -1,4 +1,5 @@
 """This is the client code for the Asphalt echo server tutorial."""
+
 import sys
 
 import anyio
