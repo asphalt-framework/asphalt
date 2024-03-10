@@ -1031,7 +1031,7 @@ async def request_resource(type: type[T_Resource], name: str = "default") -> T_R
 
 async def start_background_task(
     func: Callable[..., Coroutine[Any, Any, T_Retval]],
-    name: str,
+    name: str = "",
 ) -> TaskHandle[T_Retval]:
     """Shortcut for ``current_context().start_background_task(...)``."""
     return await current_context().start_background_task(func, name)
