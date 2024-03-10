@@ -152,7 +152,7 @@ class CLIApplicationComponent(ContainerComponent):
                 raise ApplicationExit
 
         await super().start()
-        await start_background_task(run, "Main task", teardown_action=None)
+        await start_background_task(run, "Main task")
 
     @abstractmethod
     async def run(self) -> int | None:

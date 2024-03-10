@@ -55,9 +55,7 @@ class ShutdownComponent(Component):
         if self.method == "timeout":
             await anyio.sleep(1)
         else:
-            await start_background_task(
-                self.stop_app, "Application terminator", teardown_action=None
-            )
+            await start_background_task(self.stop_app, "Application terminator")
 
 
 class CrashComponent(Component):

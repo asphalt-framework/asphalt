@@ -8,7 +8,14 @@ from typing import Any, NoReturn, Optional, Tuple, Union
 
 import anyio
 import pytest
-from anyio import create_task_group, fail_after, sleep, wait_all_tasks_blocked
+from anyio import (
+    create_task_group,
+    fail_after,
+    get_current_task,
+    sleep,
+    wait_all_tasks_blocked,
+)
+from anyio.abc import TaskStatus
 from common import raises_in_exception_group
 
 from asphalt.core import (
@@ -23,6 +30,7 @@ from asphalt.core import (
     require_resource,
     resource,
 )
+from asphalt.core._context import start_background_task, start_service_task
 
 if sys.version_info < (3, 11):
     from exceptiongroup import ExceptionGroup
@@ -66,11 +74,14 @@ class TestContext:
             tuple[Callable[[BaseException | None], Any], BaseException | None]
         ] = []
         async with AsyncExitStack() as exit_stack:
+            if exception:
+                exit_stack.enter_context(pytest.raises(ExceptionGroup))
+
             context = await exit_stack.enter_async_context(Context())
             context.add_teardown_callback(callback, pass_exception=True)
             context.add_teardown_callback(async_callback, pass_exception=True)
+
             if exception:
-                exit_stack.enter_context(pytest.raises(ExceptionGroup))
                 raise exception
 
         assert called_functions == [(async_callback, exception), (callback, exception)]
@@ -273,23 +284,78 @@ class TestContext:
         assert exc.value.type == int
         assert exc.value.name == "foo"
 
-    async def test_start_background_task_cancel_on_exit(self) -> None:
+    async def test_start_background_task(self) -> None:
+        async def taskfunc() -> str:
+            assert get_current_task().name == "taskfunc"
+            return "returnvalue"
+
+        async with Context():
+            handle = await start_background_task(taskfunc, "taskfunc")
+            assert handle.start_value is None
+            assert await handle == "returnvalue"
+
+    async def test_start_background_task_status(self) -> None:
+        async def taskfunc(task_status: TaskStatus[str]) -> str:
+            assert get_current_task().name == "taskfunc"
+            task_status.started("startval")
+            return "returnvalue"
+
+        async with Context():
+            handle = await start_background_task(taskfunc, "taskfunc")
+            assert handle.start_value == "startval"
+            assert await handle == "returnvalue"
+
+    async def test_start_background_task_cancel(self) -> None:
         started = False
         finished = False
 
         async def taskfunc() -> None:
             nonlocal started, finished
+            assert get_current_task().name == "taskfunc"
             started = True
             await sleep(3)
             finished = True
 
-        async with Context() as ctx:
-            await ctx.start_background_task(taskfunc, "taskfunc")
+        async with Context():
+            handle = await start_background_task(taskfunc, "taskfunc")
+            await wait_all_tasks_blocked()
+            handle.cancel()
 
         assert started
         assert not finished
 
-    async def test_start_background_task_custom_teardown_callback(self) -> None:
+    async def test_start_background_task_exception(self) -> None:
+        async def taskfunc() -> NoReturn:
+            raise Exception("foo")
+
+        with pytest.raises(ExceptionGroup) as excgrp:
+            async with Context():
+                handle = await start_background_task(taskfunc, "taskfunc")
+
+        assert len(excgrp.value.exceptions) == 1
+        assert str(excgrp.value.exceptions[0]) == "foo"
+
+        with pytest.raises(Exception, match="^foo$"):
+            await handle
+
+    async def test_start_service_task_cancel_on_exit(self) -> None:
+        started = False
+        finished = False
+
+        async def taskfunc() -> None:
+            nonlocal started, finished
+            assert get_current_task().name == "Service task: taskfunc"
+            started = True
+            await sleep(3)
+            finished = True
+
+        async with Context():
+            await start_service_task(taskfunc, "taskfunc")
+
+        assert started
+        assert not finished
+
+    async def test_start_service_task_custom_teardown_callback(self) -> None:
         started = False
         finished = False
         event = anyio.Event()
@@ -302,29 +368,29 @@ class TestContext:
 
             finished = True
 
-        async with Context() as ctx:
-            await ctx.start_background_task(
-                taskfunc, "taskfunc", teardown_action=event.set
-            )
+        async with Context():
+            await start_service_task(taskfunc, "taskfunc", teardown_action=event.set)
 
         assert started
         assert finished
 
-    async def test_start_background_task_no_teardown_action(self) -> None:
+    async def test_start_service_task_status(self) -> None:
         started = False
         finished = False
 
-        async def taskfunc() -> None:
+        async def taskfunc(task_status: TaskStatus[str]) -> None:
             nonlocal started, finished
+            assert get_current_task().name == "Service task: taskfunc"
             started = True
-            await wait_all_tasks_blocked()
+            task_status.started("startval")
+            await sleep(3)
             finished = True
 
-        async with Context() as ctx:
-            await ctx.start_background_task(taskfunc, "taskfunc", teardown_action=None)
+        async with Context():
+            assert await start_service_task(taskfunc, "taskfunc") == "startval"
 
         assert started
-        assert finished
+        assert not finished
 
 
 class TestContextTeardown:

@@ -9,6 +9,7 @@ from ._context import NoCurrentContext as NoCurrentContext
 from ._context import ResourceConflict as ResourceConflict
 from ._context import ResourceEvent as ResourceEvent
 from ._context import ResourceNotFound as ResourceNotFound
+from ._context import TaskHandle as TaskHandle
 from ._context import add_resource as add_resource
 from ._context import add_resource_factory as add_resource_factory
 from ._context import add_teardown_callback as add_teardown_callback
@@ -38,5 +39,5 @@ from ._utils import resolve_reference as resolve_reference
 key: str
 value: Any
 for key, value in list(locals().items()):
-    if getattr(value, "__module__", "").startswith("asphalt.core."):
+    if getattr(value, "__module__", "").startswith(f"{__name__}."):
         value.__module__ = __name__

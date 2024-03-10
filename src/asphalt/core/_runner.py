@@ -4,6 +4,7 @@ import platform
 import signal
 import sys
 from contextlib import AsyncExitStack
+from functools import partial
 from logging import INFO, basicConfig, getLogger
 from logging.config import dictConfig
 from typing import Any, cast
@@ -11,7 +12,6 @@ from typing import Any, cast
 import anyio
 from anyio import (
     Event,
-    create_task_group,
     fail_after,
     get_cancelled_exc_class,
     to_thread,
@@ -20,11 +20,11 @@ from anyio.abc import TaskStatus
 from exceptiongroup import catch
 
 from ._component import Component, component_types
-from ._context import Context
+from ._context import Context, start_service_task
 from ._exceptions import ApplicationExit
 
 if sys.version_info < (3, 11):
-    from exceptiongroup import ExceptionGroup
+    from exceptiongroup import BaseExceptionGroup
 
 
 async def handle_signals(event: Event, *, task_status: TaskStatus[None]) -> None:
@@ -40,9 +40,9 @@ async def handle_signals(event: Event, *, task_status: TaskStatus[None]) -> None
             event.set()
 
 
-def handle_application_exit(excgrp: ExceptionGroup[ApplicationExit]) -> None:
-    exc: Exception = excgrp
-    while isinstance(exc, ExceptionGroup):
+def handle_application_exit(excgrp: BaseExceptionGroup[ApplicationExit]) -> None:
+    exc: BaseException = excgrp
+    while isinstance(exc, BaseExceptionGroup):
         if len(exc.exceptions) > 1:
             raise RuntimeError("Multiple ApplicationExit exceptions were raised")
 
@@ -115,14 +115,13 @@ async def run_application(
             handlers = {ApplicationExit: handle_application_exit}
             exit_stack.enter_context(catch(handlers))  # type: ignore[arg-type]
             event = Event()
-            if platform.system() != "Windows":
-                root_tg = await exit_stack.enter_async_context(create_task_group())
-                await root_tg.start(
-                    handle_signals, event, name="Asphalt signal handler"
-                )
-                exit_stack.callback(root_tg.cancel_scope.cancel)
 
             await exit_stack.enter_async_context(Context())
+            if platform.system() != "Windows":
+                await start_service_task(
+                    partial(handle_signals, event), "Asphalt signal handler"
+                )
+
             try:
                 with fail_after(start_timeout):
                     await component.start()

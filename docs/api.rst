@@ -14,6 +14,8 @@ Concurrency
 -----------
 
 .. autofunction:: start_background_task
+.. autofunction:: start_service_task
+.. autoclass:: TaskHandle
 
 Contexts and resources
 ----------------------
