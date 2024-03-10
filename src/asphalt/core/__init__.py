@@ -22,6 +22,7 @@ from ._context import request_resource as request_resource
 from ._context import require_resource as require_resource
 from ._context import resource as resource
 from ._context import start_background_task as start_background_task
+from ._context import start_service_task as start_service_task
 from ._event import Event as Event
 from ._event import Signal as Signal
 from ._event import SignalQueueFull as SignalQueueFull
