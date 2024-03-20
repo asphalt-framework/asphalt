@@ -34,7 +34,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class TaskHandle:
     """
-    A representation of a task started from :meth:`Context.start_background_task`.
+    A representation of a task started from :class:`TaskFactory`.
 
     :ivar name: the name of the task
     :ivar start_value: the start value passed to ``task_status.started()`` if the target
@@ -115,7 +115,7 @@ class TaskFactory:
 
         If ``func`` takes an argument named ``task_status``, then this method will only
         return when the function has called ``task_status.started()``. See
-        :meth:`anyio.TaskGroup.start` for details. The value passed to
+        :meth:`anyio.abc.TaskGroup.start` for details. The value passed to
         ``task_status.started()`` will be available as the ``start_value`` property on
         the :class:`TaskHandle`.
 
@@ -150,12 +150,9 @@ async def start_service_task(
     Start a background task that gets shut down when the context shuts down.
 
     This method is meant to be used by components to run their tasks like network
-    services that should be shut down with the application, while
-    :meth:`start_background_task` is meant to be used to run ad-hoc background tasks
-    that should be allowed to finish before the root context exits.
-
-    Behind the scenes, this method uses :meth:`start_background_task`, so its
-    semantics also apply here.
+    services that should be shut down with the application, because each call to this
+    functions registers a context teardown callback that waits for the service task to
+    finish before allowing the context teardown to continue..
 
     If you supply a teardown callback, and it raises an exception, then the task
     will be cancelled instead.
@@ -248,7 +245,7 @@ async def start_background_task_factory(
         ``True`` if it successfully handled the exception.
     :return: the task factory
 
-    .. seealso:: :meth:`Context.start_service_task`
+    .. seealso:: :func:`start_service_task`
 
     """
     factory = TaskFactory(exception_handler)

@@ -622,7 +622,7 @@ class Context:
 
         This is like :meth:`get_resource` except that instead of returning ``None`` when
         a resource is not found, it will raise
-        :exc:`~asphalt.core.context.ResourceNotFound`.
+        :exc:`~asphalt.core.ResourceNotFound`.
 
         :param type: type of the requested resource
         :param name: name of the requested resource

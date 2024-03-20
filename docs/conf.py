@@ -31,4 +31,8 @@ todo_include_todos = False
 html_theme = "sphinx_rtd_theme"
 htmlhelp_basename = "asphaltdoc"
 
-intersphinx_mapping = {"python": ("https://docs.python.org/3/", None)}
+intersphinx_mapping = {
+    "anyio": ("https://anyio.readthedocs.io/en/stable/", None),
+    "asphalt-mailer": ("https://asphalt-mailer.readthedocs.io/en/stable/", None),
+    "python": ("https://docs.python.org/3/", None),
+}

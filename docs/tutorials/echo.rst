@@ -1,10 +1,13 @@
 Tutorial 1: Getting your feet wet – a simple echo server and client
 ===================================================================
 
+.. py:currentmodule:: asphalt.core
+
 This tutorial will get you started with Asphalt development from the ground up.
-You will learn how to build a simple network server that echoes back messages sent to it, along
-with a matching client application. It will however not yet touch more advanced concepts like
-using the ``asphalt`` command to run an application with a configuration file.
+You will learn how to build a simple network server that echoes back messages sent to
+it, along with a matching client application. It will however not yet touch more
+advanced concepts like using the ``asphalt`` command to run an application with a
+configuration file.
 
 Prerequisites
 -------------
@@ -198,12 +201,10 @@ Create the file ``client.py`` file in the ``echo`` package directory as follows:
         anyio.run(run_application, component)
 
 You may have noticed that ``ClientComponent`` inherits from
-:class:`~asphalt.core.component.CLIApplicationComponent` instead of
-:class:`~asphalt.core.component.Component` and that instead of overriding the
-:meth:`~asphalt.core.component.Component.start` method,
-:meth:`~asphalt.core.component.CLIApplicationComponent.run` is overridden instead.
-This is standard practice for Asphalt applications that just do one specific thing and
-then exit.
+:class:`CLIApplicationComponent` instead of :class:`Component` and that instead of
+overriding the :meth:`Component.start` method, :meth:`CLIApplicationComponent.run` is
+overridden instead. This is standard practice for Asphalt applications that just do one
+specific thing and then exit.
 
 The script instantiates ``ClientComponent`` using the first command line argument as the
 ``message`` argument to the component's constructor. Doing this instead of directly
@@ -241,4 +242,5 @@ This tutorial only scratches the surface of what's possible with Asphalt, howeve
 teach you how to work with components, resources and configuration files to build more
 useful applications.
 
-.. _AnyIO socket streams: https://anyio.readthedocs.io/en/stable/networking.html#working-with-tcp-sockets
+.. _AnyIO socket streams: https://anyio.readthedocs.io/en/stable/networking.html#\
+    working-with-tcp-sockets
