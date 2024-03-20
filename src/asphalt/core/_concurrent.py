@@ -12,7 +12,6 @@ from anyio import (
     CancelScope,
     Event,
     create_task_group,
-    get_current_task,
 )
 from anyio.abc import TaskGroup, TaskStatus
 
@@ -41,7 +40,7 @@ class TaskHandle:
         function supported that
     """
 
-    name: str = field(init=False)
+    name: str
     start_value: Any = field(init=False, repr=False)
     _cancel_scope: CancelScope = field(
         init=False, default_factory=CancelScope, repr=False
@@ -65,12 +64,12 @@ async def _run_background_task(
     task_status: TaskStatus[Any],
 ) -> None:
     __tracebackhide__ = True  # trick supported by certain debugger frameworks
+
     # Check if the function has a parameter named "task_status"
     has_task_status = any(
         param.name == "task_status" and param.kind != Parameter.POSITIONAL_ONLY
         for param in signature(func).parameters.values()
     )
-    task_handle.name = str(get_current_task().name)
     logger.debug("Background task (%s) starting", task_handle.name)
 
     try:
@@ -101,7 +100,9 @@ class TaskFactory:
     _task_group: TaskGroup = field(init=False)
 
     async def start_task(
-        self, func: Callable[..., Coroutine[Any, Any, T_Retval]], name: str | None
+        self,
+        func: Callable[..., Coroutine[Any, Any, T_Retval]],
+        name: str | None = None,
     ) -> TaskHandle:
         """
         Start a background task in the factory's task group.
@@ -125,9 +126,13 @@ class TaskFactory:
             task
 
         """
-        task_handle = TaskHandle()
+        task_handle = TaskHandle(name=name or callable_name(func))
         task_handle.start_value = await self._task_group.start(
-            _run_background_task, func, task_handle, self.exception_handler, name=name
+            _run_background_task,
+            func,
+            task_handle,
+            self.exception_handler,
+            name=task_handle.name,
         )
         return task_handle
 
@@ -214,9 +219,9 @@ async def start_service_task(
             "teardown_action must be a callable, None, or the string 'cancel'"
         )
 
-    task_handle = TaskHandle()
+    task_handle = TaskHandle(f"Service task: {name}")
     task_handle.start_value = await ctx._task_group.start(
-        _run_background_task, func, task_handle, name=f"Service task: {name}"
+        _run_background_task, func, task_handle, name=task_handle.name
     )
     ctx._exit_stack.push_async_callback(finalize_service_task)
     return task_handle.start_value
