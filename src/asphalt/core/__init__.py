@@ -3,13 +3,16 @@ from typing import Any
 from ._component import CLIApplicationComponent as CLIApplicationComponent
 from ._component import Component as Component
 from ._component import ContainerComponent as ContainerComponent
+from ._concurrent import TaskFactory as TaskFactory
+from ._concurrent import TaskHandle as TaskHandle
+from ._concurrent import start_background_task_factory as start_background_task_factory
+from ._concurrent import start_service_task as start_service_task
 from ._context import Context as Context
 from ._context import GeneratedResource as GeneratedResource
 from ._context import NoCurrentContext as NoCurrentContext
 from ._context import ResourceConflict as ResourceConflict
 from ._context import ResourceEvent as ResourceEvent
 from ._context import ResourceNotFound as ResourceNotFound
-from ._context import TaskHandle as TaskHandle
 from ._context import add_resource as add_resource
 from ._context import add_resource_factory as add_resource_factory
 from ._context import add_teardown_callback as add_teardown_callback
@@ -21,8 +24,6 @@ from ._context import inject as inject
 from ._context import request_resource as request_resource
 from ._context import require_resource as require_resource
 from ._context import resource as resource
-from ._context import start_background_task as start_background_task
-from ._context import start_service_task as start_service_task
 from ._event import Event as Event
 from ._event import Signal as Signal
 from ._event import SignalQueueFull as SignalQueueFull

@@ -8,7 +8,7 @@ from warnings import warn
 from anyio import create_task_group
 from anyio.lowlevel import cancel_shielded_checkpoint
 
-from ._context import start_background_task
+from ._concurrent import start_service_task
 from ._exceptions import ApplicationExit
 from ._utils import PluginContainer, merge_config, qualified_name
 
@@ -152,7 +152,7 @@ class CLIApplicationComponent(ContainerComponent):
                 raise ApplicationExit
 
         await super().start()
-        await start_background_task(run, "Main task")
+        await start_service_task(run, "CLI application main task", teardown_action=None)
 
     @abstractmethod
     async def run(self) -> int | None:

@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from collections.abc import AsyncGenerator
-
 # isort: off
 import logging
 from dataclasses import dataclass
@@ -15,9 +13,8 @@ from asphalt.core import (
     Component,
     Event,
     Signal,
-    context_teardown,
-    start_background_task,
     add_resource,
+    start_service_task,
 )
 
 logger = logging.getLogger(__name__)
@@ -64,18 +61,12 @@ class ChangeDetectorComponent(Component):
         self.url = url
         self.delay = delay
 
-    @context_teardown
-    async def start(self) -> AsyncGenerator[None, BaseException | None]:
+    async def start(self) -> None:
         detector = Detector(self.url, self.delay)
         add_resource(detector)
-        await start_background_task(detector.run, "Web page change detector")
+        await start_service_task(detector.run, "Web page change detector")
         logging.info(
             'Started web page change detector for url "%s" with a delay of %d seconds',
             self.url,
             self.delay,
         )
-
-        yield
-
-        # This part is run when the context is finished
-        logger.info("Shut down web page change detector")

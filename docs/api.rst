@@ -13,8 +13,9 @@ Components
 Concurrency
 -----------
 
-.. autofunction:: start_background_task
+.. autofunction:: start_background_task_factory
 .. autofunction:: start_service_task
+.. autoclass:: TaskFactory
 .. autoclass:: TaskHandle
 
 Contexts and resources

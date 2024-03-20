@@ -29,8 +29,8 @@ from asphalt.core import (
     inject,
     require_resource,
     resource,
+    start_service_task,
 )
-from asphalt.core._context import start_background_task, start_service_task
 
 if sys.version_info < (3, 11):
     from exceptiongroup import ExceptionGroup
@@ -283,60 +283,6 @@ class TestContext:
         exc.match("no matching resource was found for type=int name='foo'")
         assert exc.value.type == int
         assert exc.value.name == "foo"
-
-    async def test_start_background_task(self) -> None:
-        async def taskfunc() -> str:
-            assert get_current_task().name == "taskfunc"
-            return "returnvalue"
-
-        async with Context():
-            handle = await start_background_task(taskfunc, "taskfunc")
-            assert handle.start_value is None
-            assert await handle == "returnvalue"
-
-    async def test_start_background_task_status(self) -> None:
-        async def taskfunc(task_status: TaskStatus[str]) -> str:
-            assert get_current_task().name == "taskfunc"
-            task_status.started("startval")
-            return "returnvalue"
-
-        async with Context():
-            handle = await start_background_task(taskfunc, "taskfunc")
-            assert handle.start_value == "startval"
-            assert await handle == "returnvalue"
-
-    async def test_start_background_task_cancel(self) -> None:
-        started = False
-        finished = False
-
-        async def taskfunc() -> None:
-            nonlocal started, finished
-            assert get_current_task().name == "taskfunc"
-            started = True
-            await sleep(3)
-            finished = True
-
-        async with Context():
-            handle = await start_background_task(taskfunc, "taskfunc")
-            await wait_all_tasks_blocked()
-            handle.cancel()
-
-        assert started
-        assert not finished
-
-    async def test_start_background_task_exception(self) -> None:
-        async def taskfunc() -> NoReturn:
-            raise Exception("foo")
-
-        with pytest.raises(ExceptionGroup) as excgrp:
-            async with Context():
-                handle = await start_background_task(taskfunc, "taskfunc")
-
-        assert len(excgrp.value.exceptions) == 1
-        assert str(excgrp.value.exceptions[0]) == "foo"
-
-        with pytest.raises(Exception, match="^foo$"):
-            await handle
 
     async def test_start_service_task_cancel_on_exit(self) -> None:
         started = False

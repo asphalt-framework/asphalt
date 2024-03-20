@@ -8,10 +8,9 @@ import warnings
 from collections.abc import (
     AsyncGenerator,
     Coroutine,
-    Generator,
     Sequence,
 )
-from contextlib import AsyncExitStack, suppress
+from contextlib import AsyncExitStack
 from contextvars import ContextVar, Token
 from dataclasses import dataclass, field
 from enum import Enum, auto
@@ -29,7 +28,6 @@ from typing import (
     Any,
     Callable,
     Generic,
-    Literal,
     NoReturn,
     Optional,
     TypeVar,
@@ -41,17 +39,13 @@ from typing import (
     overload,
 )
 
-import anyio
 from anyio import (
-    CancelScope,
     create_task_group,
-    get_cancelled_exc_class,
     get_current_task,
 )
-from anyio.abc import TaskGroup, TaskStatus
+from anyio.abc import TaskGroup
 
 from ._event import Event, Signal, wait_event
-from ._exceptions import ApplicationExit
 from ._utils import callable_name, qualified_name
 
 if sys.version_info >= (3, 10):
@@ -70,12 +64,10 @@ FactoryCallback: TypeAlias = Callable[[], Any]
 TeardownCallback: TypeAlias = Union[
     Callable[[], Any], Callable[[Optional[BaseException]], Any]
 ]
-TeardownAction: TypeAlias = Union[Callable[[], Any], Literal["cancel"]]
 
 resource_name_re = re.compile(r"\w+")
 T_Resource = TypeVar("T_Resource")
 T_Retval = TypeVar("T_Retval")
-T_Context = TypeVar("T_Context", bound="Context")
 T_Self = TypeVar("T_Self")
 P = ParamSpec("P")
 _current_context: ContextVar[Context | None] = ContextVar(
@@ -125,49 +117,6 @@ class ResourceEvent(Event):
 class GeneratedResource(Generic[T_Resource]):
     resource: T_Resource
     teardown_callback: Callable[[], None | Coroutine[Any, Any, Any]] | None
-
-
-@dataclass
-class TaskHandle(Generic[T_Retval]):
-    """
-    A representation of a task started from :meth:`Context.start_background_task`.
-
-    :ivar name: the name of the task
-    :ivar start_value: the start value passed to ``task_status.started()`` if the target
-        function supported that
-    """
-
-    name: str = field(init=False)
-    start_value: Any = field(init=False, repr=False)
-    _cancel_scope: CancelScope = field(
-        init=False, default_factory=CancelScope, repr=False
-    )
-    _finished_event: anyio.Event = field(
-        init=False, default_factory=anyio.Event, repr=False
-    )
-    _return_value: T_Retval = field(init=False, repr=False)
-    _exception: BaseException | None = field(init=False, default=None, repr=False)
-
-    def cancel(self) -> None:
-        self._cancel_scope.cancel()
-
-    def _set_result(self, value: T_Retval) -> None:
-        self._return_value = value
-        self._finished_event.set()
-
-    def _set_exception(self, exception: BaseException) -> None:
-        self._exception = exception
-        self._finished_event.set()
-
-    def __await__(self) -> Generator[Any, Any, T_Retval]:
-        yield from self._finished_event.wait().__await__()
-        try:
-            if self._exception is not None:
-                raise self._exception
-
-            return self._return_value
-        finally:
-            self._exception = None
 
 
 class AwaitableResourceError(Exception):
@@ -714,157 +663,6 @@ class Context:
         )
         return self.require_resource(type, name)
 
-    @staticmethod
-    async def _run_background_task(
-        func: Callable[..., Coroutine[Any, Any, T_Retval]],
-        task_handle: TaskHandle[T_Retval],
-        task_status: TaskStatus[Any],
-    ) -> None:
-        __tracebackhide__ = True  # trick supported by certain debugger frameworks
-        # Check if the function has a parameter named "task_status"
-        has_task_status = any(
-            param.name == "task_status" and param.kind != Parameter.POSITIONAL_ONLY
-            for param in signature(func).parameters.values()
-        )
-        task_handle.name = str(get_current_task().name)
-        logger.debug("Background task (%s) starting", task_handle.name)
-
-        with task_handle._cancel_scope:
-            async with Context():
-                try:
-                    if has_task_status:
-                        retval = await func(task_status=task_status)
-                    else:
-                        task_status.started()
-                        retval = await func()
-                except BaseException as exc:
-                    task_handle._set_exception(exc)
-                    if isinstance(exc, ApplicationExit):
-                        logger.debug(
-                            "Background task (%s) triggered application exit",
-                            task_handle.name,
-                        )
-                    elif isinstance(exc, Exception):
-                        logger.exception(
-                            "Background task (%s) crashed", task_handle.name
-                        )
-
-                    raise
-                else:
-                    task_handle._set_result(retval)
-                    logger.debug("Background task (%s) finished", task_handle.name)
-
-    async def start_background_task(
-        self,
-        func: Callable[..., Coroutine[Any, Any, T_Retval]],
-        name: str = "",
-    ) -> TaskHandle[T_Retval]:
-        """
-        Start a task that runs independently on the background.
-
-        The task runs in its own context, inherited from the root context.
-        If the task raises an exception (inherited from :exc:`Exception`), it is logged
-        with a descriptive message containing the task's name.
-
-        To pass arguments to the target callable, pass them via lambda (e.g.
-        ``lambda: yourfunc(arg1, arg2, kw=val)``)
-
-        If ``func`` takes an argument named ``task_status``, then this method will only
-        return when the function has called ``task_status.started()``. See
-        :meth:`anyio.TaskGroup.start` for details. The value passed to
-        ``task_status.started()`` will be available as the ``start_value`` property on
-        the :class:`TaskHandle`.
-
-        :param func: the coroutine function to run
-        :param name: descriptive name for the task
-        :return: a task handle that can be used to await on the result or cancel the
-            task
-
-        .. seealso:: :meth:`start_service_task`
-
-        """
-        self._ensure_state(ContextState.open)
-
-        if self._parent is not None:
-            return await self._parent.start_background_task(func, name)
-
-        task_handle = TaskHandle[T_Retval]()
-        task_handle.start_value = await self._task_group.start(
-            self._run_background_task, func, task_handle, name=name
-        )
-        return task_handle
-
-    async def start_service_task(
-        self,
-        func: Callable[..., Coroutine[Any, Any, T_Retval]],
-        name: str,
-        *,
-        teardown_action: TeardownAction = "cancel",
-    ) -> Any:
-        """
-        Start a background task that gets shut down when the context shuts down.
-
-        This method is meant to be used by components to run their tasks like network
-        services that should be shut down with the application, while
-        :meth:`start_background_task` is meant to be used to run ad-hoc background tasks
-        that should be allowed to finish before the root context exits.
-
-        Behind the scenes, this method uses :meth:`start_background_task`, so its
-        semantics also apply here.
-
-        If you supply a teardown callback, and it raises an exception, then the task
-        will be cancelled instead.
-
-        :param func: the coroutine function to run
-        :param name: descriptive name (e.g. "HTTP server") for the task, to which the
-            prefix "Service task: " will be added when the task is actually created
-            in the backing asynchronous event loop implementation (e.g. asyncio)
-        :param teardown_action: the action to take when the context is being shut down:
-            ``'cancel'`` means cancel the task, or you can supply a callback (can be
-            asynchronous) that is called instead
-        :return: any value passed to ``task_status.started()`` by the target callable if
-            it supports that, otherwise ``None``
-        """
-
-        async def finalize_service_task() -> None:
-            if teardown_action == "cancel":
-                logger.debug("Cancelling service task %r", name)
-                task_handle.cancel()
-            else:
-                teardown_action_name = callable_name(teardown_action)
-                logger.debug(
-                    "Calling teardown callback (%s) for service task %r",
-                    teardown_action_name,
-                    name,
-                )
-                try:
-                    retval = teardown_action()
-                    if isawaitable(retval):
-                        await retval
-                except BaseException as exc:
-                    task_handle.cancel()
-                    if isinstance(exc, Exception):
-                        logger.exception(
-                            "Error calling teardown callback (%s) for service task %r",
-                            teardown_action_name,
-                            name,
-                        )
-
-            logger.debug("Waiting for service task %r to finish", name)
-            with suppress(get_cancelled_exc_class()):
-                await task_handle
-
-        self._ensure_state(ContextState.open)
-
-        if teardown_action != "cancel" and not callable(teardown_action):
-            raise ValueError(
-                "teardown_action must be a callable, or the string 'cancel'"
-            )
-
-        task_handle = await self.start_background_task(func, f"Service task: {name}")
-        self._exit_stack.push_async_callback(finalize_service_task)
-        return task_handle.start_value
-
 
 def context_teardown(
     func: Callable[P, AsyncGenerator[None, BaseException | None]],
@@ -1027,26 +825,6 @@ async def request_resource(type: type[T_Resource], name: str = "default") -> T_R
 
     """
     return await current_context().request_resource(type, name)
-
-
-async def start_background_task(
-    func: Callable[..., Coroutine[Any, Any, T_Retval]],
-    name: str = "",
-) -> TaskHandle[T_Retval]:
-    """Shortcut for ``current_context().start_background_task(...)``."""
-    return await current_context().start_background_task(func, name)
-
-
-async def start_service_task(
-    func: Callable[..., Coroutine[Any, Any, Any]],
-    name: str,
-    *,
-    teardown_action: TeardownAction = "cancel",
-) -> Any:
-    """Shortcut for ``current_context().start_service_task(...)``."""
-    return await current_context().start_service_task(
-        func, name, teardown_action=teardown_action
-    )
 
 
 @dataclass

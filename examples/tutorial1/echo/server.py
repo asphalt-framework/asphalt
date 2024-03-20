@@ -2,16 +2,13 @@
 
 from __future__ import annotations
 
-from collections.abc import AsyncGenerator
-
 import anyio
-from anyio.abc import SocketStream
+from anyio.abc import SocketStream, TaskStatus
 
 from asphalt.core import (
     Component,
-    context_teardown,
     run_application,
-    start_background_task,
+    start_service_task,
 )
 
 
@@ -21,14 +18,17 @@ async def handle(stream: SocketStream) -> None:
     print("Message from client:", message.decode().rstrip())
 
 
+async def serve_requests(*, task_status: TaskStatus[None]) -> None:
+    async with await anyio.create_tcp_listener(
+        local_host="localhost", local_port=64100
+    ) as listener:
+        task_status.started()
+        await listener.serve(handle)
+
+
 class ServerComponent(Component):
-    @context_teardown
-    async def start(self) -> AsyncGenerator[None, BaseException | None]:
-        async with await anyio.create_tcp_listener(
-            local_host="localhost", local_port=64100
-        ) as listener:
-            await start_background_task(lambda: listener.serve(handle), "Echo server")
-            yield
+    async def start(self) -> None:
+        await start_service_task(serve_requests, "Echo server")
 
 
 if __name__ == "__main__":
