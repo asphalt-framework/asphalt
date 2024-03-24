@@ -5,47 +5,50 @@ This library adheres to `Semantic Versioning 2.0 <http://semver.org/>`_.
 
 **UNRELEASED**
 
-- **BACKWARD INCOMPATIBLE** Asphalt now runs via AnyIO, rather than asyncio, although
-  the asyncio backend is used by default
-- **BACKWARD INCOMPATIBLE** Dropped the ``--unsafe`` switch for ``asphalt run`` –
-  configuration files are now always parsed in unsafe mode
-- **BACKWARD INCOMPATIBLE** Dropped the ``@executor`` decorator
-- **BACKWARD INCOMPATIBLE** Dropped the ``TeardownError`` exception in favor of PEP 654
-  exception groups
-- **BACKWARD INCOMPATIBLE** Dropped all context-bound methods of jumping to and from
-  worker threads (``Context.call_async()``, ``Context.call_in_executor()``,
-  ``Context.threadpool()``)
-- **BACKWARD INCOMPATIBLE** Dropped the ``Context.loop`` attribute
-- **BACKWARD INCOMPATIBLE** Dropped the ``Context.close()`` method (``Context`` objects
-  are now required to be used as context managers)
-- **BACKWARD INCOMPATIBLE** Dropped the deprecated ability to use a ``Context`` as a
-  synchronous context manager
-- **BACKWARD INCOMPATIBLE** Dropped the deprecated ``parent`` argument to ``Context``
-- **BACKWARD INCOMPATIBLE** Dropped the deprecated ``Dependency()`` marker
-- **BACKWARD INCOMPATIBLE** Dropped support for context attributes
-- **BACKWARD INCOMPATIBLE** Dropped the ``ctx`` parameter from all callbacks, including:
+- **BACKWARD INCOMPATIBLE** Changes in the application runner:
 
-  * ``Component.start()``
-  * ``CLIApplicationComponent.run()``
-  * resource factory callbacks
-- **BACKWARD INCOMPATIBLE** Refactored the event system:
+  * Asphalt now runs via AnyIO, rather than asyncio, although the asyncio backend is
+    used by default
+  * Dropped the ``--unsafe`` switch for ``asphalt run`` – configuration files are now
+    always parsed in unsafe mode
+  * Changed configuration parsing to no longer treat dotted keys in configuration
+    overrides to be interpreted as structural shortcuts (i.e. ``foo.bar.baz``
+    interpreted as a shortcut for a structure 3 levels deep:
+    ``foo: {bar: {baz: ...}}``), as this prevented proper configuration for loggers that
+    have dots in their names
+  * Switched from ruamel.yaml to PyYAML as the backing YAML library
+- **BACKWARD INCOMPATIBLE** Changes in concurrency handling:
+
+  * Added the ``start_service_task()`` function for starting background service tasks,
+    bound to the root context, from ``Component.start()``
+  * Added the ``start_background_task_factory()`` function for
+  * Dropped the ``@executor`` decorator
+  * Dropped all context-bound methods of jumping to and from worker threads
+    (``Context.call_async()``, ``Context.call_in_executor()``, ``Context.threadpool()``)
+- **BACKWARD INCOMPATIBLE** Changes in the component API:
+
+  * Dropped the ``ctx`` parameter from ``Component.start()`` and
+    ``CLIApplicationComponent.run()``
+- **BACKWARD INCOMPATIBLE** Changes in (Asphalt) context handling:
+
+  * Dropped the ``TeardownError`` exception in favor of PEP 654 exception groups
+  * Dropped the ``Context.loop`` attribute
+  * Dropped the ``Context.close()`` method (``Context`` objects are now required to be
+    used as context managers)
+  * Dropped the deprecated ability to use a ``Context`` as a synchronous context manager
+  * Dropped the deprecated ``parent`` argument to ``Context``
+  * Dropped support for context attributes
+  * Dropped the ``ctx`` parameter from resource factory callbacks
+- **BACKWARD INCOMPATIBLE** Dropped the deprecated ``Dependency()`` marker
+- **BACKWARD INCOMPATIBLE** Changes in the event system:
 
   * The ``connect()``, ``disconnect()`` and ``dispatch_raw()`` methods were removed
-  * Event dispatching was changed: the ``dispatch()`` method now accepts only an
-    ``Event`` object and fills in the source, topic and time attributes
+  * The ``dispatch()`` method now accepts only an ``Event`` object and fills in the
+    source, topic and time attributes
   * The ``Event`` class no longer has an initializer, so subclasses don't have to call
     ``super().__init__()`` anymore
 - **BACKWARD INCOMPATIBLE** Moved all exported functions and classes directly to
   ``asphalt.core`` and made submodules private
-- **BACKWARD INCOMPATIBLE** Changed configuration parsing to no longer treat dotted keys
-  in configuration overrides to be interpreted as structural shortcuts (i.e.
-  ``foo.bar.baz`` interpreted as a shortcut for a structure 3 levels deep:
-  ``foo: {bar: {baz: ...}}``), as this prevented proper configuration for loggers that
-  have dots in their names
-- Added the ``start_background_task()`` Context method (with a free-function variant
-  for convenience) that handles startup and shutdown of context-bound background tasks
-  for various purposes
-- Switched from ruamel.yaml to PyYAML as the backing YAML library
 - Dropped support for Python 3.7
 
 **4.12.0**
