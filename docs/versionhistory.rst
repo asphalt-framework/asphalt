@@ -21,7 +21,8 @@ This library adheres to `Semantic Versioning 2.0 <http://semver.org/>`_.
 
   * Added the ``start_service_task()`` function for starting background service tasks,
     bound to the root context, from ``Component.start()``
-  * Added the ``start_background_task_factory()`` function for
+  * Added the ``start_background_task_factory()`` function for launching ad-hoc
+    background tasks in a manner compatible with Structured Concurrency
   * Dropped the ``@executor`` decorator
   * Dropped all context-bound methods of jumping to and from worker threads
     (``Context.call_async()``, ``Context.call_in_executor()``, ``Context.threadpool()``)
