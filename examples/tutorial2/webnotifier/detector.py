@@ -1,4 +1,5 @@
 """This is the change detector component for the Asphalt webnotifier tutorial."""
+
 # isort: off
 from __future__ import annotations
 

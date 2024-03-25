@@ -1,4 +1,5 @@
 """This is the root component for the Asphalt webnotifier tutorial."""
+
 # isort: off
 import logging
 from difflib import HtmlDiff
