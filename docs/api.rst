@@ -29,7 +29,7 @@ Contexts and resources
 .. autofunction:: add_resource_factory
 .. autofunction:: add_teardown_callback
 .. autofunction:: get_resource
-.. autofunction:: require_resource
+.. autofunction:: get_resource_nowait
 .. autofunction:: inject
 .. autofunction:: resource
 .. autoexception:: NoCurrentContext

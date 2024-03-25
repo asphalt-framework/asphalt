@@ -7,6 +7,7 @@ from ._concurrent import TaskFactory as TaskFactory
 from ._concurrent import TaskHandle as TaskHandle
 from ._concurrent import start_background_task_factory as start_background_task_factory
 from ._concurrent import start_service_task as start_service_task
+from ._context import AsyncResourceError as AsyncResourceError
 from ._context import Context as Context
 from ._context import GeneratedResource as GeneratedResource
 from ._context import NoCurrentContext as NoCurrentContext
@@ -19,10 +20,9 @@ from ._context import add_teardown_callback as add_teardown_callback
 from ._context import context_teardown as context_teardown
 from ._context import current_context as current_context
 from ._context import get_resource as get_resource
+from ._context import get_resource_nowait as get_resource_nowait
 from ._context import get_resources as get_resources
 from ._context import inject as inject
-from ._context import request_resource as request_resource
-from ._context import require_resource as require_resource
 from ._context import resource as resource
 from ._event import Event as Event
 from ._event import Signal as Signal

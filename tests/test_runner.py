@@ -18,7 +18,7 @@ from asphalt.core import (
     CLIApplicationComponent,
     Component,
     add_teardown_callback,
-    request_resource,
+    get_resource,
     run_application,
     start_service_task,
 )
@@ -208,7 +208,7 @@ async def test_start_timeout(caplog: LogCaptureFixture) -> None:
     class StallingComponent(Component):
         async def start(self) -> None:
             # Wait forever for a non-existent resource
-            await request_resource(float)
+            await get_resource(float, wait=True)
 
     caplog.set_level(logging.INFO)
     component = StallingComponent()

@@ -40,6 +40,14 @@ This library adheres to `Semantic Versioning 2.0 <http://semver.org/>`_.
   * Dropped the deprecated ``parent`` argument to ``Context``
   * Dropped support for context attributes
   * Dropped the ``ctx`` parameter from resource factory callbacks
+  * Refactored the ``Context.require_resource()``, ``Context.require_resource()`` and
+    ``Context.request_resource()`` methods (and their free-function counterparts) to
+    just two:
+
+    * ``get_resource()``: a coroutine function, capable of triggering asynchronous
+      resource factories, and optionally waiting for the resource to become available
+    * ``get_resource_nowait()`` the synchronous counterpart to the above, but incapable
+      of waiting for resources or triggering asynchronous resource factories
 - **BACKWARD INCOMPATIBLE** Dropped the deprecated ``Dependency()`` marker
 - **BACKWARD INCOMPATIBLE** Changes in the event system:
 
