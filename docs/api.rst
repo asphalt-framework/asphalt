@@ -32,6 +32,7 @@ Contexts and resources
 .. autofunction:: get_resource_nowait
 .. autofunction:: inject
 .. autofunction:: resource
+.. autoexception:: AsyncResourceError
 .. autoexception:: NoCurrentContext
 .. autoexception:: ResourceConflict
 .. autoexception:: ResourceNotFound
