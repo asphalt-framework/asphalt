@@ -187,7 +187,7 @@ class TestContext:
                 async for event in stream:
                     events.append(event)
 
-        def factory() -> int | float:
+        def factory() -> Union[int, float]:  # noqa: UP007
             return next(counter)
 
         counter = count(1)
@@ -218,7 +218,7 @@ class TestContext:
                 async for event in stream:
                     events.append(event)
 
-        async def factory() -> int | float:
+        async def factory() -> Union[int, float]:  # noqa: UP007
             return next(counter)
 
         counter = count(1)
