@@ -20,9 +20,11 @@ from anyio.lowlevel import checkpoint
 from common import raises_in_exception_group
 
 from asphalt.core import (
+    AsyncResourceError,
     Context,
     NoCurrentContext,
     ResourceConflict,
+    ResourceEvent,
     ResourceNotFound,
     context_teardown,
     current_context,
@@ -32,7 +34,6 @@ from asphalt.core import (
     resource,
     start_service_task,
 )
-from asphalt.core._context import AsyncResourceError, ResourceEvent
 
 if sys.version_info < (3, 11):
     from exceptiongroup import ExceptionGroup
