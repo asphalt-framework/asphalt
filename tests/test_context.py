@@ -173,7 +173,8 @@ class TestContext:
             "characters and underscores"
         )
 
-    async def test_add_resource_factory(self, context: Context) -> None:
+    @pytest.mark.parametrize("nowait", [True, False])
+    async def test_add_resource_factory(self, context: Context, nowait: bool) -> None:
         """
         Test that resource factory callbacks are only called once for each context, and
         that when the factory is triggered, an appropriate resource event is dispatched.
@@ -195,8 +196,13 @@ class TestContext:
 
         async with create_task_group() as tg:
             await tg.start(resource_added_listener)
-            assert context.get_resource_nowait(int) == 1
-            assert context.get_resource_nowait(int) == 1
+            if nowait:
+                assert context.get_resource_nowait(int) == 1
+                assert context.get_resource_nowait(int) == 1
+            else:
+                assert await context.get_resource(int) == 1
+                assert await context.get_resource(int) == 1
+
             await checkpoint()
             tg.cancel_scope.cancel()
 

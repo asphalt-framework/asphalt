@@ -601,7 +601,7 @@ class Context:
         for ctx in self.context_chain:
             if key in ctx._resource_factories:
                 factory = ctx._resource_factories[key]
-                retval = await factory.value_or_factory()
+                retval = factory.value_or_factory()
                 if isawaitable(retval):
                     retval = await retval
 
