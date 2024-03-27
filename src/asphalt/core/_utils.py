@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import sys
 from collections.abc import Callable
+from functools import partial
 from importlib import import_module
 from inspect import isclass
 from typing import Any, TypeVar, overload
@@ -62,6 +63,9 @@ def qualified_name(obj: object) -> str:
 
 def callable_name(func: Callable[..., Any]) -> str:
     """Return the qualified name (e.g. package.module.func) for the given callable."""
+    if isinstance(func, partial):
+        func = func.func
+
     if func.__module__ == "builtins":
         return func.__name__
     else:

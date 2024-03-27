@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import sys
 from collections.abc import Callable
+from functools import partial
 from typing import Any
 from unittest.mock import Mock
 
@@ -62,6 +63,7 @@ def test_qualified_name(inputval: object, expected: str) -> None:
     [
         pytest.param(qualified_name, "asphalt.core.qualified_name", id="python"),
         pytest.param(len, "len", id="builtin"),
+        pytest.param(partial(len, []), "len", id="partial"),
     ],
 )
 def test_callable_name(inputval: Callable[..., Any], expected: str) -> None:
