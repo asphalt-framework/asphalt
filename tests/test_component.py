@@ -117,54 +117,54 @@ class TestContainerComponent:
 
 
 class TestCLIApplicationComponent:
-    async def test_run_return_none(self) -> None:
+    def test_run_return_none(self, anyio_backend_name: str) -> None:
         class DummyCLIComponent(CLIApplicationComponent):
             async def run(self) -> None:
                 pass
 
         # No exception should be raised here
-        await run_application(DummyCLIComponent())
+        run_application(DummyCLIComponent(), backend=anyio_backend_name)
 
-    async def test_run_return_5(self) -> None:
+    def test_run_return_5(self, anyio_backend_name: str) -> None:
         class DummyCLIComponent(CLIApplicationComponent):
             async def run(self) -> int:
                 return 5
 
         with pytest.raises(SystemExit) as exc:
-            await run_application(DummyCLIComponent())
+            run_application(DummyCLIComponent(), backend=anyio_backend_name)
 
         assert exc.value.code == 5
 
-    async def test_run_return_invalid_value(self) -> None:
+    def test_run_return_invalid_value(self, anyio_backend_name: str) -> None:
         class DummyCLIComponent(CLIApplicationComponent):
             async def run(self) -> int:
                 return 128
 
         with pytest.raises(SystemExit) as exc:
             with pytest.warns(UserWarning) as record:
-                await run_application(DummyCLIComponent())
+                run_application(DummyCLIComponent(), backend=anyio_backend_name)
 
         assert exc.value.code == 1
         assert len(record) == 1
         assert str(record[0].message) == "exit code out of range: 128"
 
-    async def test_run_return_invalid_type(self) -> None:
+    def test_run_return_invalid_type(self, anyio_backend_name: str) -> None:
         class DummyCLIComponent(CLIApplicationComponent):
             async def run(self) -> int:
                 return "foo"  # type: ignore[return-value]
 
         with pytest.raises(SystemExit) as exc:
             with pytest.warns(UserWarning) as record:
-                await run_application(DummyCLIComponent())
+                run_application(DummyCLIComponent(), backend=anyio_backend_name)
 
         assert exc.value.code == 1
         assert len(record) == 1
         assert str(record[0].message) == "run() must return an integer or None, not str"
 
-    async def test_run_exception(self) -> None:
+    def test_run_exception(self, anyio_backend_name: str) -> None:
         class DummyCLIComponent(CLIApplicationComponent):
             async def run(self) -> NoReturn:
                 raise Exception("blah")
 
         with raises_in_exception_group(Exception, match="blah"):
-            await run_application(DummyCLIComponent())
+            run_application(DummyCLIComponent(), backend=anyio_backend_name)

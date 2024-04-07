@@ -22,4 +22,4 @@ class ClientComponent(CLIApplicationComponent):
 
 if __name__ == "__main__":
     component = ClientComponent(sys.argv[1])
-    anyio.run(run_application, component)
+    run_application(component)

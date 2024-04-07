@@ -17,6 +17,8 @@ This library adheres to `Semantic Versioning 2.0 <http://semver.org/>`_.
     ``foo: {bar: {baz: ...}}``), as this prevented proper configuration for loggers that
     have dots in their names
   * Switched from ruamel.yaml to PyYAML as the backing YAML library
+  * Changed how``CLIApplicationComponent`` is run – their ``run()`` method is now
+    called directly by the runner after the component has started
 - **BACKWARD INCOMPATIBLE** Changes in concurrency handling:
 
   * Added the ``start_service_task()`` function for starting background service tasks,
@@ -30,6 +32,8 @@ This library adheres to `Semantic Versioning 2.0 <http://semver.org/>`_.
 
   * Dropped the ``ctx`` parameter from ``Component.start()`` and
     ``CLIApplicationComponent.run()``
+  * Changed how ``CLIApplicationComponent`` works: they no longer start a service task
+    that call the ``run()`` method, but instead the runner will call it directly
 - **BACKWARD INCOMPATIBLE** Changes in (Asphalt) context handling:
 
   * Dropped the ``TeardownError`` exception in favor of PEP 654 exception groups

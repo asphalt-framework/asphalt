@@ -81,7 +81,7 @@ directory::
 
     if __name__ == "__main__":
         component = ServerComponent()
-        anyio.run(run_application, component)
+        run_application(component)
 
 The ``ServerComponent`` class is the *root component* (and in this case, the only
 component) of this application. Its ``start()`` method is called by ``run_application``
@@ -135,7 +135,7 @@ For this purpose, we will use AnyIO's :func:`~anyio.create_tcp_listener` functio
 
     if __name__ == '__main__':
         component = ServerComponent()
-        anyio.run(run_application, component)
+        run_application(component)
 
 Here, :func:`anyio.create_tcp_listener` is used to listen to incoming TCP connections on
 the ``localhost`` interface on port 64100. The port number is totally arbitrary and can
@@ -198,7 +198,7 @@ Create the file ``client.py`` file in the ``echo`` package directory as follows:
 
     if __name__ == '__main__':
         component = ClientComponent(sys.argv[1])
-        anyio.run(run_application, component)
+        run_application(component)
 
 You may have noticed that ``ClientComponent`` inherits from
 :class:`CLIApplicationComponent` instead of :class:`Component` and that instead of

@@ -6,7 +6,6 @@ from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
-import anyio
 import click
 import yaml
 from yaml import Loader, ScalarNode
@@ -133,8 +132,8 @@ def run(configfile: Sequence[str], service: str | None, set_: list[str]) -> None
     # Start the application
     backend = config.pop("backend", "asyncio")
     backend_options = config.pop("backend_options", {})
-    anyio.run(
-        lambda: run_application(**config),
+    run_application(
+        **config,
         backend=backend,
         backend_options=backend_options,
     )

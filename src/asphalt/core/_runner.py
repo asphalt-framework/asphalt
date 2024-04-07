@@ -5,9 +5,10 @@ import signal
 import sys
 from contextlib import AsyncExitStack
 from functools import partial
-from logging import INFO, basicConfig, getLogger
+from logging import INFO, Logger, basicConfig, getLogger
 from logging.config import dictConfig
 from typing import Any, cast
+from warnings import warn
 
 import anyio
 from anyio import (
@@ -17,15 +18,11 @@ from anyio import (
     to_thread,
 )
 from anyio.abc import TaskStatus
-from exceptiongroup import catch
 
-from . import start_service_task
-from ._component import Component, component_types
+from ._component import CLIApplicationComponent, Component, component_types
+from ._concurrent import start_service_task
 from ._context import Context
-from ._exceptions import ApplicationExit
-
-if sys.version_info < (3, 11):
-    from exceptiongroup import BaseExceptionGroup
+from ._utils import qualified_name
 
 
 async def handle_signals(event: Event, *, task_status: TaskStatus[None]) -> None:
@@ -41,22 +38,69 @@ async def handle_signals(event: Event, *, task_status: TaskStatus[None]) -> None
             event.set()
 
 
-def handle_application_exit(excgrp: BaseExceptionGroup[ApplicationExit]) -> None:
-    exc: BaseException = excgrp
-    while isinstance(exc, BaseExceptionGroup):
-        if len(exc.exceptions) > 1:
-            raise RuntimeError("Multiple ApplicationExit exceptions were raised")
+async def _run_application_async(
+    component: Component,
+    logger: Logger,
+    max_threads: int | None,
+    start_timeout: float | None,
+) -> int:
+    # Apply the maximum worker thread limit
+    if max_threads is not None:
+        to_thread.current_default_thread_limiter().total_tokens = max_threads
 
-        exc = exc.exceptions[0]
+    logger.info("Starting application")
+    try:
+        async with AsyncExitStack() as exit_stack:
+            event = Event()
 
-    exit_exc = cast(ApplicationExit, exc)
-    if exit_exc.code:
-        raise SystemExit(exit_exc.code).with_traceback(exc.__traceback__) from None
+            await exit_stack.enter_async_context(Context())
+            if platform.system() != "Windows":
+                await start_service_task(
+                    partial(handle_signals, event), "Asphalt signal handler"
+                )
+
+            try:
+                with fail_after(start_timeout):
+                    await component.start()
+            except TimeoutError:
+                logger.error("Timeout waiting for the root component to start")
+                raise
+            except get_cancelled_exc_class():
+                logger.error("Application startup interrupted")
+                return 1
+            except BaseException:
+                logger.exception("Error during application startup")
+                raise
+
+            logger.info("Application started")
+
+            if isinstance(component, CLIApplicationComponent):
+                exit_code = await component.run()
+                if isinstance(exit_code, int):
+                    if 0 <= exit_code <= 127:
+                        return exit_code
+                    else:
+                        warn(f"exit code out of range: {exit_code}")
+                        return 1
+                elif exit_code is not None:
+                    warn(
+                        f"run() must return an integer or None, not "
+                        f"{qualified_name(exit_code.__class__)}"
+                    )
+                    return 1
+            else:
+                await event.wait()
+
+        return 0
+    finally:
+        logger.info("Application stopped")
 
 
-async def run_application(
+def run_application(
     component: Component | dict[str, Any],
     *,
+    backend: str = "asyncio",
+    backend_options: dict[str, Any] | None = None,
     max_threads: int | None = None,
     logging: dict[str, Any] | int | None = INFO,
     start_timeout: int | float | None = 10,
@@ -102,42 +146,17 @@ async def run_application(
     logger = getLogger(__name__)
     logger.info("Running in %s mode", "development" if __debug__ else "production")
 
-    # Apply the maximum worker thread limit
-    if max_threads is not None:
-        to_thread.current_default_thread_limiter().total_tokens = max_threads
-
     # Instantiate the root component if a dict was given
     if isinstance(component, dict):
         component = cast(Component, component_types.create_object(**component))
 
-    logger.info("Starting application")
-    try:
-        async with AsyncExitStack() as exit_stack:
-            handlers = {ApplicationExit: handle_application_exit}
-            exit_stack.enter_context(catch(handlers))  # type: ignore[arg-type]
-            event = Event()
-
-            await exit_stack.enter_async_context(Context())
-            if platform.system() != "Windows":
-                await start_service_task(
-                    partial(handle_signals, event), "Asphalt signal handler"
-                )
-
-            try:
-                with fail_after(start_timeout):
-                    await component.start()
-            except TimeoutError:
-                logger.error("Timeout waiting for the root component to start")
-                raise
-            except (ApplicationExit, get_cancelled_exc_class()):
-                logger.error("Application startup interrupted")
-                return
-            except BaseException:
-                logger.exception("Error during application startup")
-                raise
-
-            logger.info("Application started")
-
-            await event.wait()
-    finally:
-        logger.info("Application stopped")
+    if exit_code := anyio.run(
+        _run_application_async,
+        component,
+        logger,
+        max_threads,
+        start_timeout,
+        backend=backend,
+        backend_options=backend_options,
+    ):
+        sys.exit(exit_code)

@@ -223,7 +223,7 @@ async def start_service_task(
     task_handle.start_value = await ctx._task_group.start(
         _run_background_task, func, task_handle, name=task_handle.name
     )
-    ctx._exit_stack.push_async_callback(finalize_service_task)
+    ctx.add_teardown_callback(finalize_service_task)
     return task_handle.start_value
 
 

@@ -3,14 +3,10 @@ from __future__ import annotations
 from abc import ABCMeta, abstractmethod
 from collections import OrderedDict
 from typing import Any
-from warnings import warn
 
 from anyio import create_task_group
-from anyio.lowlevel import cancel_shielded_checkpoint
 
-from ._concurrent import start_service_task
-from ._exceptions import ApplicationExit
-from ._utils import PluginContainer, merge_config, qualified_name
+from ._utils import PluginContainer, merge_config
 
 
 class Component(metaclass=ABCMeta):
@@ -127,32 +123,6 @@ class CLIApplicationComponent(ContainerComponent):
     be set to 1. If the returned exit code is out of range or of the wrong data type,
     it is set to 1 and a warning is emitted.
     """
-
-    async def start(self) -> None:
-        async def run() -> None:
-            retval = await self.run()
-
-            # Ensure that the runner can conclude application startup, in case run()
-            # returns without going through a checkpoint
-            await cancel_shielded_checkpoint()
-
-            if isinstance(retval, int):
-                if 0 <= retval <= 127:
-                    raise ApplicationExit(retval)
-                else:
-                    warn(f"exit code out of range: {retval}")
-                    raise ApplicationExit(1)
-            elif retval is not None:
-                warn(
-                    f"run() must return an integer or None, not "
-                    f"{qualified_name(retval.__class__)}"
-                )
-                raise ApplicationExit(1)
-            else:
-                raise ApplicationExit
-
-        await super().start()
-        await start_service_task(run, "CLI application main task", teardown_action=None)
 
     @abstractmethod
     async def run(self) -> int | None:

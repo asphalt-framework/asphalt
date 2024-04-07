@@ -62,6 +62,8 @@ logging:
         args, kwargs = run_app.call_args
         assert len(args) == 0
         assert kwargs == {
+            "backend": anyio_backend_name,
+            "backend_options": {},
             "component": {
                 "type": DummyComponent,
                 "dummyval1": "testval",
@@ -146,6 +148,8 @@ component:
         args, kwargs = run_app.call_args
         assert len(args) == 0
         assert kwargs == {
+            "backend": "asyncio",
+            "backend_options": {},
             "component": {
                 "type": component_class,
                 "dummyval1": "alternate",
@@ -205,6 +209,8 @@ logging:
             assert len(args) == 0
             if service == "server":
                 assert kwargs == {
+                    "backend": "asyncio",
+                    "backend_options": {},
                     "max_threads": 30,
                     "component": {
                         "type": "myproject.server.ServerComponent",
@@ -223,6 +229,8 @@ logging:
                 }
             else:
                 assert kwargs == {
+                    "backend": "asyncio",
+                    "backend_options": {},
                     "max_threads": 15,
                     "component": {
                         "type": "myproject.client.ClientComponent",
@@ -328,6 +336,8 @@ logging:
             args, kwargs = run_app.call_args
             assert len(args) == 0
             assert kwargs == {
+                "backend": "asyncio",
+                "backend_options": {},
                 "component": {"type": "myproject.client.ClientComponent"},
                 "logging": {"version": 1, "disable_existing_loggers": False},
             }
@@ -358,6 +368,8 @@ logging:
             args, kwargs = run_app.call_args
             assert len(args) == 0
             assert kwargs == {
+                "backend": "asyncio",
+                "backend_options": {},
                 "component": {"type": "myproject.server.ServerComponent"},
                 "logging": {"version": 1, "disable_existing_loggers": False},
             }
@@ -391,6 +403,8 @@ logging:
             args, kwargs = run_app.call_args
             assert len(args) == 0
             assert kwargs == {
+                "backend": "asyncio",
+                "backend_options": {},
                 "component": {"type": "myproject.client.ClientComponent"},
                 "logging": {"version": 1, "disable_existing_loggers": False},
             }
@@ -424,6 +438,8 @@ logging:
             args, kwargs = run_app.call_args
             assert len(args) == 0
             assert kwargs == {
+                "backend": "asyncio",
+                "backend_options": {},
                 "component": {"type": "myproject.server.ServerComponent"},
                 "logging": {"version": 1, "disable_existing_loggers": False},
             }

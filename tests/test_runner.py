@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import platform
 import signal
-from typing import Any
+from typing import Any, Literal
 from unittest.mock import patch
 
 import anyio
@@ -14,7 +14,6 @@ from anyio.lowlevel import checkpoint
 from common import raises_in_exception_group
 
 from asphalt.core import (
-    ApplicationExit,
     CLIApplicationComponent,
     Component,
     add_teardown_callback,
@@ -30,20 +29,13 @@ windows_signal_mark = pytest.mark.skipif(
 
 
 class ShutdownComponent(Component):
-    def __init__(self, method: str = "exit"):
+    def __init__(self, method: Literal["keyboard", "sigterm", "exception"]):
         self.method = method
         self.teardown_callback_called = False
-        self.exception: BaseException | None = None
-
-    def teardown_callback(self, exception: BaseException | None) -> None:
-        self.teardown_callback_called = True
-        self.exception = exception
 
     async def stop_app(self) -> None:
         await checkpoint()
-        if self.method == "exit":
-            raise ApplicationExit
-        elif self.method == "keyboard":
+        if self.method == "keyboard":
             signal.raise_signal(signal.SIGINT)
         elif self.method == "sigterm":
             signal.raise_signal(signal.SIGTERM)
@@ -51,11 +43,7 @@ class ShutdownComponent(Component):
             raise RuntimeError("this should crash the application")
 
     async def start(self) -> None:
-        add_teardown_callback(self.teardown_callback, pass_exception=True)
-        if self.method == "timeout":
-            await anyio.sleep(1)
-        else:
-            await start_service_task(self.stop_app, "Application terminator")
+        await start_service_task(self.stop_app, "Application terminator")
 
 
 class CrashComponent(Component):
@@ -72,8 +60,21 @@ class CrashComponent(Component):
 
 
 class DummyCLIApp(CLIApplicationComponent):
+    def __init__(self, exit_code: int | None = None):
+        super().__init__()
+        self.exit_code = exit_code
+        self.teardown_callback_called = False
+        self.exception: BaseException | None = None
+
+    def teardown_callback(self, exception: BaseException | None) -> None:
+        self.teardown_callback_called = True
+        self.exception = exception
+
+    async def start(self) -> None:
+        add_teardown_callback(self.teardown_callback, pass_exception=True)
+
     async def run(self) -> int | None:
-        return 20
+        return self.exit_code
 
 
 @pytest.mark.parametrize(
@@ -86,40 +87,58 @@ class DummyCLIApp(CLIApplicationComponent):
         ),
     ],
 )
-async def test_run_logging_config(logging_config: dict[str, Any] | int | None) -> None:
+def test_run_logging_config(
+    logging_config: dict[str, Any] | int | None, anyio_backend_name: str
+) -> None:
     """Test that logging initialization happens as expected."""
     with patch("asphalt.core._runner.basicConfig") as basicConfig, patch(
         "asphalt.core._runner.dictConfig"
     ) as dictConfig:
-        await run_application(ShutdownComponent(), logging=logging_config)
+        run_application(
+            DummyCLIApp(), logging=logging_config, backend=anyio_backend_name
+        )
 
     assert basicConfig.call_count == (1 if logging_config == logging.INFO else 0)
     assert dictConfig.call_count == (1 if isinstance(logging_config, dict) else 0)
 
 
 @pytest.mark.parametrize("max_threads", [None, 3])
-async def test_run_max_threads(max_threads: int | None) -> None:
+def test_run_max_threads(max_threads: int | None, anyio_backend_name: str) -> None:
     """
     Test that a new default executor is installed if and only if the max_threads
     argument is given.
 
     """
-    component = ShutdownComponent()
-    limiter = to_thread.current_default_thread_limiter()
-    expected_total_tokens = max_threads or limiter.total_tokens
-    await run_application(component, max_threads=max_threads)
-    assert limiter.total_tokens == expected_total_tokens
+    observed_total_tokens: float | None = None
+
+    class MaxThreadsComponent(CLIApplicationComponent):
+        async def run(self) -> int | None:
+            nonlocal observed_total_tokens
+            limiter = to_thread.current_default_thread_limiter()
+            observed_total_tokens = limiter.total_tokens
+            return None
+
+    async def get_default_total_tokens() -> float:
+        limiter = to_thread.current_default_thread_limiter()
+        return limiter.total_tokens
+
+    component = MaxThreadsComponent()
+    expected_total_tokens = max_threads or anyio.run(
+        get_default_total_tokens, backend=anyio_backend_name
+    )
+    run_application(component, max_threads=max_threads, backend=anyio_backend_name)
+    assert observed_total_tokens == expected_total_tokens
 
 
-async def test_run_callbacks(caplog: LogCaptureFixture) -> None:
+def test_run_callbacks(caplog: LogCaptureFixture, anyio_backend_name: str) -> None:
     """
     Test that the teardown callbacks are run when the application is started and shut
     down properly and that the proper logging messages are emitted.
 
     """
     caplog.set_level(logging.INFO)
-    component = ShutdownComponent()
-    await run_application(component)
+    component = DummyCLIApp()
+    run_application(component, backend=anyio_backend_name)
 
     assert component.teardown_callback_called
     records = [
@@ -135,7 +154,6 @@ async def test_run_callbacks(caplog: LogCaptureFixture) -> None:
 @pytest.mark.parametrize(
     "method, expected_stop_message",
     [
-        pytest.param("exit", None, id="exit"),
         pytest.param(
             "keyboard",
             "Received signal (Interrupt) – terminating application",
@@ -150,8 +168,11 @@ async def test_run_callbacks(caplog: LogCaptureFixture) -> None:
         ),
     ],
 )
-async def test_clean_exit(
-    caplog: LogCaptureFixture, method: str, expected_stop_message: str | None
+def test_clean_exit(
+    caplog: LogCaptureFixture,
+    method: Literal["keyboard", "sigterm"],
+    expected_stop_message: str | None,
+    anyio_backend_name: str,
 ) -> None:
     """
     Test that when application termination is explicitly requested either externally or
@@ -160,7 +181,7 @@ async def test_clean_exit(
     """
     caplog.set_level(logging.INFO)
     component = ShutdownComponent(method=method)
-    await run_application(component)
+    run_application(component, backend=anyio_backend_name)
 
     records = [
         record for record in caplog.records if record.name == "asphalt.core._runner"
@@ -175,7 +196,7 @@ async def test_clean_exit(
         assert records[3].message == expected_stop_message
 
 
-async def test_start_exception(caplog: LogCaptureFixture) -> None:
+def test_start_exception(caplog: LogCaptureFixture, anyio_backend_name: str) -> None:
     """
     Test that an exception caught during the application initialization is put into the
     application context and made available to teardown callbacks.
@@ -186,7 +207,7 @@ async def test_start_exception(caplog: LogCaptureFixture) -> None:
     with raises_in_exception_group(
         RuntimeError, match="this should crash the application"
     ):
-        await run_application(component)
+        run_application(component, backend=anyio_backend_name)
 
     records = [
         record for record in caplog.records if record.name.startswith("asphalt.core.")
@@ -198,11 +219,10 @@ async def test_start_exception(caplog: LogCaptureFixture) -> None:
     assert records[3].message == "Application stopped"
 
 
-async def test_start_timeout(caplog: LogCaptureFixture) -> None:
+def test_start_timeout(caplog: LogCaptureFixture, anyio_backend_name: str) -> None:
     """
     Test that when the root component takes too long to start up, the runner exits and
     logs the appropriate error message.
-
     """
 
     class StallingComponent(Component):
@@ -213,7 +233,7 @@ async def test_start_timeout(caplog: LogCaptureFixture) -> None:
     caplog.set_level(logging.INFO)
     component = StallingComponent()
     with raises_in_exception_group(TimeoutError):
-        await run_application(component, start_timeout=0.1)
+        run_application(component, start_timeout=0.1, backend=anyio_backend_name)
 
     records = [
         record for record in caplog.records if record.name == "asphalt.core._runner"
@@ -228,10 +248,10 @@ async def test_start_timeout(caplog: LogCaptureFixture) -> None:
     assert records[3].message == "Application stopped"
 
 
-async def test_dict_config(caplog: LogCaptureFixture) -> None:
+def test_dict_config(caplog: LogCaptureFixture, anyio_backend_name: str) -> None:
     """Test that component configuration passed as a dictionary works."""
     caplog.set_level(logging.INFO)
-    await run_application(component={"type": ShutdownComponent})
+    run_application(component={"type": DummyCLIApp}, backend=anyio_backend_name)
 
     records = [
         record for record in caplog.records if record.name == "asphalt.core._runner"
@@ -243,10 +263,12 @@ async def test_dict_config(caplog: LogCaptureFixture) -> None:
     assert records[3].message == "Application stopped"
 
 
-async def test_run_cli_application(caplog: LogCaptureFixture) -> None:
+def test_run_cli_application(
+    caplog: LogCaptureFixture, anyio_backend_name: str
+) -> None:
     caplog.set_level(logging.INFO)
     with pytest.raises(SystemExit) as exc:
-        await run_application(DummyCLIApp())
+        run_application(DummyCLIApp(20), backend=anyio_backend_name)
 
     assert exc.value.code == 20
 

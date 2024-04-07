@@ -33,4 +33,4 @@ class ServerComponent(Component):
 
 if __name__ == "__main__":
     component = ServerComponent()
-    anyio.run(run_application, component)
+    run_application(component)
