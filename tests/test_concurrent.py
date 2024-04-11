@@ -131,6 +131,24 @@ class TestTaskFactory:
 
         assert str(handled_exception) == "foo"
 
+    @pytest.mark.parametrize("name", ["taskname", None])
+    async def test_start_soon(self, name: str | None) -> None:
+        expected_name = (
+            name
+            or f"{__name__}.{self.__class__.__name__}.test_start_soon.<locals>.taskfunc"
+        )
+
+        async def taskfunc() -> str:
+            assert get_current_task().name == expected_name
+            return "returnvalue"
+
+        async with Context():
+            factory = await start_background_task_factory()
+            handle = factory.start_task_soon(taskfunc, name)
+            await handle.wait_finished()
+
+        assert handle.name == expected_name
+
 
 class TestServiceTask:
     async def test_bad_teardown_action(self, caplog: LogCaptureFixture) -> None:

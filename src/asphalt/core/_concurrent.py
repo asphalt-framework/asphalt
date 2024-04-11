@@ -9,6 +9,7 @@ from inspect import Parameter, isawaitable, signature
 from typing import Any, Callable, Literal, TypeVar, Union
 
 from anyio import (
+    TASK_STATUS_IGNORED,
     CancelScope,
     Event,
     create_task_group,
@@ -61,7 +62,7 @@ async def _run_background_task(
     task_handle: TaskHandle,
     exception_handler: ExceptionHandler | None = None,
     *,
-    task_status: TaskStatus[Any],
+    task_status: TaskStatus[Any] = TASK_STATUS_IGNORED,
 ) -> None:
     __tracebackhide__ = True  # trick supported by certain debugger frameworks
 
@@ -128,6 +129,33 @@ class TaskFactory:
         """
         task_handle = TaskHandle(name=name or callable_name(func))
         task_handle.start_value = await self._task_group.start(
+            _run_background_task,
+            func,
+            task_handle,
+            self.exception_handler,
+            name=task_handle.name,
+        )
+        return task_handle
+
+    def start_task_soon(
+        self,
+        func: Callable[..., Coroutine[Any, Any, T_Retval]],
+        name: str | None = None,
+    ) -> TaskHandle:
+        """
+        Start a background task in the factory's task group.
+
+        This is similar to :meth:`start_task`, but works from synchronous callbacks and
+        doesn't support :class:`~anyio.abc.TaskStatus`.
+
+        :param func: the coroutine function to run
+        :param name: descriptive name for the task
+        :return: a task handle that can be used to await on the result or cancel the
+            task
+
+        """
+        task_handle = TaskHandle(name=name or callable_name(func))
+        self._task_group.start_soon(
             _run_background_task,
             func,
             task_handle,
