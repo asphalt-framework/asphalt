@@ -586,14 +586,19 @@ class Context:
         :param wait: if ``True``, wait for the resource to become available if it's not
             already available in the context chain
         :param optional: if ``True``, return ``None`` if the resource was not available
+        :raises ValueError: if both ``optional=True`` and ``wait=True`` were specified,
+            as it doesn't make sense
         :return: the requested resource, or ``None`` if none was available and
             ``optional`` was ``False``
 
         """
         self._ensure_state(ContextState.open, ContextState.closing)
-        key = (type, name)
+
+        if wait and optional:
+            raise ValueError("combining wait=True and optional=True doesn't make sense")
 
         # First check if there's already a matching resource in this context
+        key = (type, name)
         if (resource := self._resources.get(key)) is not None:
             return cast(T_Resource, resource.value_or_factory)
 

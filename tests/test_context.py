@@ -351,6 +351,10 @@ class TestContext:
         assert exc.value.type == int
         assert exc.value.name == "foo"
 
+    async def test_get_resource_optional_wait(self, context: Context) -> None:
+        with pytest.raises(ValueError, match="doesn't make sense"):
+            await context.get_resource(int, optional=True, wait=True)
+
     async def test_start_service_task_cancel_on_exit(self) -> None:
         started = False
         finished = False
