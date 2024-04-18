@@ -99,6 +99,7 @@ class TestTaskFactory:
 
     async def test_start_exception(self) -> None:
         async def taskfunc() -> NoReturn:
+            await sleep(0)
             raise Exception("foo")
 
         with pytest.raises(ExceptionGroup) as excinfo:
