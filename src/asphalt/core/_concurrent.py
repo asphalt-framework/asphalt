@@ -6,7 +6,7 @@ from collections.abc import Coroutine
 from dataclasses import dataclass, field
 from functools import partial
 from inspect import Parameter, isawaitable, signature
-from typing import Any, Callable, List, Literal, TypeVar, Union
+from typing import Any, Callable, Literal, TypeVar, Union
 
 from anyio import (
     TASK_STATUS_IGNORED,
@@ -99,7 +99,7 @@ class TaskFactory:
     exception_handler: ExceptionHandler | None = None
     _finished_event: Event = field(init=False, default_factory=Event)
     _task_group: TaskGroup = field(init=False)
-    _tasks: List[TaskHandle] = field(default_factory=list)
+    _tasks: list[TaskHandle] = field(default_factory=list)
 
     async def start_task(
         self,
