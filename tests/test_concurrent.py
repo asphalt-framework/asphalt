@@ -149,6 +149,36 @@ class TestTaskFactory:
 
         assert handle.name == expected_name
 
+    async def test_cancel_all_tasks(self) -> None:
+        async def taskfunc(task_status: TaskStatus[None]) -> None:
+            task_status.started()
+            await sleep(1)
+            raise RuntimeError("this exception should not be raised")
+
+        async with Context():
+            factory = await start_background_task_factory()
+            await factory.start_task(taskfunc)
+            await factory.start_task(taskfunc)
+            factory.cancel_all_tasks()
+
+        assert not factory._tasks
+
+    async def test_wait_all_tasks_finished(self) -> None:
+        return_values = []
+
+        async def taskfunc(task_status: TaskStatus[None]) -> None:
+            task_status.started()
+            return_values.append("returnvalue")
+
+        async with Context():
+            factory = await start_background_task_factory()
+            await factory.start_task(taskfunc)
+            await factory.start_task(taskfunc)
+            await factory.wait_all_tasks_finished()
+            assert return_values == 2 * ["returnvalue"]
+            await sleep(0.01)
+            assert not factory._tasks
+
 
 class TestServiceTask:
     async def test_bad_teardown_action(self, caplog: LogCaptureFixture) -> None:

@@ -6,7 +6,7 @@ from collections.abc import Coroutine
 from dataclasses import dataclass, field
 from functools import partial
 from inspect import Parameter, isawaitable, signature
-from typing import Any, Callable, Literal, TypeVar, Union
+from typing import Any, Callable, List, Literal, TypeVar, Union
 
 from anyio import (
     TASK_STATUS_IGNORED,
@@ -99,6 +99,7 @@ class TaskFactory:
     exception_handler: ExceptionHandler | None = None
     _finished_event: Event = field(init=False, default_factory=Event)
     _task_group: TaskGroup = field(init=False)
+    _tasks: List[TaskHandle] = field(default_factory=list)
 
     async def start_task(
         self,
@@ -135,6 +136,7 @@ class TaskFactory:
             self.exception_handler,
             name=task_handle.name,
         )
+        self._register_task(task_handle)
         return task_handle
 
     def start_task_soon(
@@ -162,7 +164,26 @@ class TaskFactory:
             self.exception_handler,
             name=task_handle.name,
         )
+        self._register_task(task_handle)
         return task_handle
+
+    def cancel_all_tasks(self) -> None:
+        """Schedule all currently running tasks to be cancelled."""
+        for task in self._tasks:
+            task.cancel()
+
+    async def wait_all_tasks_finished(self) -> None:
+        """Wait until all currently running tasks are finished."""
+        for task in self._tasks:
+            await task.wait_finished()
+
+    def _register_task(self, task: TaskHandle) -> None:
+        self._tasks.append(task)
+        self._task_group.start_soon(partial(self._unregister_task, task))
+
+    async def _unregister_task(self, task: TaskHandle) -> None:
+        await task.wait_finished()
+        self._tasks.remove(task)
 
     async def _run(
         self, ctx: Context, resource_name: str, *, task_status: TaskStatus[None]
