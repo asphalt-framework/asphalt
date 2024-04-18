@@ -174,8 +174,9 @@ class TaskFactory:
 
     async def wait_all_tasks_finished(self) -> None:
         """Wait until all currently running tasks are finished."""
-        for task in self._tasks:
-            await task.wait_finished()
+        while self._tasks:
+            for task in list(self._tasks):
+                await task.wait_finished()
 
     def _register_task(self, task: TaskHandle) -> None:
         self._tasks.append(task)
