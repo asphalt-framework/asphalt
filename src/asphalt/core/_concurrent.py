@@ -99,6 +99,7 @@ class TaskFactory:
     exception_handler: ExceptionHandler | None = None
     _finished_event: Event = field(init=False, default_factory=Event)
     _task_group: TaskGroup = field(init=False)
+    _sub_task_group: TaskGroup = field(init=False)
 
     async def start_task(
         self,
@@ -128,7 +129,7 @@ class TaskFactory:
 
         """
         task_handle = TaskHandle(name=name or callable_name(func))
-        task_handle.start_value = await self._task_group.start(
+        task_handle.start_value = await self._sub_task_group.start(
             _run_background_task,
             func,
             task_handle,
@@ -155,7 +156,7 @@ class TaskFactory:
 
         """
         task_handle = TaskHandle(name=name or callable_name(func))
-        self._task_group.start_soon(
+        self._sub_task_group.start_soon(
             _run_background_task,
             func,
             task_handle,
@@ -164,13 +165,34 @@ class TaskFactory:
         )
         return task_handle
 
+    def cancel_all_tasks(self) -> None:
+        """Schedule all currently running tasks to be cancelled."""
+        self._sub_task_group.cancel_scope.cancel()
+        self._task_group.start_soon(self._start)
+
+    async def wait_all_tasks_finished(self) -> None:
+        """Wait until all currently running tasks are finished."""
+        self._finished_event.set()
+        self._finished_event = Event()
+        await self._task_group.start(self._start)
+
     async def _run(
         self, ctx: Context, resource_name: str, *, task_status: TaskStatus[None]
     ) -> None:
         async with create_task_group() as self._task_group:
             ctx.add_resource(self, resource_name)
             task_status.started()
+            await self._start()
+
+    async def _start(
+        self, *, task_status: TaskStatus[None] = TASK_STATUS_IGNORED
+    ) -> None:
+        async with create_task_group() as self._sub_task_group:
+            task_status.started()
             await self._finished_event.wait()
+
+    def _stop(self) -> None:
+        self._finished_event.set()
 
 
 async def start_service_task(
@@ -285,6 +307,6 @@ async def start_background_task_factory(
     await start_service_task(
         partial(factory._run, current_context(), resource_name),
         f"Background task factory ({resource_name})",
-        teardown_action=factory._finished_event.set,
+        teardown_action=factory._stop,
     )
     return factory

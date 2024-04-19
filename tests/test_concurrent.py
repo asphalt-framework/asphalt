@@ -108,9 +108,13 @@ class TestTaskFactory:
 
         assert len(excinfo.value.exceptions) == 1
         assert isinstance(excinfo.value.exceptions[0], ExceptionGroup)
-        excgrp = excinfo.value.exceptions[0]
-        assert len(excgrp.exceptions) == 1
-        assert str(excgrp.exceptions[0]) == "foo"
+        excgrp0 = excinfo.value.exceptions[0]
+        assert len(excgrp0.exceptions) == 1
+        assert isinstance(excgrp0, ExceptionGroup)
+        excgrp1 = excgrp0.exceptions[0]
+        assert isinstance(excgrp1, ExceptionGroup)
+        assert len(excgrp1.exceptions) == 1
+        assert str(excgrp1.exceptions[0]) == "foo"
 
     async def test_start_exception_handled(self) -> None:
         handled_exception: Exception | None = None
@@ -148,6 +152,36 @@ class TestTaskFactory:
             await handle.wait_finished()
 
         assert handle.name == expected_name
+
+    async def test_cancel_all_tasks(self) -> None:
+        async def taskfunc(task_status: TaskStatus[None]) -> None:
+            task_status.started()
+            await sleep(1)
+            raise RuntimeError("this exception should not be raised")
+
+        async with Context():
+            factory = await start_background_task_factory()
+            await factory.start_task(taskfunc)
+            await factory.start_task(taskfunc)
+            factory.cancel_all_tasks()
+
+    async def test_wait_all_tasks_finished(self) -> None:
+        return_values = []
+
+        async def taskfunc(task_status: TaskStatus[None]) -> None:
+            task_status.started()
+            return_values.append("returnvalue")
+
+        async with Context():
+            factory = await start_background_task_factory()
+            await factory.start_task(taskfunc)
+            await factory.start_task(taskfunc)
+            await factory.wait_all_tasks_finished()
+            assert return_values == 2 * ["returnvalue"]
+            return_values.clear()
+            await factory.start_task(taskfunc)
+            await factory.wait_all_tasks_finished()
+            assert return_values == ["returnvalue"]
 
 
 class TestServiceTask:
