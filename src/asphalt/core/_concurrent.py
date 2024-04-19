@@ -24,6 +24,9 @@ if sys.version_info >= (3, 10):
 else:
     from typing_extensions import TypeAlias
 
+if sys.version_info < (3, 11):
+    from exceptiongroup import ExceptionGroup
+
 T_Retval = TypeVar("T_Retval")
 TeardownAction: TypeAlias = Union[Callable[[], Any], Literal["cancel"], None]
 ExceptionHandler: TypeAlias = Callable[[Exception], bool]
@@ -179,10 +182,13 @@ class TaskFactory:
     async def _run(
         self, ctx: Context, resource_name: str, *, task_status: TaskStatus[None]
     ) -> None:
-        async with create_task_group() as self._task_group:
-            ctx.add_resource(self, resource_name)
-            task_status.started()
-            await self._start()
+        try:
+            async with create_task_group() as self._task_group:
+                ctx.add_resource(self, resource_name)
+                task_status.started()
+                await self._start()
+        except ExceptionGroup as excgrp:
+            raise excgrp.exceptions[0]
 
     async def _start(
         self, *, task_status: TaskStatus[None] = TASK_STATUS_IGNORED

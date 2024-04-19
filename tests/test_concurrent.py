@@ -108,13 +108,9 @@ class TestTaskFactory:
 
         assert len(excinfo.value.exceptions) == 1
         assert isinstance(excinfo.value.exceptions[0], ExceptionGroup)
-        excgrp0 = excinfo.value.exceptions[0]
-        assert len(excgrp0.exceptions) == 1
-        assert isinstance(excgrp0, ExceptionGroup)
-        excgrp1 = excgrp0.exceptions[0]
-        assert isinstance(excgrp1, ExceptionGroup)
-        assert len(excgrp1.exceptions) == 1
-        assert str(excgrp1.exceptions[0]) == "foo"
+        excgrp = excinfo.value.exceptions[0]
+        assert len(excgrp.exceptions) == 1
+        assert str(excgrp.exceptions[0]) == "foo"
 
     async def test_start_exception_handled(self) -> None:
         handled_exception: Exception | None = None
