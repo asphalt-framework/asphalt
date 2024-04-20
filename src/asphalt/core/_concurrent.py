@@ -4,7 +4,6 @@ import logging
 import sys
 from collections.abc import Coroutine
 from dataclasses import dataclass, field
-from functools import partial
 from inspect import Parameter, isawaitable, signature
 from typing import Any, Callable, Literal, TypeVar, Union
 
@@ -164,11 +163,8 @@ class TaskFactory:
         )
         return task_handle
 
-    async def _run(
-        self, ctx: Context, resource_name: str, *, task_status: TaskStatus[None]
-    ) -> None:
+    async def _run(self, *, task_status: TaskStatus[None]) -> None:
         async with create_task_group() as self._task_group:
-            ctx.add_resource(self, resource_name)
             task_status.started()
             await self._finished_event.wait()
 
@@ -256,7 +252,7 @@ async def start_service_task(
 
 
 async def start_background_task_factory(
-    resource_name: str = "default", *, exception_handler: ExceptionHandler | None = None
+    *, exception_handler: ExceptionHandler | None = None
 ) -> TaskFactory:
     """
     Start a service task that hosts ad-hoc background tasks.
@@ -272,7 +268,6 @@ async def start_background_task_factory(
     so risks those resources being removed from the context before all the tasks
     have finished.
 
-    :param resource_name: resource name for the :class:`TaskFactory` resource
     :param exception_handler: a callback called to handle an exception raised from the
         task. Takes the exception (:exc:`Exception`) as the argument, and should return
         ``True`` if it successfully handled the exception.
@@ -283,8 +278,8 @@ async def start_background_task_factory(
     """
     factory = TaskFactory(exception_handler)
     await start_service_task(
-        partial(factory._run, current_context(), resource_name),
-        f"Background task factory ({resource_name})",
+        factory._run,
+        f"Background task factory ({id(factory):x})",
         teardown_action=factory._finished_event.set,
     )
     return factory

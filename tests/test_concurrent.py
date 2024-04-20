@@ -9,13 +9,7 @@ from anyio import fail_after, get_current_task, sleep
 from anyio.abc import TaskStatus
 from pytest import LogCaptureFixture
 
-from asphalt.core import (
-    Context,
-    TaskFactory,
-    get_resource_nowait,
-    start_background_task_factory,
-    start_service_task,
-)
+from asphalt.core import Context, start_background_task_factory, start_service_task
 
 if sys.version_info < (3, 11):
     from exceptiongroup import ExceptionGroup
@@ -24,13 +18,6 @@ pytestmark = pytest.mark.anyio()
 
 
 class TestTaskFactory:
-    async def test_resource(self) -> None:
-        async with Context():
-            default_factory = await start_background_task_factory()
-            other_factory = await start_background_task_factory("other")
-            assert default_factory is get_resource_nowait(TaskFactory)
-            assert other_factory is get_resource_nowait(TaskFactory, "other")
-
     async def test_start(self) -> None:
         async def taskfunc() -> str:
             assert get_current_task().name == "taskfunc"
