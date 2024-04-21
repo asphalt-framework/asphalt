@@ -30,7 +30,7 @@ ExceptionHandler: TypeAlias = Callable[[Exception], bool]
 logger = logging.getLogger(__name__)
 
 
-@dataclass
+@dataclass(unsafe_hash=True)
 class TaskHandle:
     """
     A representation of a task started from :class:`TaskFactory`.
@@ -40,12 +40,14 @@ class TaskHandle:
         function supported that
     """
 
-    name: str
-    start_value: Any = field(init=False, repr=False)
+    name: str = field(hash=False, compare=False)
+    start_value: Any = field(init=False, repr=False, compare=False)
     _cancel_scope: CancelScope = field(
         init=False, default_factory=CancelScope, repr=False
     )
-    _finished_event: Event = field(init=False, default_factory=Event, repr=False)
+    _finished_event: Event = field(
+        init=False, default_factory=Event, repr=False, compare=False
+    )
 
     def cancel(self) -> None:
         """Schedule the task to be cancelled."""
@@ -98,6 +100,15 @@ class TaskFactory:
     exception_handler: ExceptionHandler | None = None
     _finished_event: Event = field(init=False, default_factory=Event)
     _task_group: TaskGroup = field(init=False)
+    _tasks: set[TaskHandle] = field(init=False, default_factory=set)
+
+    def all_task_handles(self) -> set[TaskHandle]:
+        """
+        Return task handles for all the tasks currently running on the factory's task
+        group.
+
+        """
+        return self._tasks.copy()
 
     async def start_task(
         self,
@@ -127,8 +138,9 @@ class TaskFactory:
 
         """
         task_handle = TaskHandle(name=name or callable_name(func))
+        self._tasks.add(task_handle)
         task_handle.start_value = await self._task_group.start(
-            _run_background_task,
+            self._run_background_task,
             func,
             task_handle,
             self.exception_handler,
@@ -154,14 +166,31 @@ class TaskFactory:
 
         """
         task_handle = TaskHandle(name=name or callable_name(func))
+        self._tasks.add(task_handle)
         self._task_group.start_soon(
-            _run_background_task,
+            self._run_background_task,
             func,
             task_handle,
             self.exception_handler,
             name=task_handle.name,
         )
         return task_handle
+
+    async def _run_background_task(
+        self,
+        func: Callable[..., Coroutine[Any, Any, Any]],
+        task_handle: TaskHandle,
+        exception_handler: ExceptionHandler | None = None,
+        *,
+        task_status: TaskStatus[Any] = TASK_STATUS_IGNORED,
+    ) -> None:
+        __tracebackhide__ = True  # trick supported by certain debugger frameworks
+        try:
+            await _run_background_task(
+                func, task_handle, exception_handler, task_status=task_status
+            )
+        finally:
+            self._tasks.remove(task_handle)
 
     async def _run(self, *, task_status: TaskStatus[None]) -> None:
         async with create_task_group() as self._task_group:

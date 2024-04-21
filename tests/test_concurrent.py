@@ -5,7 +5,7 @@ from typing import NoReturn
 
 import anyio
 import pytest
-from anyio import fail_after, get_current_task, sleep
+from anyio import Event, fail_after, get_current_task, sleep
 from anyio.abc import TaskStatus
 from pytest import LogCaptureFixture
 
@@ -135,6 +135,23 @@ class TestTaskFactory:
             await handle.wait_finished()
 
         assert handle.name == expected_name
+
+    async def test_all_task_handles(self) -> None:
+        event = Event()
+
+        async def taskfunc() -> None:
+            await event.wait()
+
+        async with Context():
+            factory = await start_background_task_factory()
+            handle1 = await factory.start_task(taskfunc)
+            handle2 = factory.start_task_soon(taskfunc)
+            assert factory.all_task_handles() == {handle1, handle2}
+            event.set()
+            for handle in (handle1, handle2):
+                await handle.wait_finished()
+
+            assert factory.all_task_handles() == set()
 
 
 class TestServiceTask:
