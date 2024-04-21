@@ -30,7 +30,7 @@ ExceptionHandler: TypeAlias = Callable[[Exception], bool]
 logger = logging.getLogger(__name__)
 
 
-@dataclass
+@dataclass(unsafe_hash=True)
 class TaskHandle:
     """
     A representation of a task started from :class:`TaskFactory`.
@@ -40,12 +40,14 @@ class TaskHandle:
         function supported that
     """
 
-    name: str
-    start_value: Any = field(init=False, repr=False)
+    name: str = field(hash=False, compare=False)
+    start_value: Any = field(init=False, repr=False, compare=False)
     _cancel_scope: CancelScope = field(
         init=False, default_factory=CancelScope, repr=False
     )
-    _finished_event: Event = field(init=False, default_factory=Event, repr=False)
+    _finished_event: Event = field(
+        init=False, default_factory=Event, repr=False, compare=False
+    )
 
     def cancel(self) -> None:
         """Schedule the task to be cancelled."""
@@ -54,15 +56,6 @@ class TaskHandle:
     async def wait_finished(self) -> None:
         """Wait until the task is finished."""
         await self._finished_event.wait()
-
-    def __hash__(self) -> int:
-        return hash(self._cancel_scope)
-
-    def __eq__(self, other: object) -> bool:
-        if isinstance(other, TaskHandle):
-            return self._cancel_scope is other._cancel_scope
-
-        return NotImplemented
 
 
 async def _run_background_task(
