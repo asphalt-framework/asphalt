@@ -50,7 +50,7 @@ end, you need to set up an asynchronous HTTP client using the httpx_ library::
         async def run(self) -> None:
             async with httpx.AsyncClient() as http:
                 while True:
-                    async with http.get("http://imgur.com") as resp:
+                    async with http.get("https://imgur.com") as resp:
                         await resp.text()
 
                     await anyio.sleep(10)
@@ -58,7 +58,7 @@ end, you need to set up an asynchronous HTTP client using the httpx_ library::
     if __name__ == "__main__":
         run_application(ApplicationComponent(), logging=logging.DEBUG)
 
-Great, so now the code fetches the contents of ``http://imgur.com`` at 10 second
+Great, so now the code fetches the contents of ``https://imgur.com`` at 10 second
 intervals. But this isn't very useful yet – you need something that compares the old and
 new versions of the contents somehow. Furthermore, constantly loading the contents of a
 page exerts unnecessary strain on the hosting provider. We want our application to be as
@@ -79,7 +79,7 @@ So, modify the code as follows::
                     headers: dict[str, Any] = (
                         {"if-modified-since": last_modified} if last_modified else {}
                     )
-                    async with http.get("http://imgur.com", headers=headers) as resp:
+                    async with http.get("https://imgur.com", headers=headers) as resp:
                         logger.debug("Response status: %d", resp.status)
                         if resp.status == 200:
                             last_modified = resp.headers["date"]
@@ -116,7 +116,7 @@ to the logger::
                     headers: dict[str, Any] = (
                         {"if-modified-since": last_modified} if last_modified else {}
                     )
-                    async with http.get("http://imgur.com", headers=headers) as resp:
+                    async with http.get("https://imgur.com", headers=headers) as resp:
                         logger.debug("Response status: %d", resp.status)
                         if resp.status == 200:
                             last_modified = resp.headers["date"]
@@ -178,7 +178,7 @@ And to make the the results look nicer in an email message, you can switch to us
                     headers: dict[str, Any] = (
                         {"if-modified-since": last_modified} if last_modified else {}
                     )
-                    async with http.get("http://imgur.com", headers=headers) as resp:
+                    async with http.get("https://imgur.com", headers=headers) as resp:
                         logger.debug("Response status: %d", resp.status)
                         if resp.status == 200:
                             last_modified = resp.headers["date"]
@@ -307,7 +307,7 @@ Now that you've moved the change detection code to its own module,
 
     class ApplicationComponent(CLIApplicationComponent):
         async def start(self) -> None:
-            self.add_component("detector", ChangeDetectorComponent, url="http://imgur.com")
+            self.add_component("detector", ChangeDetectorComponent, url="https://imgur.com")
             self.add_component(
                 "mailer", backend="smtp", host="your.smtp.server.here",
                 message_defaults={"sender": "your@email.here", "to": "your@email.here"})
@@ -362,7 +362,7 @@ following contents:
       type: !!python/name:webnotifier.app.ApplicationComponent
       components:
         detector:
-          url: http://imgur.com/
+          url: https://imgur.com/
           delay: 15
         mailer:
           host: your.smtp.server.here
@@ -422,7 +422,7 @@ On Windows:
     The ``if __name__ == '__main__':`` block is no longer needed since ``asphalt run``
     is now used as the entry point for the application.
 
-.. _YAML: http://yaml.org/
+.. _YAML: https://yaml.org/
 .. _properly packaged: https://packaging.python.org/
 
 Conclusion

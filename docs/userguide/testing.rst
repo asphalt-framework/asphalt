@@ -66,7 +66,7 @@ To run the test suite, make sure you're in the project directory and then do:
 For more elaborate examples, please see the test suites of various
 `Asphalt subprojects`_.
 
-.. _pytest: http://pytest.org/
+.. _pytest: https://pytest.org/
 .. _AnyIO's pytest plugin: https://anyio.readthedocs.io/en/stable/testing.html
 .. _capsys: https://docs.pytest.org/en/stable/how-to/capture-stdout-stderr.html\
    #accessing-captured-output-from-a-test-function

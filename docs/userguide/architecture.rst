@@ -48,4 +48,4 @@ so the config file only needs to override settings where necessary.
 The following chapters describe in detail how each of these building blocks work.
 
 .. _Qt: https://www.qt.io/
-.. _YAML: http://yaml.org/
+.. _YAML: https://yaml.org/

@@ -10,7 +10,7 @@ deployments that all need their own custom configuration.
 For this purpose, Asphalt provides a command line interface that will read a YAML_ formatted
 configuration file and run the application it describes.
 
-.. _YAML: http://yaml.org/
+.. _YAML: https://yaml.org/
 
 Running the Asphalt launcher
 ----------------------------
@@ -266,4 +266,4 @@ Add the following piece to your application's configuration:
     backend_options:
         use_uvloop: true
 
-.. _uvloop: http://magic.io/blog/uvloop-make-python-networking-great-again/
+.. _uvloop: https://magic.io/blog/uvloop-make-python-networking-great-again/

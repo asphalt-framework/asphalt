@@ -5,7 +5,7 @@ services:
       type: webnotifier.app:ApplicationComponent
       components:
         detector:
-          url: http://imgur.com/
+          url: https://imgur.com/
           delay: 15
         mailer:
           host: your.smtp.server.here
