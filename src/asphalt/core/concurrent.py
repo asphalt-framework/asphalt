@@ -26,15 +26,13 @@ def executor(
 ) -> Callable[
     [Callable[Concatenate[Context, P], T_Retval]],
     Callable[Concatenate[Context, P], T_Retval | Awaitable[T_Retval]],
-]:
-    ...
+]: ...
 
 
 @overload
 def executor(
     func_or_executor: Callable[Concatenate[Context, P], T_Retval],
-) -> Callable[Concatenate[Context, P], T_Retval | Awaitable[T_Retval]]:
-    ...
+) -> Callable[Concatenate[Context, P], T_Retval | Awaitable[T_Retval]]: ...
 
 
 def executor(

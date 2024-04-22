@@ -183,9 +183,7 @@ class ResourceNotFound(LookupError):
         self.name = name
 
     def __str__(self):
-        return "no matching resource was found for type={typename} name={self.name!r}".format(
-            self=self, typename=qualified_name(self.type)
-        )
+        return f"no matching resource was found for type={qualified_name(self.type)} name={self.name!r}"
 
 
 class TeardownError(Exception):
@@ -207,9 +205,7 @@ class TeardownError(Exception):
             "\n".join(format_exception(type(exc), exc, exc.__traceback__))
             for exc in self.exceptions
         )
-        return "{} exceptions(s) were raised by teardown callbacks:\n{}{}".format(
-            len(self.exceptions), separator, tracebacks
-        )
+        return f"{len(self.exceptions)} exceptions(s) were raised by teardown callbacks:\n{separator}{tracebacks}"
 
 
 class NoCurrentContext(Exception):
@@ -845,15 +841,13 @@ def executor(arg: Executor | str | None | Callable[..., T_Retval] = None):
 @overload
 def context_teardown(
     func: Callable[[T_Context], AsyncGenerator[None, Exception | None]],
-) -> Callable[[T_Context], Coroutine[Any, Any, None]]:
-    ...
+) -> Callable[[T_Context], Coroutine[Any, Any, None]]: ...
 
 
 @overload
 def context_teardown(
     func: Callable[[T_Self, T_Context], AsyncGenerator[None, Exception | None]],
-) -> Callable[[T_Self, T_Context], Coroutine[Any, Any, None]]:
-    ...
+) -> Callable[[T_Self, T_Context], Coroutine[Any, Any, None]]: ...
 
 
 def context_teardown(
@@ -993,13 +987,11 @@ def Dependency(name: str = "default") -> Any:
 @overload
 def inject(
     func: Callable[P, Coroutine[Any, Any, T_Retval]],
-) -> Callable[P, Coroutine[Any, Any, T_Retval]]:
-    ...
+) -> Callable[P, Coroutine[Any, Any, T_Retval]]: ...
 
 
 @overload
-def inject(func: Callable[P, T_Retval]) -> Callable[P, T_Retval]:
-    ...
+def inject(func: Callable[P, T_Retval]) -> Callable[P, T_Retval]: ...
 
 
 def inject(func: Callable[P, Any]) -> Callable[P, Any]:
