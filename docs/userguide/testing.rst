@@ -26,7 +26,7 @@ we'll test them against each other.
 Create a ``tests`` directory at the root of the project directory and create a module
 named ``test_client_server`` there (the ``test_`` prefix is important):
 
-.. literalinclude:: snippets/deployment.py
+.. literalinclude:: ../../examples/tutorial1/tests/test_client_server.py
    :language: python
 
 In the above test module, the first thing you should note is
