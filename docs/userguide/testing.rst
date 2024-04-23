@@ -33,7 +33,7 @@ In the above test module, the first thing you should note is
 ``pytestmark = pytest.mark.anyio``. This is the pytest marker that marks all coroutine
 functions in the module to be run via AnyIO's pytest plugin.
 
-The next item in the module is the ``server`` asynchronou generator fixture. Fixtures
+The next item in the module is the ``server`` asynchronous generator fixture. Fixtures
 like these are run by AnyIO's pytest plugin in their respective tasks, making the
 practice of straddling a :class:`Context` on a ``yield`` safe. This would normally be
 bad, as the context contains a :class:`~anyio.TaskGroup` which usually should not be
