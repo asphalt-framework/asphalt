@@ -180,9 +180,8 @@ class PluginContainer:
         plugin_class = self.resolve(type)
         if not isclass(plugin_class) or not issubclass(plugin_class, self.base_class):
             raise TypeError(
-                "{} is not a subclass of {}".format(
-                    qualified_name(plugin_class), qualified_name(self.base_class)
-                )
+                f"{qualified_name(plugin_class)} is not a subclass of "
+                f"{qualified_name(self.base_class)}"
             )
 
         return plugin_class(**constructor_kwargs)
@@ -210,6 +209,7 @@ class PluginContainer:
         return values
 
     def __repr__(self):
-        return "{0.__class__.__name__}(namespace={0.namespace!r}, base_class={1})".format(
-            self, qualified_name(self.base_class)
+        return (
+            f"{self.__class__.__name__}(namespace={self.namespace!r}, "
+            f"base_class={qualified_name(self.base_class)})"
         )
