@@ -9,6 +9,8 @@ This library adheres to `Semantic Versioning 2.0 <https://semver.org/>`_.
 
   * Asphalt now runs via AnyIO, rather than asyncio, although the asyncio backend is
     used by default
+  * The runner now outputs an elaborate tree of component startup tasks if the
+    application fails to start within the allotted time
   * Dropped the ``--unsafe`` switch for ``asphalt run`` – configuration files are now
     always parsed in unsafe mode
   * Changed configuration parsing to no longer treat dotted keys in configuration
