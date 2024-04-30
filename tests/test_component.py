@@ -15,6 +15,7 @@ from asphalt.core import (
     ContainerComponent,
     Context,
     run_application,
+    start_component,
 )
 from asphalt.core._component import component_types
 
@@ -110,7 +111,7 @@ class TestContainerComponent:
 
     async def test_start(self, container: ContainerComponent) -> None:
         async with Context():
-            await container.start()
+            await start_component(container)
 
         dummy = cast(DummyComponent, container.child_components["dummy"])
         assert dummy.started

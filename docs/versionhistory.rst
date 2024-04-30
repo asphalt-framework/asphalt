@@ -36,6 +36,8 @@ This library adheres to `Semantic Versioning 2.0 <https://semver.org/>`_.
     ``CLIApplicationComponent.run()``
   * Changed how ``CLIApplicationComponent`` works: they no longer start a service task
     that call the ``run()`` method, but instead the runner will call it directly
+  * Added the ``start_component()`` function which is now the preferred method for
+    starting components directly (e.g. in test suites)
 - **BACKWARD INCOMPATIBLE** Changes in (Asphalt) context handling:
 
   * Dropped the ``TeardownError`` exception in favor of PEP 654 exception groups
