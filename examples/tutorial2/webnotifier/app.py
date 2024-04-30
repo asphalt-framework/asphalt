@@ -5,7 +5,7 @@ import logging
 from difflib import HtmlDiff
 
 from asphalt.core import CLIApplicationComponent, inject, resource
-from asphalt.mailer.api import Mailer
+from asphalt.mailer import Mailer
 
 from webnotifier.detector import ChangeDetectorComponent, Detector
 
