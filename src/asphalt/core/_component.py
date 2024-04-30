@@ -6,7 +6,7 @@ from typing import Any
 
 from anyio import create_task_group
 
-from ._utils import PluginContainer, merge_config
+from ._utils import PluginContainer, merge_config, qualified_name
 
 
 class Component(metaclass=ABCMeta):
@@ -105,7 +105,10 @@ class ContainerComponent(Component):
 
         async with create_task_group() as tg:
             for alias, component in self.child_components.items():
-                tg.start_soon(component.start)
+                tg.start_soon(
+                    component.start,
+                    name=f"Starting {qualified_name(component)} ({alias})",
+                )
 
 
 class CLIApplicationComponent(ContainerComponent):

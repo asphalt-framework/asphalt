@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import platform
+import re
 import signal
 from typing import Any, Literal
 from unittest.mock import patch
@@ -11,11 +12,11 @@ import pytest
 from _pytest.logging import LogCaptureFixture
 from anyio import to_thread
 from anyio.lowlevel import checkpoint
-from common import raises_in_exception_group
 
 from asphalt.core import (
     CLIApplicationComponent,
     Component,
+    ContainerComponent,
     add_teardown_callback,
     get_resource,
     run_application,
@@ -204,11 +205,10 @@ def test_start_exception(caplog: LogCaptureFixture, anyio_backend_name: str) -> 
     """
     caplog.set_level(logging.INFO)
     component = CrashComponent(method="exception")
-    with raises_in_exception_group(
-        RuntimeError, match="this should crash the application"
-    ):
+    with pytest.raises(SystemExit) as exc_info:
         run_application(component, backend=anyio_backend_name)
 
+    assert exc_info.value.code == 1
     records = [
         record for record in caplog.records if record.name.startswith("asphalt.core.")
     ]
@@ -219,33 +219,78 @@ def test_start_exception(caplog: LogCaptureFixture, anyio_backend_name: str) -> 
     assert records[3].message == "Application stopped"
 
 
-def test_start_timeout(caplog: LogCaptureFixture, anyio_backend_name: str) -> None:
-    """
-    Test that when the root component takes too long to start up, the runner exits and
-    logs the appropriate error message.
-    """
+@pytest.mark.parametrize("levels", [1, 2, 3])
+def test_start_timeout(
+    caplog: LogCaptureFixture, anyio_backend_name: str, levels: int
+) -> None:
+    class StallingComponent(ContainerComponent):
+        def __init__(self, level: int):
+            super().__init__()
+            self.level = level
 
-    class StallingComponent(Component):
         async def start(self) -> None:
-            # Wait forever for a non-existent resource
-            await get_resource(float, wait=True)
+            if self.level == levels:
+                # Wait forever for a non-existent resource
+                await get_resource(float, wait=True)
+            else:
+                self.add_component("child1", StallingComponent, level=self.level + 1)
+                self.add_component("child2", StallingComponent, level=self.level + 1)
+
+            await super().start()
 
     caplog.set_level(logging.INFO)
-    component = StallingComponent()
-    with raises_in_exception_group(TimeoutError):
+    component = StallingComponent(1)
+    with pytest.raises(SystemExit) as exc_info:
         run_application(component, start_timeout=0.1, backend=anyio_backend_name)
 
-    records = [
-        record for record in caplog.records if record.name == "asphalt.core._runner"
-    ]
-    assert len(records) == 4
-    assert records[0].message == "Running in development mode"
-    assert records[1].message == "Starting application"
-    assert records[2].message.startswith(
-        "Timeout waiting for the root component to start"
+    assert exc_info.value.code == 1
+    assert len(caplog.messages) == 4
+    assert caplog.messages[0] == "Running in development mode"
+    assert caplog.messages[1] == "Starting application"
+    assert caplog.messages[2].startswith(
+        "Timeout waiting for the root component to start\n"
+        "Components still waiting to finish startup:\n"
     )
-    # assert "-> await ctx.get_resource(float)" in records[2].message
-    assert records[3].message == "Application stopped"
+    assert caplog.messages[3] == "Application stopped"
+
+    child_component_re = re.compile(r"([ |]+)\+-([a-z.12]+) \((.+)\)")
+    lines = caplog.messages[2].splitlines()
+    expected_test_name = f"{__name__}.test_start_timeout"
+    assert lines[2] == f"  root ({expected_test_name}.<locals>.StallingComponent)"
+    component_aliases: set[str] = set()
+    depths: list[int] = [0] * levels
+    expected_indent = "  |  "
+    for line in lines[3:]:
+        if match := child_component_re.match(line):
+            indent, alias, component_name = match.groups()
+            depth = len(alias.split("."))
+            depths[depth - 1] += 1
+            depths[depth:] = [0] * (len(depths) - depth)
+            assert len(depths) == levels
+            assert all(d < 3 for d in depths)
+            expected_indent = "  " + "".join(
+                ("  " if d > 1 else "| ") for d in depths[:depth]
+            )
+            assert component_name == (
+                f"{expected_test_name}.<locals>.StallingComponent"
+            )
+            component_aliases.add(alias)
+        else:
+            assert line.startswith(expected_indent)
+
+    if levels == 1:
+        assert not component_aliases
+    elif levels == 2:
+        assert component_aliases == {"child1", "child2"}
+    else:
+        assert component_aliases == {
+            "child1",
+            "child2",
+            "child1.child1",
+            "child1.child2",
+            "child2.child1",
+            "child2.child2",
+        }
 
 
 def test_dict_config(caplog: LogCaptureFixture, anyio_backend_name: str) -> None:
