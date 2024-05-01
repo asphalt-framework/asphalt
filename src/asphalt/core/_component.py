@@ -167,6 +167,16 @@ async def start_component(
     start_timeout: float | None = 20,
     startup_scope: CancelScope | None = None,
 ) -> None:
+    """
+    Start a component and its subcomponents.
+
+    :param component: the (root) component to start
+    :param start_timeout: seconds to wait for all the components in the hierarchy to
+        start (default: ``20``; set to ``None`` to disable timeout)
+    :param startup_scope: used only by :func:`run_application`
+    :raises RuntimeError: if this function is called without an active :class:`Context`
+
+    """
     try:
         current_context()
     except NoCurrentContext:
