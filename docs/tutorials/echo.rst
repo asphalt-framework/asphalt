@@ -12,7 +12,7 @@ configuration file.
 Prerequisites
 -------------
 
-Asphalt requires Python 3.9 or later. You will also need to have the ``venv`` module
+Asphalt requires Python 3.8 or later. You will also need to have the ``venv`` module
 installed for your Python version of choice. It should come with most Python
 distributions, but if it does not, you can usually install it with your operating
 system's package manager (``python3-venv`` is a good guess).
@@ -68,26 +68,18 @@ Creating the first component
 ----------------------------
 
 Now, let's write some code! Create a file named ``server.py`` in the ``echo`` package
-directory::
+directory:
 
-    import anyio
-
-    from asphalt.core import Component, run_application
-
-
-    class ServerComponent(Component):
-        async def start(self) -> None:
-            print("Hello, world!")
-
-    if __name__ == "__main__":
-        component = ServerComponent()
-        run_application(component)
+.. literalinclude:: snippets/echo1.py
+   :language: python
+   :start-after: isort: off
 
 The ``ServerComponent`` class is the *root component* (and in this case, the only
-component) of this application. Its ``start()`` method is called by ``run_application``
-when it has set up the event loop. Finally, the ``if __name__ == '__main__':`` block is
-not strictly necessary but is good, common practice that prevents ``run_application()``
-from being called again if this module is ever imported from another module.
+component) of this application. Its ``start()`` method is called by
+:func:`run_application` when it has set up the event loop. Finally, the
+``if __name__ == '__main__':`` block is not strictly necessary but is good, common
+practice that prevents :func:`run_application()` from being called again if this module
+is ever imported from another module.
 
 You can now try running the above application. With the project directory
 (``tutorial``) as your current directory, do:
@@ -103,39 +95,11 @@ Making the server listen for connections
 ----------------------------------------
 
 The next step is to make the server actually accept incoming connections.
-For this purpose, we will use AnyIO's :func:`~anyio.create_tcp_listener` function::
+For this purpose, we will use AnyIO's :func:`~anyio.create_tcp_listener` function:
 
-    from collections.abc import AsyncIterator
-
-    import anyio
-    from anyio.abc import SocketStream
-
-    from asphalt.core import (
-        Component,
-        context_teardown,
-        run_application,
-        start_background_task,
-    )
-
-
-    async def handle(stream: SocketStream) -> None:
-        message = await stream.receive()
-        await stream.send(message)
-        print("Message from client:", message.decode().rstrip())
-
-
-    class ServerComponent(Component):
-        @context_teardown
-        async def start(self) -> AsyncGenerator[None, Exception | None]:
-            async with await anyio.create_tcp_listener(
-                local_host="localhost", local_port=64100
-            ) as listener:
-                start_background_task(lambda: listener.serve(handle), "Echo server")
-                yield
-
-    if __name__ == '__main__':
-        component = ServerComponent()
-        run_application(component)
+.. literalinclude:: ../../examples/tutorial1/echo/server.py
+   :language: python
+   :start-after: isort: off
 
 Here, :func:`anyio.create_tcp_listener` is used to listen to incoming TCP connections on
 the ``localhost`` interface on port 64100. The port number is totally arbitrary and can
@@ -175,30 +139,11 @@ No server is very useful without a client to access it, so we'll need to add a c
 module in this project. And to make things a bit more interesting, we'll make the client
 accept a message to be sent as a command line argument.
 
-Create the file ``client.py`` file in the ``echo`` package directory as follows::
+Create the file ``client.py`` file in the ``echo`` package directory as follows:
 
-    import sys
-
-    import anyio
-
-    from asphalt.core import CLIApplicationComponent, run_application
-
-
-    class ClientComponent(CLIApplicationComponent):
-        def __init__(self, message: str):
-            super().__init__()
-            self.message = message
-
-        async def run(self) -> None:
-            async with await anyio.connect_tcp("localhost", 64100) as stream:
-                await stream.send(self.message.encode() + b"\n")
-                response = await stream.receive()
-
-            print("Server responded:", response.decode().rstrip())
-
-    if __name__ == '__main__':
-        component = ClientComponent(sys.argv[1])
-        run_application(component)
+.. literalinclude:: ../../examples/tutorial1/echo/client.py
+   :language: python
+   :start-after: isort: off
 
 You may have noticed that ``ClientComponent`` inherits from
 :class:`CLIApplicationComponent` instead of :class:`Component` and that instead of

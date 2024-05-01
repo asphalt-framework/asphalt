@@ -1,10 +1,10 @@
 """This is the server code for the Asphalt echo server tutorial."""
 
+# isort: off
 from __future__ import annotations
 
 import anyio
 from anyio.abc import SocketStream, TaskStatus
-
 from asphalt.core import (
     Component,
     run_application,

@@ -34,29 +34,11 @@ Detecting changes in a web page
 -------------------------------
 
 The first task is to set up a loop that periodically retrieves the web page. To that
-end, you need to set up an asynchronous HTTP client using the httpx_ library::
+end, you need to set up an asynchronous HTTP client using the httpx_ library:
 
-    import logging
-    from typing import Any
-
-    import anyio
-    import httpx
-    from asphalt.core import CLIApplicationComponent, Context, run_application
-
-    logger = logging.getLogger(__name__)
-
-
-    class ApplicationComponent(CLIApplicationComponent):
-        async def run(self) -> None:
-            async with httpx.AsyncClient() as http:
-                while True:
-                    async with http.get("https://imgur.com") as resp:
-                        await resp.text()
-
-                    await anyio.sleep(10)
-
-    if __name__ == "__main__":
-        run_application(ApplicationComponent(), logging=logging.DEBUG)
+.. literalinclude:: snippets/webnotifier-app1.py
+   :language: python
+   :start-after: isort: off
 
 Great, so now the code fetches the contents of ``https://imgur.com`` at 10 second
 intervals. But this isn't very useful yet – you need something that compares the old and
@@ -69,24 +51,11 @@ requests after the initial one specify the last modified date value in the reque
 headers, the remote server will respond with a ``304 Not Modified`` if the contents have
 not changed since that moment.
 
-So, modify the code as follows::
+So, modify the code as follows:
 
-    class ApplicationComponent(CLIApplicationComponent):
-        async def run(self) -> None:
-            last_modified = None
-            async with httpx.AsyncClient() as http:
-                while True:
-                    headers: dict[str, Any] = (
-                        {"if-modified-since": last_modified} if last_modified else {}
-                    )
-                    async with http.get("https://imgur.com", headers=headers) as resp:
-                        logger.debug("Response status: %d", resp.status)
-                        if resp.status == 200:
-                            last_modified = resp.headers["date"]
-                            await resp.text()
-                            logger.info("Contents changed")
-
-                    await anyio.sleep(10)
+.. literalinclude:: snippets/webnotifier-app2.py
+   :language: python
+   :start-after: isort: off
 
 The code here stores the ``date`` header from the first response and uses it in the
 ``if-modified-since`` header of the next request. A ``200`` response indicates that the
@@ -99,35 +68,14 @@ idea of what's happening.
 Computing the changes between old and new versions
 --------------------------------------------------
 
-Now you have code that actually detects when the page has been modified between the requests.
-But it doesn't yet show *what* in its contents has changed. The next step will then be to use the
-standard library :mod:`difflib` module to calculate the difference between the contents and send it
-to the logger::
+Now you have code that actually detects when the page has been modified between the
+requests. But it doesn't yet show *what* in its contents has changed. The next step will
+then be to use the standard library :mod:`difflib` module to calculate the difference
+between the contents and send it to the logger:
 
-    from difflib import unified_diff
-
-
-    class ApplicationComponent(CLIApplicationComponent):
-        async def run(self) -> None:
-            async with httpx.AsyncClient() as http:
-                last_modified, old_lines = None, None
-                while True:
-                    logger.debug("Fetching webpage")
-                    headers: dict[str, Any] = (
-                        {"if-modified-since": last_modified} if last_modified else {}
-                    )
-                    async with http.get("https://imgur.com", headers=headers) as resp:
-                        logger.debug("Response status: %d", resp.status)
-                        if resp.status == 200:
-                            last_modified = resp.headers["date"]
-                            new_lines = (await resp.text()).split("\n")
-                            if old_lines is not None and old_lines != new_lines:
-                                difference = unified_diff(old_lines, new_lines)
-                                logger.info("Contents changed:\n%s", difference)
-
-                            old_lines = new_lines
-
-                    await anyio.sleep(10)
+.. literalinclude:: snippets/webnotifier-app3.py
+   :language: python
+   :start-after: isort: off
 
 This modified code now stores the old and new contents in different variables to enable
 them to be compared. The ``.split("\n")`` is needed because
@@ -153,47 +101,11 @@ function as a resource by adding a keyword-only argument, annotated with the typ
 the resource you want to inject (:class:`~asphalt.mailer.Mailer`).
 
 And to make the the results look nicer in an email message, you can switch to using
-:class:`difflib.HtmlDiff` to produce the delta output::
+:class:`difflib.HtmlDiff` to produce the delta output:
 
-    from difflib import HtmlDiff
-
-    from asphalt.core import inject, resource
-    from asphalt.mailer import Mailer
-
-
-    class ApplicationComponent(CLIApplicationComponent):
-        async def start(self) -> None:
-            self.add_component(
-                "mailer", backend="smtp", host="your.smtp.server.here",
-                message_defaults={"sender": "your@email.here", "to": "your@email.here"})
-            await super().start()
-
-        @inject
-        async def run(self, *, mailer: Mailer = resource()) -> None:
-            async with httpx.AsyncClient() as http:
-                last_modified, old_lines = None, None
-                diff = HtmlDiff()
-                while True:
-                    logger.debug("Fetching webpage")
-                    headers: dict[str, Any] = (
-                        {"if-modified-since": last_modified} if last_modified else {}
-                    )
-                    async with http.get("https://imgur.com", headers=headers) as resp:
-                        logger.debug("Response status: %d", resp.status)
-                        if resp.status == 200:
-                            last_modified = resp.headers["date"]
-                            new_lines = (await resp.text()).split("\n")
-                            if old_lines is not None and old_lines != new_lines:
-                                difference = diff.make_file(old_lines, new_lines, context=True)
-                                await mailer.create_and_deliver(
-                                    subject="Change detected in web page",
-                                    html_body=difference
-                                )
-                                logger.info("Sent notification email")
-
-                            old_lines = new_lines
-
-                    await anyio.sleep(10)
+.. literalinclude:: snippets/webnotifier-app4.py
+   :language: python
+   :start-after: isort: off
 
 You'll need to replace the ``host``, ``sender`` and ``to`` arguments for the mailer
 component and possibly add the ``username`` and ``password`` arguments if your SMTP
@@ -214,123 +126,45 @@ code. A well designed application should maintain proper `separation of concerns
 way to do this is to separate the change detection logic to its own class.
 
 Create a new module named ``detector`` in the ``webnotifier`` package. Then, add the
-change event class to it::
+change event class to it:
 
-    from dataclasses import dataclass
-    import logging
-
-    import httpx
-    from asphalt.core import Component, Event, Signal, context_teardown
-
-    logger = logging.getLogger(__name__)
-
-
-    @dataclass
-    class WebPageChangeEvent(Event):
-        old_lines: list[str]
-        new_lines: list[str]
+.. literalinclude:: snippets/webnotifier-detector1.py
+   :language: python
+   :start-after: isort: off
 
 This class defines the type of event that the notifier will emit when the target web
 page changes. The old and new content are stored in the event instance to allow the
 event listener to generate the output any way it wants.
 
 Next, add another class in the same module that will do the HTTP requests and change
-detection::
+detection:
 
-    class Detector:
-        changed = Signal(WebPageChangeEvent)
+.. literalinclude:: snippets/webnotifier-detector2.py
+   :language: python
+   :start-after: isort: off
 
-        def __init__(self, url: str, delay: float):
-            self.url = url
-            self.delay = delay
-
-        async def run(self) -> None:
-            async with aiohttp.ClientSession() as http:
-                last_modified, old_lines = None, None
-                while True:
-                    logger.debug("Fetching contents of %s", self.url)
-                    headers: dict[str, Any] = (
-                        {"if-modified-since": last_modified} if last_modified else {}
-                    )
-                    async with http.get(self.url, headers=headers) as resp:
-                        logger.debug("Response status: %d", resp.status)
-                        if resp.status == 200:
-                            last_modified = resp.headers["date"]
-                            new_lines = (await resp.text()).split("\n")
-                            if old_lines is not None and old_lines != new_lines:
-                                await self.changed.dispatch(
-                                    WebPageChangeEvent(old_lines, new_lines)
-                                )
-
-                            old_lines = new_lines
-
-                    await anyio.sleep(self.delay)
-
-The constructor arguments allow you to freely specify the parameters for the detection
+The initializer arguments allow you to freely specify the parameters for the detection
 process. The class includes a signal named ``changed`` that uses the previously created
 ``WebPageChangeEvent`` class. The code dispatches such an event when a change in the
 target web page is detected.
 
 Finally, add the component class which will allow you to integrate this functionality
-into any Asphalt application::
+into any Asphalt application:
 
-    class ChangeDetectorComponent(Component):
-        def __init__(self, url: str, delay: float = 10):
-            self.url = url
-            self.delay = delay
-
-        @context_teardown
-        async def start(self) -> None:
-            detector = Detector(self.url, self.delay)
-            await ctx.add_resource(detector)
-            start_service_task(detector.run, "Web page change detector")
-            logging.info(
-                'Started web page change detector for url "%s" with a delay of %d seconds',
-                self.url,
-                self.delay,
-            )
-
-            yield
-
-            # This part is run when the context is being torn down
-            logger.info("Shut down web page change detector")
+.. literalinclude:: ../../examples/tutorial2/webnotifier/detector.py
+   :language: python
+   :start-after: isort: off
 
 The component's ``start()`` method starts the detector's ``run()`` method as a new task,
 adds the detector object as resource and installs an event listener that will shut down
 the detector when the context is torn down.
 
 Now that you've moved the change detection code to its own module,
-``ApplicationComponent`` will become somewhat lighter::
+``ApplicationComponent`` will become somewhat lighter:
 
-    from contextlib import aclosing  # on Python < 3.10, import from async_generator or contextlib2
-
-
-    class ApplicationComponent(CLIApplicationComponent):
-        async def start(self) -> None:
-            self.add_component("detector", ChangeDetectorComponent, url="https://imgur.com")
-            self.add_component(
-                "mailer", backend="smtp", host="your.smtp.server.here",
-                message_defaults={"sender": "your@email.here", "to": "your@email.here"})
-            await super().start(ctx)
-
-        @inject
-        async def run(
-            self,
-            *,
-            mailer: Mailer = resource(),
-            detector: Detector = resource(),
-        ):
-            diff = HtmlDiff()
-            async with aclosing(detector.changed.stream_events()) as stream:
-                async for event in stream:
-                    difference = diff.make_file(
-                        event.old_lines, event.new_lines, context=True
-                    )
-                    await mailer.create_and_deliver(
-                        subject=f"Change detected in {event.source.url}",
-                        html_body=difference,
-                    )
-                    logger.info("Sent notification email")
+.. literalinclude:: ../../examples/tutorial2/webnotifier/app.py
+   :language: python
+   :start-after: isort: off
 
 The main application component will now use the detector resource added by
 ``ChangeDetectorComponent``. It adds one event listener which reacts to change events by
@@ -355,37 +189,8 @@ different configuration.
 In your project directory (``tutorial2``), create a file named ``config.yaml`` with the
 following contents:
 
-.. code-block:: yaml
-
-    ---
-    component:
-      type: !!python/name:webnotifier.app.ApplicationComponent
-      components:
-        detector:
-          url: https://imgur.com/
-          delay: 15
-        mailer:
-          host: your.smtp.server.here
-          message_defaults:
-            sender: your@email.here
-            to: your@email.here
-
-    logging:
-      version: 1
-      disable_existing_loggers: false
-      formatters:
-        default:
-          format: '[%(asctime)s %(levelname)s] %(message)s'
-      handlers:
-        console:
-          class: logging.StreamHandler
-          formatter: default
-      root:
-        handlers: [console]
-        level: INFO
-      loggers:
-        webnotifier:
-          level: DEBUG
+.. literalinclude:: ../../examples/tutorial2/config.yaml
+   :language: yaml
 
 The ``component`` section defines parameters for the root component. Aside from the
 special ``type`` key which tells the runner where to find the component class, all the

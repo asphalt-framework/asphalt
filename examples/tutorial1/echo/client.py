@@ -1,9 +1,9 @@
 """This is the client code for the Asphalt echo server tutorial."""
 
+# isort: off
 import sys
 
 import anyio
-
 from asphalt.core import CLIApplicationComponent, run_application
 
 
