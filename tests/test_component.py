@@ -169,3 +169,10 @@ class TestCLIApplicationComponent:
 
         with raises_in_exception_group(Exception, match="blah"):
             run_application(DummyCLIComponent(), backend=anyio_backend_name)
+
+
+async def test_start_component_no_context() -> None:
+    with pytest.raises(
+        RuntimeError, match=r"start_component\(\) requires an active Asphalt context"
+    ):
+        await start_component(ContainerComponent())
