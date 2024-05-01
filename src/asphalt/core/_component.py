@@ -1,8 +1,5 @@
 from __future__ import annotations
 
-import gc
-import re
-import textwrap
 from abc import ABCMeta, abstractmethod
 from collections import OrderedDict
 from collections.abc import Coroutine
@@ -26,8 +23,6 @@ from ._concurrent import start_service_task
 from ._context import current_context
 from ._exceptions import NoCurrentContext
 from ._utils import PluginContainer, merge_config, qualified_name
-
-component_task_re = re.compile(r"^Starting (\S+) \((.+)\)$")
 
 
 class Component(metaclass=ABCMeta):
@@ -186,7 +181,7 @@ async def start_component(
         startup_watcher_scope: CancelScope | None = None
         if start_timeout is not None:
             startup_watcher_scope = await start_service_task(
-                lambda task_status: startup_watcher(
+                lambda task_status: _component_startup_watcher(
                     startup_scope,
                     component,
                     start_timeout,
@@ -202,7 +197,7 @@ async def start_component(
             startup_watcher_scope.cancel()
 
 
-async def startup_watcher(
+async def _component_startup_watcher(
     startup_cancel_scope: CancelScope,
     root_component: Component,
     start_timeout: float,
@@ -210,6 +205,8 @@ async def startup_watcher(
     task_status: TaskStatus[CancelScope],
 ) -> None:
     def get_coro_stack_summary(coro: Any) -> StackSummary:
+        import gc
+
         frames: list[FrameType] = []
         while isinstance(coro, Coroutine):
             while coro.__class__.__name__ == "async_generator_asend":
@@ -246,6 +243,10 @@ async def startup_watcher(
         traceback: list[str] = field(init=False, default_factory=list)
         children: list[ComponentStatus] = field(init=False, default_factory=list)
 
+    import re
+    import textwrap
+
+    component_task_re = re.compile(r"^Starting (\S+) \((.+)\)$")
     component_statuses: dict[int, ComponentStatus] = {}
     for task in get_running_tasks():
         if task.id == parent_task.id:
