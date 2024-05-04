@@ -173,7 +173,7 @@ async def start_component(
         (default: ``20``; set to ``None`` to disable timeout)
     :raises RuntimeError: if this function is called without an active :class:`Context`
     :raises TimeoutError: if the startup of the component hierarchy takes more than
-        ``start_timeout`` seconds
+        ``timeout`` seconds
 
     """
     try:
