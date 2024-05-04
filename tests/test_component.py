@@ -187,4 +187,4 @@ async def test_start_component_timeout() -> None:
 
     async with Context():
         with pytest.raises(TimeoutError, match="timeout starting component"):
-            await start_component(StallingComponent(), start_timeout=0.01)
+            await start_component(StallingComponent(), timeout=0.01)

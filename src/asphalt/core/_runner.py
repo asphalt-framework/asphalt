@@ -72,7 +72,7 @@ async def _run_application_async(
             try:
                 await start_component(
                     component,
-                    start_timeout=start_timeout,
+                    timeout=start_timeout,
                 )
             except (get_cancelled_exc_class(), TimeoutError):
                 # This happens when a signal handler cancels the startup or

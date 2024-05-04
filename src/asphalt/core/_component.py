@@ -163,14 +163,14 @@ component_types = PluginContainer("asphalt.components", Component)
 async def start_component(
     component: Component,
     *,
-    start_timeout: float | None = 20,
+    timeout: float | None = 20,
 ) -> None:
     """
     Start a component and its subcomponents.
 
     :param component: the (root) component to start
-    :param start_timeout: seconds to wait for all the components in the hierarchy to
-        start (default: ``20``; set to ``None`` to disable timeout)
+    :param timeout: seconds to wait for all the components in the hierarchy to start
+        (default: ``20``; set to ``None`` to disable timeout)
     :raises RuntimeError: if this function is called without an active :class:`Context`
     :raises TimeoutError: if the startup of the component hierarchy takes more than
         ``start_timeout`` seconds
@@ -185,12 +185,12 @@ async def start_component(
 
     with CancelScope() as startup_scope:
         startup_watcher_scope: CancelScope | None = None
-        if start_timeout is not None:
+        if timeout is not None:
             startup_watcher_scope = await start_service_task(
                 lambda task_status: _component_startup_watcher(
                     startup_scope,
                     component,
-                    start_timeout,
+                    timeout,
                     task_status=task_status,
                 ),
                 "Asphalt component startup watcher task",
