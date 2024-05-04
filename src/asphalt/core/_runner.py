@@ -138,12 +138,20 @@ def run_application(
 
     :param component: the root component (either a component instance or a configuration
         dictionary where the special ``type`` key is a component class
+    :param backend: name of the AnyIO backend (e.g. ``asyncio`` or ``trio``)
+    :param backend_options: options to pass to the AnyIO backend (see the
+        `AnyIO documentation`_ for reference)
     :param max_threads: the maximum number of worker threads in the default thread pool
         executor (the default value depends on the event loop implementation)
     :param logging: a logging configuration dictionary, :ref:`logging level
         <python:levels>` or`None``
     :param start_timeout: seconds to wait for the root component (and its subcomponents)
         to start up before giving up (``None`` = wait forever)
+    :raises SystemExit: if the root component fails to start, or an exception is raised
+        when the application is running
+
+    .. _AnyIO documentation: https://anyio.readthedocs.io/en/stable/basics.html\
+    #backend-specific-options
 
     """
     # Configure the logging system
