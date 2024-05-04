@@ -62,24 +62,25 @@ async def _run_application_async(
             event = Event()
 
             await exit_stack.enter_async_context(Context())
-            with CancelScope() as startup_scope:
-                if platform.system() != "Windows":
-                    await start_service_task(
-                        partial(handle_signals, startup_scope, event),
-                        "Asphalt signal handler",
-                    )
+            if platform.system() != "Windows":
+                startup_scope = exit_stack.enter_context(CancelScope())
+                await start_service_task(
+                    partial(handle_signals, startup_scope, event),
+                    "Asphalt signal handler",
+                )
 
-                try:
-                    await start_component(
-                        component,
-                        start_timeout=start_timeout,
-                        startup_scope=startup_scope,
-                    )
-                except get_cancelled_exc_class():
-                    return 1
-                except BaseException:
-                    logger.exception("Error during application startup")
-                    return 1
+            try:
+                await start_component(
+                    component,
+                    start_timeout=start_timeout,
+                )
+            except (get_cancelled_exc_class(), TimeoutError):
+                # This happens when a signal handler cancels the startup or
+                # start_component() times out
+                return 1
+            except BaseException:
+                logger.exception("Error during application startup")
+                return 1
 
             logger.info("Application started")
 

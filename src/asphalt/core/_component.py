@@ -3,7 +3,6 @@ from __future__ import annotations
 from abc import ABCMeta, abstractmethod
 from collections import OrderedDict
 from collections.abc import Coroutine
-from contextlib import ExitStack
 from dataclasses import dataclass, field
 from logging import getLogger
 from traceback import StackSummary
@@ -165,7 +164,6 @@ async def start_component(
     component: Component,
     *,
     start_timeout: float | None = 20,
-    startup_scope: CancelScope | None = None,
 ) -> None:
     """
     Start a component and its subcomponents.
@@ -173,7 +171,6 @@ async def start_component(
     :param component: the (root) component to start
     :param start_timeout: seconds to wait for all the components in the hierarchy to
         start (default: ``20``; set to ``None`` to disable timeout)
-    :param startup_scope: used only by :func:`run_application`
     :raises RuntimeError: if this function is called without an active :class:`Context`
     :raises TimeoutError: if the startup of the component hierarchy takes more than
         ``start_timeout`` seconds
@@ -186,10 +183,7 @@ async def start_component(
             "start_component() requires an active Asphalt context"
         ) from None
 
-    with ExitStack() as exit_stack:
-        if startup_scope is None:
-            startup_scope = exit_stack.enter_context(CancelScope())
-
+    with CancelScope() as startup_scope:
         startup_watcher_scope: CancelScope | None = None
         if start_timeout is not None:
             startup_watcher_scope = await start_service_task(
@@ -208,7 +202,7 @@ async def start_component(
         if startup_watcher_scope:
             startup_watcher_scope.cancel()
 
-    if startup_scope and startup_scope.cancel_called:
+    if startup_scope.cancel_called:
         raise TimeoutError("timeout starting component")
 
 

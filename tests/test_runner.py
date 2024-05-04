@@ -10,7 +10,7 @@ from unittest.mock import patch
 import anyio
 import pytest
 from _pytest.logging import LogCaptureFixture
-from anyio import to_thread
+from anyio import sleep, to_thread
 from anyio.lowlevel import checkpoint
 
 from asphalt.core import (
@@ -53,9 +53,11 @@ class CrashComponent(Component):
 
     async def start(self) -> None:
         if self.method == "keyboard":
-            raise KeyboardInterrupt
+            signal.raise_signal(signal.SIGINT)
+            await sleep(3)
         elif self.method == "sigterm":
             signal.raise_signal(signal.SIGTERM)
+            await sleep(3)
         elif self.method == "exception":
             raise RuntimeError("this should crash the application")
 
@@ -197,14 +199,41 @@ def test_clean_exit(
         assert records[3].message == expected_stop_message
 
 
-def test_start_exception(caplog: LogCaptureFixture, anyio_backend_name: str) -> None:
+@pytest.mark.parametrize(
+    "method, expected_stop_message",
+    [
+        pytest.param(
+            "exception",
+            "Error during application startup",
+            id="exception",
+        ),
+        pytest.param(
+            "keyboard",
+            "Received signal (Interrupt) – terminating application",
+            id="keyboard",
+            marks=[windows_signal_mark],
+        ),
+        pytest.param(
+            "sigterm",
+            "Received signal (Terminated) – terminating application",
+            id="sigterm",
+            marks=[windows_signal_mark],
+        ),
+    ],
+)
+def test_start_exception(
+    caplog: LogCaptureFixture,
+    anyio_backend_name: str,
+    method: str,
+    expected_stop_message: str,
+) -> None:
     """
     Test that an exception caught during the application initialization is put into the
     application context and made available to teardown callbacks.
 
     """
     caplog.set_level(logging.INFO)
-    component = CrashComponent(method="exception")
+    component = CrashComponent(method=method)
     with pytest.raises(SystemExit) as exc_info:
         run_application(component, backend=anyio_backend_name)
 
@@ -215,7 +244,7 @@ def test_start_exception(caplog: LogCaptureFixture, anyio_backend_name: str) -> 
     assert len(records) == 4
     assert records[0].message == "Running in development mode"
     assert records[1].message == "Starting application"
-    assert records[2].message == "Error during application startup"
+    assert records[2].message == expected_stop_message
     assert records[3].message == "Application stopped"
 
 
