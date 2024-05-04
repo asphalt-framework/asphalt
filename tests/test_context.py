@@ -444,7 +444,7 @@ class TestContextTeardown:
 
         class SomeComponent:
             @context_teardown
-            async def start(self, ctx: Context) -> AsyncGenerator[None, Any]:
+            async def start(self) -> AsyncGenerator[None, Any]:
                 nonlocal phase, received_exception
                 phase = "started"
                 exc = yield
@@ -452,8 +452,8 @@ class TestContextTeardown:
                 received_exception = exc
 
         with ExitStack() as exit_stack:
-            async with Context() as context:
-                await SomeComponent().start(context)
+            async with Context():
+                await SomeComponent().start()
                 assert phase == "started"
                 if expected_exc:
                     exit_stack.enter_context(pytest.raises(ExceptionGroup))

@@ -2,10 +2,25 @@ from __future__ import annotations
 
 from abc import ABCMeta, abstractmethod
 from collections import OrderedDict
+from collections.abc import Coroutine
+from dataclasses import dataclass, field
+from logging import getLogger
+from traceback import StackSummary
+from types import FrameType
 from typing import Any
 
-from anyio import create_task_group
+from anyio import (
+    CancelScope,
+    create_task_group,
+    get_current_task,
+    get_running_tasks,
+    sleep,
+)
+from anyio.abc import TaskStatus
 
+from ._concurrent import start_service_task
+from ._context import current_context
+from ._exceptions import NoCurrentContext
 from ._utils import PluginContainer, merge_config, qualified_name
 
 
@@ -28,6 +43,10 @@ class Component(metaclass=ABCMeta):
         It is advisable for Components to first add all the resources they can to the
         context before requesting any from it. This will speed up the dependency
         resolution and prevent deadlocks.
+
+        .. warning:: It's unadvisable to call this method directly (in case you're doing
+            it in a test suite). Instead, call :func:`start_component`, as it comes with
+            extra safeguards.
         """
 
 
@@ -139,3 +158,155 @@ class CLIApplicationComponent(ContainerComponent):
 
 
 component_types = PluginContainer("asphalt.components", Component)
+
+
+async def start_component(
+    component: Component,
+    *,
+    timeout: float | None = 20,
+) -> None:
+    """
+    Start a component and its subcomponents.
+
+    :param component: the (root) component to start
+    :param timeout: seconds to wait for all the components in the hierarchy to start
+        (default: ``20``; set to ``None`` to disable timeout)
+    :raises RuntimeError: if this function is called without an active :class:`Context`
+    :raises TimeoutError: if the startup of the component hierarchy takes more than
+        ``timeout`` seconds
+
+    """
+    try:
+        current_context()
+    except NoCurrentContext:
+        raise RuntimeError(
+            "start_component() requires an active Asphalt context"
+        ) from None
+
+    with CancelScope() as startup_scope:
+        startup_watcher_scope: CancelScope | None = None
+        if timeout is not None:
+            startup_watcher_scope = await start_service_task(
+                lambda task_status: _component_startup_watcher(
+                    startup_scope,
+                    component,
+                    timeout,
+                    task_status=task_status,
+                ),
+                "Asphalt component startup watcher task",
+            )
+
+        await component.start()
+
+        # Cancel the startup timeout, if any
+        if startup_watcher_scope:
+            startup_watcher_scope.cancel()
+
+    if startup_scope.cancel_called:
+        raise TimeoutError("timeout starting component")
+
+
+async def _component_startup_watcher(
+    startup_cancel_scope: CancelScope,
+    root_component: Component,
+    start_timeout: float,
+    *,
+    task_status: TaskStatus[CancelScope],
+) -> None:
+    def get_coro_stack_summary(coro: Any) -> StackSummary:
+        import gc
+
+        frames: list[FrameType] = []
+        while isinstance(coro, Coroutine):
+            while coro.__class__.__name__ == "async_generator_asend":
+                # Hack to get past asend() objects
+                coro = gc.get_referents(coro)[0].ag_await
+
+            if frame := getattr(coro, "cr_frame", None):
+                frames.append(frame)
+
+            coro = getattr(coro, "cr_await", None)
+
+        frame_tuples = [(f, f.f_lineno) for f in frames]
+        return StackSummary.extract(frame_tuples)
+
+    current_task = get_current_task()
+    parent_task = next(
+        task_info
+        for task_info in get_running_tasks()
+        if task_info.id == current_task.parent_id
+    )
+
+    with CancelScope() as cancel_scope:
+        task_status.started(cancel_scope)
+        await sleep(start_timeout)
+
+    if cancel_scope.cancel_called:
+        return
+
+    @dataclass
+    class ComponentStatus:
+        name: str
+        alias: str | None
+        parent_task_id: int | None
+        traceback: list[str] = field(init=False, default_factory=list)
+        children: list[ComponentStatus] = field(init=False, default_factory=list)
+
+    import re
+    import textwrap
+
+    component_task_re = re.compile(r"^Starting (\S+) \((.+)\)$")
+    component_statuses: dict[int, ComponentStatus] = {}
+    for task in get_running_tasks():
+        if task.id == parent_task.id:
+            status = ComponentStatus(qualified_name(root_component), None, None)
+        elif task.name and (match := component_task_re.match(task.name)):
+            name: str
+            alias: str
+            name, alias = match.groups()
+            status = ComponentStatus(name, alias, task.parent_id)
+        else:
+            continue
+
+        status.traceback = get_coro_stack_summary(task.coro).format()
+        component_statuses[task.id] = status
+
+    root_status: ComponentStatus
+    for task_id, component_status in component_statuses.items():
+        if component_status.parent_task_id is None:
+            root_status = component_status
+        elif parent_status := component_statuses.get(component_status.parent_task_id):
+            parent_status.children.append(component_status)
+            if parent_status.alias:
+                component_status.alias = (
+                    f"{parent_status.alias}.{component_status.alias}"
+                )
+
+    def format_status(status_: ComponentStatus, level: int) -> str:
+        title = f"{status_.alias or 'root'} ({status_.name})"
+        if status_.children:
+            children_output = ""
+            for i, child in enumerate(status_.children):
+                prefix = "| " if i < (len(status_.children) - 1) else "  "
+                children_output += "+-" + textwrap.indent(
+                    format_status(child, level + 1),
+                    prefix,
+                    lambda line: line[0] in " +|",
+                )
+
+            output = title + "\n" + children_output
+        else:
+            formatted_traceback = "".join(status_.traceback)
+            if level == 0:
+                formatted_traceback = textwrap.indent(formatted_traceback, "| ")
+
+            output = title + "\n" + formatted_traceback
+
+        return output
+
+    getLogger(__name__).error(
+        "Timeout waiting for the root component to start\n"
+        "Components still waiting to finish startup:\n%s",
+        textwrap.indent(format_status(root_status, 0).rstrip(), "  "),
+    )
+    startup_cancel_scope.cancel()

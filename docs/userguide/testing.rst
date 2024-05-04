@@ -6,10 +6,9 @@ Testing Asphalt components
 Testing Asphalt components and component hierarchies is a relatively simple procedure:
 
 #. Create an instance of your :class:`~Component`
-#. Create a :class:`~Context` instance
-#. Run the component's :meth:`~Component.start` method with the context as the argument
-#. Run the tests
-#. Close the context to release any resources
+#. Create a :class:`~Context` and enter it with ``async with ...``
+#. Run :func:`start_component` with the component instance as the argument
+#. Run the test code itself
 
 With Asphalt projects, it is recommended to use the pytest_ testing framework because it
 is already being used with Asphalt core and it provides easy testing of asynchronous
