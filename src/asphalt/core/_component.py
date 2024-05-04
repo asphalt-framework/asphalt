@@ -61,7 +61,7 @@ class ContainerComponent(Component):
     :vartype component_configs: Dict[str, Optional[Dict[str, Any]]]
     """
 
-    started = False
+    _component_started = False
 
     def __init__(
         self, components: dict[str, dict[str, Any] | None] | None = None
@@ -94,7 +94,7 @@ class ContainerComponent(Component):
         :param config: keyword arguments passed to the component's constructor
 
         """
-        if self.started:
+        if self._component_started:
             raise RuntimeError(
                 "child components cannot be added once the component has been started"
             )
@@ -155,7 +155,7 @@ async def _start_component(component: Component) -> None:
             if alias not in component.child_components:
                 component.add_component(alias)
 
-        component.started = True
+        component._component_started = True
         async with create_task_group() as tg:
             for alias, child_component in component.child_components.items():
                 tg.start_soon(
