@@ -175,6 +175,8 @@ async def start_component(
         start (default: ``20``; set to ``None`` to disable timeout)
     :param startup_scope: used only by :func:`run_application`
     :raises RuntimeError: if this function is called without an active :class:`Context`
+    :raises TimeoutError: if the startup of the component hierarchy takes more than
+        ``start_timeout`` seconds
 
     """
     try:
@@ -205,6 +207,9 @@ async def start_component(
         # Cancel the startup timeout, if any
         if startup_watcher_scope:
             startup_watcher_scope.cancel()
+
+    if startup_scope and startup_scope.cancel_called:
+        raise TimeoutError("timeout starting component")
 
 
 async def _component_startup_watcher(
