@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from abc import ABCMeta, abstractmethod
-from collections import OrderedDict
 from collections.abc import Coroutine
 from dataclasses import dataclass, field
 from logging import getLogger
@@ -26,8 +25,6 @@ from ._utils import PluginContainer, merge_config, qualified_name
 
 class Component(metaclass=ABCMeta):
     """This is the base class for all Asphalt components."""
-
-    __slots__ = ()
 
     @abstractmethod
     async def start(self) -> None:
@@ -64,12 +61,12 @@ class ContainerComponent(Component):
     :vartype component_configs: Dict[str, Optional[Dict[str, Any]]]
     """
 
-    __slots__ = "child_components", "component_configs"
+    started = False
 
     def __init__(
         self, components: dict[str, dict[str, Any] | None] | None = None
     ) -> None:
-        self.child_components: OrderedDict[str, Component] = OrderedDict()
+        self.child_components: dict[str, Component] = {}
         self.component_configs = components or {}
 
     def add_component(
@@ -97,8 +94,14 @@ class ContainerComponent(Component):
         :param config: keyword arguments passed to the component's constructor
 
         """
+        if self.started:
+            raise RuntimeError(
+                "child components cannot be added once the component has been started"
+            )
+
         if not isinstance(alias, str) or not alias:
             raise TypeError("component_alias must be a nonempty string")
+
         if alias in self.child_components:
             raise ValueError(f'there is already a child component named "{alias}"')
 
@@ -112,22 +115,7 @@ class ContainerComponent(Component):
         self.child_components[alias] = component
 
     async def start(self) -> None:
-        """
-        Create child components that have been configured but not yet created and then
-        calls their :meth:`~Component.start` methods in separate tasks and waits until
-        they have completed.
-
-        """
-        for alias in self.component_configs:
-            if alias not in self.child_components:
-                self.add_component(alias)
-
-        async with create_task_group() as tg:
-            for alias, component in self.child_components.items():
-                tg.start_soon(
-                    component.start,
-                    name=f"Starting {qualified_name(component)} ({alias})",
-                )
+        pass
 
 
 class CLIApplicationComponent(ContainerComponent):
@@ -160,11 +148,26 @@ class CLIApplicationComponent(ContainerComponent):
 component_types = PluginContainer("asphalt.components", Component)
 
 
-async def start_component(
-    component: Component,
-    *,
-    timeout: float | None = 20,
-) -> None:
+async def _start_component(component: Component) -> None:
+    if isinstance(component, ContainerComponent):
+        # Prevent the add_component() method from adding any more child components
+        for alias in component.component_configs:
+            if alias not in component.child_components:
+                component.add_component(alias)
+
+        component.started = True
+        async with create_task_group() as tg:
+            for alias, child_component in component.child_components.items():
+                tg.start_soon(
+                    _start_component,
+                    child_component,
+                    name=f"Starting {qualified_name(child_component)} ({alias})",
+                )
+
+    await component.start()
+
+
+async def start_component(component: Component, *, timeout: float | None = 20) -> None:
     """
     Start a component and its subcomponents.
 
@@ -196,14 +199,14 @@ async def start_component(
                 "Asphalt component startup watcher task",
             )
 
-        await component.start()
-
-        # Cancel the startup timeout, if any
-        if startup_watcher_scope:
-            startup_watcher_scope.cancel()
+        await _start_component(component)
 
     if startup_scope.cancel_called:
         raise TimeoutError("timeout starting component")
+
+    # Cancel the startup timeout, if any
+    if startup_watcher_scope:
+        startup_watcher_scope.cancel()
 
 
 async def _component_startup_watcher(

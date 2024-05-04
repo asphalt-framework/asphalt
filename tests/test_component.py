@@ -117,6 +117,15 @@ class TestContainerComponent:
         dummy = cast(DummyComponent, container.child_components["dummy"])
         assert dummy.started
 
+    async def test_add_component_during_start(self) -> None:
+        class BadContainerComponent(ContainerComponent):
+            async def start(self) -> None:
+                self.add_component("foo", ContainerComponent)
+
+        async with Context():
+            with pytest.raises(RuntimeError, match="child components cannot be added"):
+                await start_component(BadContainerComponent())
+
 
 class TestCLIApplicationComponent:
     def test_run_return_none(self, anyio_backend_name: str) -> None:

@@ -256,16 +256,14 @@ def test_start_timeout(
         def __init__(self, level: int):
             super().__init__()
             self.level = level
+            if self.level < levels:
+                self.add_component("child1", StallingComponent, level=self.level + 1)
+                self.add_component("child2", StallingComponent, level=self.level + 1)
 
         async def start(self) -> None:
             if self.level == levels:
                 # Wait forever for a non-existent resource
                 await get_resource(float, wait=True)
-            else:
-                self.add_component("child1", StallingComponent, level=self.level + 1)
-                self.add_component("child2", StallingComponent, level=self.level + 1)
-
-            await super().start()
 
     caplog.set_level(logging.INFO)
     component = StallingComponent(1)

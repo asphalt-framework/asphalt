@@ -15,14 +15,16 @@ logger = logging.getLogger(__name__)
 
 
 class ApplicationComponent(CLIApplicationComponent):
-    async def start(self) -> None:
+    def __init__(
+        self, components: dict[str, dict[str, Any] | None] | None = None
+    ) -> None:
+        super().__init__(components)
         self.add_component(
             "mailer",
             backend="smtp",
             host="your.smtp.server.here",
             message_defaults={"sender": "your@email.here", "to": "your@email.here"},
         )
-        await super().start()
 
     @inject
     async def run(self, *, mailer: Mailer = resource()) -> None:

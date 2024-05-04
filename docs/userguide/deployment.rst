@@ -53,11 +53,8 @@ Suppose you had the following component class as your root component::
         def __init__(self, components, data_directory: str):
             super().__init__(components)
             self.data_directory = data_directory
-
-        async def start() -> None:
             self.add_component('mailer', backend='smtp')
             self.add_component('sqlalchemy')
-            await super().start()
 
 You could then write a configuration file like this::
 
