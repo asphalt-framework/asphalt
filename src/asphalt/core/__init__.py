@@ -9,7 +9,6 @@ from ._concurrent import TaskHandle as TaskHandle
 from ._concurrent import start_background_task_factory as start_background_task_factory
 from ._concurrent import start_service_task as start_service_task
 from ._context import Context as Context
-from ._context import GeneratedResource as GeneratedResource
 from ._context import ResourceEvent as ResourceEvent
 from ._context import add_resource as add_resource
 from ._context import add_resource_factory as add_resource_factory
