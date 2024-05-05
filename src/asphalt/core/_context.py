@@ -421,16 +421,6 @@ class Context:
                 )
 
             origin = get_origin(return_type_hint)
-            if origin is GeneratedResource:
-                args = get_args(return_type_hint)
-                if len(args) != 1:
-                    raise ValueError(
-                        f"GeneratedResource must specify exactly one parameter, got "
-                        f"{len(args)}"
-                    )
-
-                return_type_hint = args[0]
-
             if origin is Union or (
                 sys.version_info >= (3, 10) and origin is stdlib_types.UnionType
             ):
@@ -509,19 +499,12 @@ class Context:
             if key in ctx._resource_factories:
                 # Call the factory callback to generate the resource
                 factory = ctx._resource_factories[key]
-                retval = factory.value_or_factory()
+                resource = factory.value_or_factory()
 
                 # Raise AsyncResourceError if the factory returns a coroutine object
-                if iscoroutine(retval):
-                    retval.close()
+                if iscoroutine(resource):
+                    resource.close()
                     raise AsyncResourceError()
-
-                if isinstance(retval, GeneratedResource):
-                    resource = retval.resource
-                    if retval.teardown_callback is not None:
-                        self.add_teardown_callback(retval.teardown_callback)
-                else:
-                    resource = retval
 
                 # Store the generated resource in the context
                 container = ResourceContainer(
@@ -606,16 +589,9 @@ class Context:
         for ctx in self.context_chain:
             if key in ctx._resource_factories:
                 factory = ctx._resource_factories[key]
-                retval = factory.value_or_factory()
-                if isawaitable(retval):
-                    retval = await retval
-
-                if isinstance(retval, GeneratedResource):
-                    resource = retval.resource
-                    if retval.teardown_callback is not None:
-                        self.add_teardown_callback(retval.teardown_callback)
-                else:
-                    resource = retval
+                resource = factory.value_or_factory()
+                if isawaitable(resource):
+                    resource = await resource
 
                 container = ResourceContainer(
                     resource, factory.types, factory.name, factory.description, False
