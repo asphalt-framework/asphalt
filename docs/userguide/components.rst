@@ -28,19 +28,17 @@ In order to speed up the startup process and to prevent any deadlocks, component
 try to add any resources as soon as possible before requesting any. If two or more
 components end up waiting on each others' resources, the application will fail to start.
 
-Container components
---------------------
+Component hierarchies
+---------------------
 
-A *container component* is component that can contain other Asphalt components.
-The root component of virtually any nontrivial Asphalt application is a container
-component. Container components can of course contain other container components and so
-on.
-
-When the container component starts its child components, each :meth:`Component.start`
-call is launched in its own task. Therefore all the child components start concurrently
-and cannot rely on the start order. This is by design. The only way components should be
-relying on each other is by the sharing of resources in the context. If a component
-needs a resource from its "sibling" component, it should pass the ``wait=True`` option
-to :func:`get_resource` in order to block until that resource becomes available. Note,
-however, that if that resource is never added by any component in the context, the
-application start-up will time out.
+Any Asphalt component can have *child components* added to it. When a component is
+started by :func:`start_component`, its child components are started first, and only
+then is the parent component itself started. The idea is that child components provide
+services that either the parent component, or another child component, require to
+provide their own services and/or resources call is launched in its own task. Therefore
+all the child components start concurrently and cannot rely on the start order. This is
+by design. The only way components should be relying on each other is by the sharing of
+resources in the context. If a component needs a resource from its "sibling" component,
+it should pass the ``wait=True`` option to :func:`get_resource` in order to block until
+that resource becomes available. Note, however, that if that resource is never added by
+any component in the context, the application start-up will time out.

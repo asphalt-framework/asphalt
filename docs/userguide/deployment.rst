@@ -49,7 +49,7 @@ A production-ready configuration file should contain at least the following opti
 
 Suppose you had the following component class as your root component::
 
-    class MyRootComponent(ContainerComponent):
+    class MyRootComponent(Component):
         def __init__(self, components, data_directory: str):
             super().__init__(components)
             self.data_directory = data_directory
@@ -62,13 +62,16 @@ You could then write a configuration file like this::
     max_threads: 20
     component:
       type: !!python/name:myproject.MyRootComponent
-      data_directory: /some/file/somewhere
+      config:
+        data_directory: /some/file/somewhere
       components:
         mailer:
-          host: smtp.mycompany.com
-          ssl: true
+          config:
+            host: smtp.mycompany.com
+            ssl: true
         sqlalchemy:
-          url: postgresql:///mydatabase
+          config:
+            url: postgresql:///mydatabase
 
     logging:
       version: 1
@@ -148,7 +151,7 @@ Configuration overlays
 
 Component configuration can be specified on several levels:
 
-* Hard-coded arguments to :meth:`ContainerComponent.add_component`
+* Hard-coded arguments to :meth:`Component.add_component`
 * First configuration file argument to ``asphalt run``
 * Second configuration file argument to ``asphalt run``
 * ...

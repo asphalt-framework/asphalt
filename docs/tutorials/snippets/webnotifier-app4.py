@@ -15,10 +15,7 @@ logger = logging.getLogger(__name__)
 
 
 class ApplicationComponent(CLIApplicationComponent):
-    def __init__(
-        self, components: dict[str, dict[str, Any] | None] | None = None
-    ) -> None:
-        super().__init__(components)
+    def __init__(self) -> None:
         self.add_component(
             "mailer",
             backend="smtp",

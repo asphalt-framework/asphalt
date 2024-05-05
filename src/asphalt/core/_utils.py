@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import sys
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from functools import partial
 from importlib import import_module
 from inspect import isclass
@@ -73,7 +73,7 @@ def callable_name(func: Callable[..., Any]) -> str:
 
 
 def merge_config(
-    original: dict[str, Any] | None, overrides: dict[str, Any] | None
+    original: Mapping[str, Any] | None, overrides: Mapping[str, Any] | None
 ) -> dict[str, Any]:
     """
     Return a copy of the ``original`` configuration dictionary, with overrides from
@@ -96,7 +96,7 @@ def merge_config(
         loggers).
 
     """
-    copied = original.copy() if original else {}
+    copied = dict(original) if original else {}
     if overrides:
         for key, value in overrides.items():
             orig_value = copied.get(key)

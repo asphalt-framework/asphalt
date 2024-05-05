@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import logging
 from difflib import HtmlDiff
-from typing import Any
 
 from asphalt.core import CLIApplicationComponent, inject, resource
 from asphalt.mailer import Mailer
@@ -16,12 +15,9 @@ logger = logging.getLogger(__name__)
 
 
 class ApplicationComponent(CLIApplicationComponent):
-    def __init__(
-        self, components: dict[str, dict[str, Any] | None] | None = None
-    ) -> None:
+    def __init__(self) -> None:
         self.add_component("detector", ChangeDetectorComponent)
         self.add_component("mailer", backend="smtp")
-        super().__init__(components)
 
     @inject
     async def run(

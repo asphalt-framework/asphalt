@@ -16,7 +16,6 @@ from anyio.lowlevel import checkpoint
 from asphalt.core import (
     CLIApplicationComponent,
     Component,
-    ContainerComponent,
     add_teardown_callback,
     get_resource,
     run_application,
@@ -252,7 +251,7 @@ def test_start_exception(
 def test_start_timeout(
     caplog: LogCaptureFixture, anyio_backend_name: str, levels: int
 ) -> None:
-    class StallingComponent(ContainerComponent):
+    class StallingComponent(Component):
         def __init__(self, level: int):
             super().__init__()
             self.level = level
