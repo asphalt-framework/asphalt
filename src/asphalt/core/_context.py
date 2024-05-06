@@ -940,8 +940,7 @@ def inject(func: Callable[P, Any]) -> Callable[P, Any]:
         del local_names
         forward_refs_resolved = True
 
-    @wraps(func)
-    def sync_wrapper(*args: P.args, **kwargs: P.kwargs) -> Any:
+    def resolve_resources() -> dict[str, Any]:
         if not forward_refs_resolved:
             resolve_forward_refs()
 
@@ -957,26 +956,35 @@ def inject(func: Callable[P, Any]) -> Callable[P, Any]:
                     dependency.cls, dependency.name
                 )
 
-        return func(*args, **kwargs, **resources)
+        return resources
+
+    @wraps(func)
+    def sync_wrapper(*args: P.args, **kwargs: P.kwargs) -> Any:
+        __tracebackhide__ = True
+        return func(*args, **kwargs, **resolve_resources())
+
+    async def resolve_resources_async() -> dict[str, Any]:
+        if not forward_refs_resolved:
+            resolve_forward_refs()
+
+        ctx = current_context()
+        resources: dict[str, Any] = {}
+        for argname, dependency in injected_resources.items():
+            if dependency.optional:
+                resources[argname] = await ctx.get_resource(
+                    dependency.cls, dependency.name, optional=True
+                )
+            else:
+                resources[argname] = await ctx.get_resource(
+                    dependency.cls, dependency.name
+                )
+
+        return resources
 
     @wraps(func)
     async def async_wrapper(*args: P.args, **kwargs: P.kwargs) -> Any:
-        if not forward_refs_resolved:
-            resolve_forward_refs()
-
-        ctx = current_context()
-        resources: dict[str, Any] = {}
-        for argname, dependency in injected_resources.items():
-            if dependency.optional:
-                resources[argname] = await ctx.get_resource(
-                    dependency.cls, dependency.name, optional=True
-                )
-            else:
-                resources[argname] = await ctx.get_resource(
-                    dependency.cls, dependency.name
-                )
-
-        return await func(*args, **kwargs, **resources)
+        __tracebackhide__ = True
+        return await func(*args, **kwargs, **await resolve_resources_async())
 
     sig = signature(func)
     injected_resources: dict[str, _Dependency] = {}
