@@ -421,16 +421,6 @@ class Context:
                 )
 
             origin = get_origin(return_type_hint)
-            if origin is GeneratedResource:
-                args = get_args(return_type_hint)
-                if len(args) != 1:
-                    raise ValueError(
-                        f"GeneratedResource must specify exactly one parameter, got "
-                        f"{len(args)}"
-                    )
-
-                return_type_hint = args[0]
-
             if origin is Union or (
                 sys.version_info >= (3, 10) and origin is stdlib_types.UnionType
             ):
@@ -509,19 +499,12 @@ class Context:
             if key in ctx._resource_factories:
                 # Call the factory callback to generate the resource
                 factory = ctx._resource_factories[key]
-                retval = factory.value_or_factory()
+                resource = factory.value_or_factory()
 
                 # Raise AsyncResourceError if the factory returns a coroutine object
-                if iscoroutine(retval):
-                    retval.close()
+                if iscoroutine(resource):
+                    resource.close()
                     raise AsyncResourceError()
-
-                if isinstance(retval, GeneratedResource):
-                    resource = retval.resource
-                    if retval.teardown_callback is not None:
-                        self.add_teardown_callback(retval.teardown_callback)
-                else:
-                    resource = retval
 
                 # Store the generated resource in the context
                 container = ResourceContainer(
@@ -606,16 +589,9 @@ class Context:
         for ctx in self.context_chain:
             if key in ctx._resource_factories:
                 factory = ctx._resource_factories[key]
-                retval = factory.value_or_factory()
-                if isawaitable(retval):
-                    retval = await retval
-
-                if isinstance(retval, GeneratedResource):
-                    resource = retval.resource
-                    if retval.teardown_callback is not None:
-                        self.add_teardown_callback(retval.teardown_callback)
-                else:
-                    resource = retval
+                resource = factory.value_or_factory()
+                if isawaitable(resource):
+                    resource = await resource
 
                 container = ResourceContainer(
                     resource, factory.types, factory.name, factory.description, False
@@ -964,8 +940,7 @@ def inject(func: Callable[P, Any]) -> Callable[P, Any]:
         del local_names
         forward_refs_resolved = True
 
-    @wraps(func)
-    def sync_wrapper(*args: P.args, **kwargs: P.kwargs) -> Any:
+    def resolve_resources() -> dict[str, Any]:
         if not forward_refs_resolved:
             resolve_forward_refs()
 
@@ -981,26 +956,35 @@ def inject(func: Callable[P, Any]) -> Callable[P, Any]:
                     dependency.cls, dependency.name
                 )
 
-        return func(*args, **kwargs, **resources)
+        return resources
+
+    @wraps(func)
+    def sync_wrapper(*args: P.args, **kwargs: P.kwargs) -> Any:
+        __tracebackhide__ = True
+        return func(*args, **kwargs, **resolve_resources())
+
+    async def resolve_resources_async() -> dict[str, Any]:
+        if not forward_refs_resolved:
+            resolve_forward_refs()
+
+        ctx = current_context()
+        resources: dict[str, Any] = {}
+        for argname, dependency in injected_resources.items():
+            if dependency.optional:
+                resources[argname] = await ctx.get_resource(
+                    dependency.cls, dependency.name, optional=True
+                )
+            else:
+                resources[argname] = await ctx.get_resource(
+                    dependency.cls, dependency.name
+                )
+
+        return resources
 
     @wraps(func)
     async def async_wrapper(*args: P.args, **kwargs: P.kwargs) -> Any:
-        if not forward_refs_resolved:
-            resolve_forward_refs()
-
-        ctx = current_context()
-        resources: dict[str, Any] = {}
-        for argname, dependency in injected_resources.items():
-            if dependency.optional:
-                resources[argname] = await ctx.get_resource(
-                    dependency.cls, dependency.name, optional=True
-                )
-            else:
-                resources[argname] = await ctx.get_resource(
-                    dependency.cls, dependency.name
-                )
-
-        return await func(*args, **kwargs, **resources)
+        __tracebackhide__ = True
+        return await func(*args, **kwargs, **await resolve_resources_async())
 
     sig = signature(func)
     injected_resources: dict[str, _Dependency] = {}
