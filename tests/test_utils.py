@@ -9,7 +9,13 @@ from unittest.mock import Mock
 
 import pytest
 
-from asphalt.core import PluginContainer, callable_name, merge_config, qualified_name
+from asphalt.core import (
+    PluginContainer,
+    callable_name,
+    merge_config,
+    qualified_name,
+    resolve_reference,
+)
 
 if sys.version_info >= (3, 10):
     from importlib.metadata import EntryPoint
@@ -24,6 +30,39 @@ class BaseDummyPlugin:
 class DummyPlugin(BaseDummyPlugin):
     def __init__(self, **kwargs: Any) -> None:
         self.kwargs = kwargs
+
+
+@pytest.mark.parametrize(
+    "inputval",
+    ["asphalt.core:resolve_reference", resolve_reference],
+    ids=["reference", "object"],
+)
+def test_resolve_reference(inputval: Any) -> None:
+    assert resolve_reference(inputval) is resolve_reference
+
+
+@pytest.mark.parametrize(
+    "inputval, error_type, error_text",
+    [
+        pytest.param(
+            "x.y:foo",
+            LookupError,
+            "error resolving reference x.y:foo: could not import module",
+            id="module_not_found",
+        ),
+        pytest.param(
+            "asphalt.core:foo",
+            LookupError,
+            "error resolving reference asphalt.core:foo: error looking up object",
+            id="object_not_found",
+        ),
+    ],
+)
+def test_resolve_reference_error(
+    inputval: str, error_type: type[Exception], error_text: str
+) -> None:
+    exc = pytest.raises(error_type, resolve_reference, inputval)
+    assert str(exc.value) == error_text
 
 
 def test_merge_config() -> None:
@@ -85,6 +124,7 @@ class TestPluginContainer:
         "inputvalue",
         [
             pytest.param("dummy", id="entrypoint"),
+            pytest.param(f"{__name__}:DummyPlugin", id="reference"),
             pytest.param(DummyPlugin, id="arbitrary_object"),
         ],
     )
