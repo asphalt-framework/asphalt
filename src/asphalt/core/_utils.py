@@ -151,9 +151,9 @@ class PluginContainer:
         """
         if not isinstance(obj, str):
             return obj
-        if ":" in obj:
+        elif ":" in obj:
             return resolve_reference(obj)
-        if obj in self._resolved:
+        elif obj in self._resolved:
             return self._resolved[obj]
 
         value = self._entrypoints.get(obj)
