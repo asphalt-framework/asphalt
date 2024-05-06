@@ -93,21 +93,31 @@ class TestComplexComponent:
     @pytest.mark.parametrize(
         "alias, cls, exc_cls, message",
         [
-            ("", None, TypeError, "alias must be a nonempty string"),
-            (
+            pytest.param(
+                "", None, TypeError, "alias must be a nonempty string", id="empty_alias"
+            ),
+            pytest.param(
                 "foo",
                 None,
                 LookupError,
                 "no such entry point in asphalt.components: foo",
+                id="bogus_entry_point",
             ),
-            (
+            pytest.param(
                 "foo",
                 int,
                 TypeError,
                 "int is not a subclass of asphalt.core.Component",
+                id="wrong_subclass",
+            ),
+            pytest.param(
+                "foo",
+                4,
+                TypeError,
+                "type must be either a subclass of asphalt.core.Component or a string",
+                id="invalid_type",
             ),
         ],
-        ids=["empty_alias", "bogus_entry_point", "wrong_subclass"],
     )
     def test_add_component_errors(
         self,
