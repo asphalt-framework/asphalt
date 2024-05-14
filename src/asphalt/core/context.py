@@ -130,9 +130,9 @@ class ResourceContainer:
     def __repr__(self) -> str:
         typenames = ", ".join(qualified_name(cls) for cls in self.types)
         value_repr = (
-            "factory=%s" % callable_name(self.value_or_factory)
+            f"factory={callable_name(self.value_or_factory)}"
             if self.is_factory
-            else "value=%r" % self.value_or_factory
+            else f"value={self.value_or_factory!r}"
         )
         return (
             f"{self.__class__.__name__}({value_repr}, types=[{typenames}], name={self.name!r}, "

@@ -567,8 +567,8 @@ class TestExecutor:
                 await runs_in_default_worker()
 
         exc.match(
-            r"the first positional argument to %s\(\) has to be a Context instance"
-            % callable_name(runs_in_default_worker)
+            rf"the first positional argument to "
+            rf"{callable_name(runs_in_default_worker)}\(\) has to be a Context instance"
         )
 
 
@@ -640,8 +640,8 @@ class TestContextTeardown:
             await start(None)
 
         exc.match(
-            r"the first positional argument to %s\(\) has to be a Context instance"
-            % callable_name(start)
+            rf"the first positional argument to {callable_name(start)}\(\) has to be a "
+            rf"Context instance"
         )
 
     @pytest.mark.asyncio
