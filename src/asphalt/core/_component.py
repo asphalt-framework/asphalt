@@ -36,9 +36,11 @@ class Component(metaclass=ABCMeta):
         """
         Add a child component.
 
-        This will instantiate a component class, as specified by the ``type`` argument.
+        This will store the type and configuration options of the named child component,
+        to be later instantiated by :func:`start_component`.
 
-        If the second argument is omitted, the value of ``alias`` is used as its value.
+        If the ``type`` argument is omitted, then the value of the ``alias`` argument is
+        used to derive the type.
 
         The locally given configuration can be overridden by component configuration
         parameters supplied to the constructor (via the ``components`` argument).
@@ -93,7 +95,7 @@ class Component(metaclass=ABCMeta):
         """
         Perform any necessary initialization before starting the component.
 
-        This method is called by :func:`start_component` before starting the child
+        This method is called by :func:`start_component` *before* starting the child
         components of this component, so it can be used to add any resources required
         by the child components.
         """
@@ -102,18 +104,12 @@ class Component(metaclass=ABCMeta):
         """
         Perform any necessary tasks to start the services provided by this component.
 
-        In this method, components typically use the context to:
-          * add resources and/or resource factories to it
-            (:func:`add_resource` and :func:`add_resource_factory`)
-          * get resources from it asynchronously
-            (:func:`get_resource`)
+        This method is called by :func:`start_component` *after* the child components of
+        this component have been started, so any resources provided by the child
+        components are available at this point.
 
-        It is advisable for Components to first add all the resources they can to the
-        context before requesting any from it. This will speed up the dependency
-        resolution and prevent deadlocks.
-
-        .. warning:: You should never need to call this method directly, as doing so
-            will only initialize the component itself, and not any child components.
+        .. warning:: Do not call this method directly; use :func:`start_component`
+            instead.
         """
 
 
