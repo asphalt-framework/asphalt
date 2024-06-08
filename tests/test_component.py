@@ -14,6 +14,8 @@ from asphalt.core import (
     CLIApplicationComponent,
     Component,
     Context,
+    add_resource,
+    get_resource_nowait,
     run_application,
     start_component,
 )
@@ -216,3 +218,24 @@ async def test_start_component_timeout() -> None:
     async with Context():
         with pytest.raises(TimeoutError, match="timeout starting component"):
             await start_component(StallingComponent(), timeout=0.01)
+
+
+async def test_prepare() -> None:
+    class ParentComponent(Component):
+        def __init__(self) -> None:
+            self.add_component("child", ChildComponent)
+
+        async def prepare(self) -> None:
+            add_resource("foo")
+
+        async def start(self) -> None:
+            get_resource_nowait(str, "bar")
+
+    class ChildComponent(Component):
+        async def start(self) -> None:
+            foo = get_resource_nowait(str)
+            add_resource(foo + "bar", "bar")
+
+    async with Context():
+        await start_component(ParentComponent())
+        assert get_resource_nowait(str, "bar") == "foobar"

@@ -59,7 +59,8 @@ class Component(metaclass=ABCMeta):
         """
         if self._component_started:
             raise RuntimeError(
-                "child components cannot be added once the component has been started"
+                "child components cannot be added once start_component() has been "
+                "called on the component"
             )
 
         if not isinstance(alias, str) or not alias:
@@ -87,6 +88,15 @@ class Component(metaclass=ABCMeta):
             raise ValueError(f'there is already a child component named "{alias}"')
 
         self._child_components[alias] = {"type": type, **config}
+
+    async def prepare(self) -> None:
+        """
+        Perform any necessary initialization before starting the component.
+
+        This method is called by :func:`start_component` before starting the child
+        components of this component, so it can be used to add any resources required
+        by the child components.
+        """
 
     async def start(self) -> None:
         """
@@ -140,6 +150,9 @@ component_types = PluginContainer("asphalt.components", Component)
 async def _start_component(
     component: Component, path: str, components_config: dict[str, Any]
 ) -> None:
+    # Prevent add_component() from being called beyond this point
+    component._component_started = True
+
     # Merge the overrides to the hard-coded configuration
     merged_components_config = merge_config(
         component._child_components, components_config
@@ -158,6 +171,9 @@ async def _start_component(
         child_component = component_class(**child_config)
         child_components_by_alias[alias] = (child_component, child_components_config)
 
+    # Call prepare() on the component itself
+    await component.prepare()
+
     # Start the child components
     if child_components_by_alias:
         async with create_task_group() as tg:
@@ -174,7 +190,6 @@ async def _start_component(
                     name=f"Starting {final_path} ({qualified_name(child_component)})",
                 )
 
-    component._component_started = True
     await component.start()
 
 
