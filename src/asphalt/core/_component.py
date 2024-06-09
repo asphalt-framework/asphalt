@@ -246,7 +246,9 @@ async def start_component(
     """
     if isinstance(config_or_component_class, dict):
         configuration = config_or_component_class
-    elif issubclass(config_or_component_class, Component):
+    elif isclass(config_or_component_class) and issubclass(
+        config_or_component_class, Component
+    ):
         configuration = config or {}
         configuration["type"] = config_or_component_class
     else:
