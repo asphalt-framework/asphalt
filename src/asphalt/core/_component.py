@@ -242,6 +242,8 @@ async def start_component(
     :raises RuntimeError: if this function is called without an active :class:`Context`
     :raises TimeoutError: if the startup of the component hierarchy takes more than
         ``timeout`` seconds
+    :raises TypeError: if ``config_or_component_class`` is neither a dict or a
+        :class:`Component` subclass
 
     """
     if isinstance(config_or_component_class, dict):
