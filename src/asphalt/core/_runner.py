@@ -7,7 +7,7 @@ from contextlib import AsyncExitStack
 from functools import partial
 from logging import INFO, Logger, basicConfig, getLogger
 from logging.config import dictConfig
-from typing import Any, cast
+from typing import Any, overload
 from warnings import warn
 
 import anyio
@@ -22,7 +22,6 @@ from anyio.abc import TaskStatus
 from ._component import (
     CLIApplicationComponent,
     Component,
-    component_types,
     start_component,
 )
 from ._concurrent import start_service_task
@@ -47,7 +46,8 @@ async def handle_signals(
 
 
 async def _run_application_async(
-    component: Component,
+    config_or_component_class: type[Component] | dict[str, Any],
+    config: dict[str, Any] | None,
     logger: Logger,
     max_threads: int | None,
     start_timeout: float | None,
@@ -70,9 +70,8 @@ async def _run_application_async(
                 )
 
             try:
-                await start_component(
-                    component,
-                    timeout=start_timeout,
+                component = await start_component(
+                    config_or_component_class, config, timeout=start_timeout
                 )
             except (get_cancelled_exc_class(), TimeoutError):
                 # This happens when a signal handler cancels the startup or
@@ -106,8 +105,46 @@ async def _run_application_async(
         logger.info("Application stopped")
 
 
+@overload
 def run_application(
-    component: Component | dict[str, Any],
+    config_or_component_class: type[Component],
+    config: dict[str, Any],
+    *,
+    backend: str = "asyncio",
+    backend_options: dict[str, Any] | None = None,
+    max_threads: int | None = None,
+    logging: dict[str, Any] | int | None = INFO,
+    start_timeout: int | float | None = 10,
+) -> None: ...
+
+
+@overload
+def run_application(
+    config_or_component_class: type[Component],
+    *,
+    backend: str = "asyncio",
+    backend_options: dict[str, Any] | None = None,
+    max_threads: int | None = None,
+    logging: dict[str, Any] | int | None = INFO,
+    start_timeout: int | float | None = 10,
+) -> None: ...
+
+
+@overload
+def run_application(
+    config_or_component_class: dict[str, Any],
+    *,
+    backend: str = "asyncio",
+    backend_options: dict[str, Any] | None = None,
+    max_threads: int | None = None,
+    logging: dict[str, Any] | int | None = INFO,
+    start_timeout: int | float | None = 10,
+) -> None: ...
+
+
+def run_application(
+    config_or_component_class: type[Component] | dict[str, Any],
+    config: dict[str, Any] | None = None,
     *,
     backend: str = "asyncio",
     backend_options: dict[str, Any] | None = None,
@@ -136,8 +173,8 @@ def run_application(
     is set to the value of ``max_threads`` or, if omitted, the default value of
     :class:`~concurrent.futures.ThreadPoolExecutor`.
 
-    :param component: the root component (either a component instance or a configuration
-        dictionary where the special ``type`` key is a component class
+    :param config_or_component_class: the root component (either a component instance or a
+        configuration dictionary where the special ``type`` key is a component class)
     :param backend: name of the AnyIO backend (e.g. ``asyncio`` or ``trio``)
     :param backend_options: options to pass to the AnyIO backend (see the
         `AnyIO documentation`_ for reference)
@@ -164,13 +201,10 @@ def run_application(
     logger = getLogger(__name__)
     logger.info("Running in %s mode", "development" if __debug__ else "production")
 
-    # Instantiate the root component if a dict was given
-    if isinstance(component, dict):
-        component = cast(Component, component_types.create_object(**component))
-
     if exit_code := anyio.run(
         _run_application_async,
-        component,
+        config_or_component_class,
+        config,
         logger,
         max_threads,
         start_timeout,

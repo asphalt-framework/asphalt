@@ -2,15 +2,15 @@
 
 # isort: off
 import sys
+from dataclasses import dataclass
 
 import anyio
 from asphalt.core import CLIApplicationComponent, run_application
 
 
+@dataclass
 class ClientComponent(CLIApplicationComponent):
-    def __init__(self, message: str):
-        super().__init__()
-        self.message = message
+    message: str
 
     async def run(self) -> None:
         async with await anyio.connect_tcp("localhost", 64100) as stream:
@@ -21,5 +21,4 @@ class ClientComponent(CLIApplicationComponent):
 
 
 if __name__ == "__main__":
-    component = ClientComponent(sys.argv[1])
-    run_application(component)
+    run_application(ClientComponent, {"message": sys.argv[1]})

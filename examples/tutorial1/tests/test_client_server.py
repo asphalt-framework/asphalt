@@ -17,16 +17,14 @@ pytestmark = pytest.mark.anyio
 @pytest.fixture
 async def server(capsys: CaptureFixture[str]) -> AsyncGenerator[None, None]:
     async with Context():
-        server = ServerComponent()
-        await start_component(server)
+        await start_component(ServerComponent)
         yield
 
 
 async def test_client_and_server(server: None, capsys: CaptureFixture[str]) -> None:
     async with Context():
-        client = ClientComponent("Hello!")
-        await start_component(client)
-        await client.run()
+        component = await start_component(ClientComponent, {"message": "Hello!"})
+        await component.run()
 
     # Grab the captured output of sys.stdout and sys.stderr from the capsys fixture
     await wait_all_tasks_blocked()

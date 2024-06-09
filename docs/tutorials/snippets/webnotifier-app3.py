@@ -36,4 +36,4 @@ class ApplicationComponent(CLIApplicationComponent):
 
 
 if __name__ == "__main__":
-    run_application(ApplicationComponent(), logging=logging.DEBUG)
+    run_application(ApplicationComponent, logging=logging.DEBUG)

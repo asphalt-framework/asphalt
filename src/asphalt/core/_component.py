@@ -7,7 +7,7 @@ from inspect import isclass
 from logging import getLogger
 from traceback import StackSummary
 from types import FrameType
-from typing import Any
+from typing import Any, TypeVar, overload
 
 from anyio import (
     CancelScope,
@@ -22,6 +22,8 @@ from ._concurrent import start_service_task
 from ._context import current_context
 from ._exceptions import NoCurrentContext
 from ._utils import PluginContainer, merge_config, qualified_name
+
+TComponent = TypeVar("TComponent", bound="Component")
 
 
 class Component(metaclass=ABCMeta):
@@ -143,63 +145,98 @@ class CLIApplicationComponent(Component):
 component_types = PluginContainer("asphalt.components", Component)
 
 
+def _init_component(
+    component_or_config: Component | dict[str, Any],
+    path: str,
+    child_components_by_alias: dict[str, dict[str, Component]],
+) -> Component:
+    # Separate the child components from the config
+    if isinstance(component_or_config, Component):
+        component = component_or_config
+        child_components_config = component._child_components or {}
+    else:
+        child_components_config = component_or_config.pop("components", {})
+
+        # Resolve the type to a class
+        component_type = component_or_config.pop("type")
+        component_class = component_types.resolve(component_type)
+
+        # Instantiate the component
+        component = component_class(**component_or_config)
+
+        # Merge the overrides to the hard-coded configuration
+        child_components_config = merge_config(
+            component._child_components, child_components_config
+        )
+
+    # Create the child components
+    child_components = child_components_by_alias[path] = {}
+    for alias, child_config in child_components_config.items():
+        final_path = f"{path}.{alias}" if path else alias
+        child_component = _init_component(
+            child_config, final_path, child_components_by_alias
+        )
+        child_components[alias] = child_component
+
+    return component
+
+
 async def _start_component(
-    component: Component, path: str, components_config: dict[str, Any]
+    component: Component,
+    path: str,
+    child_components_by_alias: dict[str, dict[str, Component]],
 ) -> None:
     # Prevent add_component() from being called beyond this point
     component._component_started = True
-
-    # Merge the overrides to the hard-coded configuration
-    merged_components_config = merge_config(
-        component._child_components, components_config
-    )
-
-    # Create the child components
-    child_components_by_alias: dict[str, tuple[Component, dict[str, Any]]] = {}
-    for alias, child_config in merged_components_config.items():
-        component_type = child_config.pop("type")
-        if isinstance(component_type, str):
-            component_class = component_types.resolve(component_type)
-        else:
-            component_class = component_type
-
-        child_components_config = child_config.pop("components", {})
-        child_component = component_class(**child_config)
-        child_components_by_alias[alias] = (child_component, child_components_config)
 
     # Call prepare() on the component itself
     await component.prepare()
 
     # Start the child components
-    if child_components_by_alias:
+    if child_components := child_components_by_alias.get(path):
         async with create_task_group() as tg:
-            for alias, (
-                child_component,
-                child_components_config,
-            ) in child_components_by_alias.items():
+            for alias, child_component in child_components.items():
                 final_path = f"{path}.{alias}" if path else alias
                 tg.start_soon(
                     _start_component,
                     child_component,
                     final_path,
-                    child_components_config,
+                    child_components_by_alias,
                     name=f"Starting {final_path} ({qualified_name(child_component)})",
                 )
 
     await component.start()
 
 
+@overload
 async def start_component(
-    component: Component,
-    override_config: dict[str, Any] | None = None,
+    config_or_component_class: type[TComponent],
+    config: dict[str, Any] | None = ...,
+    *,
+    timeout: float | None = ...,
+) -> TComponent: ...
+
+
+@overload
+async def start_component(
+    config_or_component_class: dict[str, Any],
+    config: dict[str, Any] | None = ...,
+    *,
+    timeout: float | None = ...,
+) -> Component: ...
+
+
+async def start_component(
+    config_or_component_class: type[Component] | dict[str, Any],
+    config: dict[str, Any] | None = None,
     *,
     timeout: float | None = 20,
-) -> None:
+) -> Component:
     """
     Start a component and its subcomponents.
 
-    :param component: the (root) component to start
-    :param override_config: configuration overrides for the root component and subcomponents
+    :param config_or_component_class: the (root) component to start, or a configuration
+    :param config: configuration overrides for the root component and subcomponents
     :param timeout: seconds to wait for all the components in the hierarchy to start
         (default: ``20``; set to ``None`` to disable timeout)
     :raises RuntimeError: if this function is called without an active :class:`Context`
@@ -207,6 +244,16 @@ async def start_component(
         ``timeout`` seconds
 
     """
+    if isinstance(config_or_component_class, dict):
+        configuration = config_or_component_class
+    elif issubclass(config_or_component_class, Component):
+        configuration = config or {}
+        configuration["type"] = config_or_component_class
+    else:
+        raise TypeError(
+            "config_or_component_class must either be a Component subclass or a dict"
+        )
+
     try:
         current_context()
     except NoCurrentContext:
@@ -214,20 +261,23 @@ async def start_component(
             "start_component() requires an active Asphalt context"
         ) from None
 
+    child_components_by_alias: dict[str, dict[str, Component]] = {}
+    root_component = _init_component(configuration, "", child_components_by_alias)
+
     with CancelScope() as startup_scope:
         startup_watcher_scope: CancelScope | None = None
         if timeout is not None:
             startup_watcher_scope = await start_service_task(
                 lambda task_status: _component_startup_watcher(
                     startup_scope,
-                    component,
+                    root_component,
                     timeout,
                     task_status=task_status,
                 ),
                 "Asphalt component startup watcher task",
             )
 
-        await _start_component(component, "", override_config or {})
+        await _start_component(root_component, "", child_components_by_alias)
 
     if startup_scope.cancel_called:
         raise TimeoutError("timeout starting component")
@@ -235,6 +285,8 @@ async def start_component(
     # Cancel the startup timeout, if any
     if startup_watcher_scope:
         startup_watcher_scope.cancel()
+
+    return root_component
 
 
 async def _component_startup_watcher(
