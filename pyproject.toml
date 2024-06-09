@@ -27,6 +27,7 @@ classifiers = [
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
 ]
 requires-python = ">=3.8"
 dependencies = [
@@ -51,7 +52,6 @@ test = [
     "anyio[trio] ~= 4.1",
     "coverage >= 7",
     "pytest >= 7",
-    "uvloop; python_implementation == 'CPython' and platform_system != 'Windows'",
 ]
 doc = [
     "Sphinx >= 7.0",
@@ -105,7 +105,7 @@ exclude_also = [
 [tool.tox]
 legacy_tox_ini = """
 [tox]
-envlist = py38, py39, py310, py311, py312, pypy3
+envlist = py38, py39, py310, py311, py312, py313, pypy3
 skip_missing_interpreters = true
 minversion = 4.0
 
