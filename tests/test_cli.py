@@ -50,27 +50,27 @@ logging:
   version: 1
   disable_existing_loggers: false
 """
-    args = ["test.yml"]
     with runner.isolated_filesystem(), patch(
         "asphalt.core._cli.run_application"
     ) as run_app:
         Path("test.yml").write_text(config)
-        result = runner.invoke(_cli.run, args)
+        result = runner.invoke(_cli.run, ["test.yml"])
 
         assert result.exit_code == 0
         assert run_app.call_count == 1
         args, kwargs = run_app.call_args
-        assert len(args) == 0
-        assert kwargs == {
-            "backend": anyio_backend_name,
-            "backend_options": {},
-            "component": {
+        assert args == (
+            {
                 "type": DummyComponent,
                 "dummyval1": "testval",
                 "envval": "from environment",
                 "textfileval": "Hello, World!",
                 "binaryfileval": b"Hello, World!",
             },
+        )
+        assert kwargs == {
+            "backend": anyio_backend_name,
+            "backend_options": {},
             "logging": {"version": 1, "disable_existing_loggers": False},
         }
 
@@ -146,17 +146,18 @@ component:
         assert result.exit_code == 0
         assert run_app.call_count == 1
         args, kwargs = run_app.call_args
-        assert len(args) == 0
-        assert kwargs == {
-            "backend": "asyncio",
-            "backend_options": {},
-            "component": {
+        assert args == (
+            {
                 "type": component_class,
                 "dummyval1": "alternate",
                 "dummyval2": 10,
                 "dummyval3": "bar",
                 "dummyval4": "baz",
             },
+        )
+        assert kwargs == {
+            "backend": "asyncio",
+            "backend_options": {},
             "logging": {"version": 1, "disable_existing_loggers": False},
         }
 
@@ -206,13 +207,9 @@ logging:
             assert result.exit_code == 0
             assert run_app.call_count == 1
             args, kwargs = run_app.call_args
-            assert len(args) == 0
             if service == "server":
-                assert kwargs == {
-                    "backend": "asyncio",
-                    "backend_options": {},
-                    "max_threads": 30,
-                    "component": {
+                assert args == (
+                    {
                         "type": "myproject.server.ServerComponent",
                         "components": {
                             "wamp": {
@@ -225,14 +222,16 @@ logging:
                             "mailer": {"backend": "smtp"},
                         },
                     },
-                    "logging": {"version": 1, "disable_existing_loggers": False},
-                }
-            else:
+                )
                 assert kwargs == {
                     "backend": "asyncio",
                     "backend_options": {},
-                    "max_threads": 15,
-                    "component": {
+                    "max_threads": 30,
+                    "logging": {"version": 1, "disable_existing_loggers": False},
+                }
+            else:
+                assert args == (
+                    {
                         "type": "myproject.client.ClientComponent",
                         "components": {
                             "wamp": {
@@ -244,6 +243,11 @@ logging:
                             }
                         },
                     },
+                )
+                assert kwargs == {
+                    "backend": "asyncio",
+                    "backend_options": {},
+                    "max_threads": 15,
                     "logging": {"version": 1, "disable_existing_loggers": False},
                 }
 
@@ -334,11 +338,10 @@ logging:
             assert result.exit_code == 0
             assert run_app.call_count == 1
             args, kwargs = run_app.call_args
-            assert len(args) == 0
+            assert args == ({"type": "myproject.client.ClientComponent"},)
             assert kwargs == {
                 "backend": "asyncio",
                 "backend_options": {},
-                "component": {"type": "myproject.client.ClientComponent"},
                 "logging": {"version": 1, "disable_existing_loggers": False},
             }
 
@@ -366,11 +369,10 @@ logging:
             assert result.exit_code == 0
             assert run_app.call_count == 1
             args, kwargs = run_app.call_args
-            assert len(args) == 0
+            assert args == ({"type": "myproject.server.ServerComponent"},)
             assert kwargs == {
                 "backend": "asyncio",
                 "backend_options": {},
-                "component": {"type": "myproject.server.ServerComponent"},
                 "logging": {"version": 1, "disable_existing_loggers": False},
             }
 
@@ -401,11 +403,10 @@ logging:
             assert result.exit_code == 0
             assert run_app.call_count == 1
             args, kwargs = run_app.call_args
-            assert len(args) == 0
+            assert args == ({"type": "myproject.client.ClientComponent"},)
             assert kwargs == {
                 "backend": "asyncio",
                 "backend_options": {},
-                "component": {"type": "myproject.client.ClientComponent"},
                 "logging": {"version": 1, "disable_existing_loggers": False},
             }
 
@@ -436,10 +437,9 @@ logging:
             assert result.exit_code == 0
             assert run_app.call_count == 1
             args, kwargs = run_app.call_args
-            assert len(args) == 0
+            assert args == ({"type": "myproject.server.ServerComponent"},)
             assert kwargs == {
                 "backend": "asyncio",
                 "backend_options": {},
-                "component": {"type": "myproject.server.ServerComponent"},
                 "logging": {"version": 1, "disable_existing_loggers": False},
             }
