@@ -173,8 +173,13 @@ def _init_component(
     # Create the child components
     child_components = child_components_by_alias[path] = {}
     for alias, child_config in child_components_config.items():
+        # If the type was specified only via an alias, use that as a type
+        if "type" not in child_config:
+            # Use the first part of the alias as type, partitioned by "/"
+            child_config.setdefault("type", alias.split("/")[0])
+
         final_path = f"{path}.{alias}" if path else alias
-        child_config.setdefault("type", alias)
+
         child_component = _init_component(
             child_config, final_path, child_components_by_alias
         )

@@ -18,6 +18,9 @@ This library adheres to `Semantic Versioning 2.0 <https://semver.org/>`_.
     interpreted as a shortcut for a structure 3 levels deep:
     ``foo: {bar: {baz: ...}}``), as this prevented proper configuration for loggers that
     have dots in their names
+  * Added a shortcut for specify multiple components of the same type using a scheme
+    like ``mycomponenttype/name1``, ``mycomponenttype/name2`` where ``mycomponenttype``
+    is used as the type for both components
   * Switched from ruamel.yaml to PyYAML as the backing YAML library
   * Changed how``CLIApplicationComponent`` is run – their ``run()`` method is now
     called directly by the runner after the component has started

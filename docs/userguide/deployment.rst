@@ -50,8 +50,7 @@ A production-ready configuration file should contain at least the following opti
 Suppose you had the following component class as your root component::
 
     class MyRootComponent(Component):
-        def __init__(self, components, data_directory: str):
-            super().__init__(components)
+        def __init__(self, data_directory: str):
             self.data_directory = data_directory
             self.add_component('mailer', backend='smtp')
             self.add_component('sqlalchemy')
@@ -108,6 +107,59 @@ entries of at least ``INFO`` level to the console. You may want to set up more g
 logging in your own configuration file. See the
 :ref:`Python standard library documentation <python:logging-config-dictschema>` for
 details.
+
+Using multiple components of the same type under the same parent component
+--------------------------------------------------------------------------
+
+Occasionally, you may run into a situation where you need two instances of the same
+component under the same parent component. A practical example of this is two SQLAlchemy
+engines, one for the master, one for the replica database. But specifying this in the
+configuration won't work::
+
+    ---
+    component:
+      type: !!python/name:myproject.MyRootComponent
+      components:
+        sqlalchemy:
+          url: postgresql://user:pass@postgres-master/dbname
+        sqlalchemy:
+          url: postgresql://user:pass@postgres-replica/dbname
+          resource_name: replica
+
+.. note:: The ``sqlalchemy`` component still requires the ``resource_name`` parameter in
+    order to publish its resources under a name other than ``default`` to prevent
+    resource name conflicts.
+
+The problem is obvious: you can't have duplicate keys under the same mapping.
+The correct solution to the problem is to use different aliases::
+
+    ---
+    component:
+      type: !!python/name:myproject.MyRootComponent
+      components:
+        sqlalchemy:
+          url: postgresql://user:pass@postgres-master/dbname
+        sqlalchemy/replica:
+          url: postgresql://user:pass@postgres-replica/dbname
+          resource_name: replica
+
+As of v5.0, the framework understands the ``type/name`` notation, and fills in the
+``type`` field of the child component with ``sqlalchemy``, if there's no existing
+``type`` key.
+
+An alternate solution would be to just rename the other component and explicitly add the
+``type`` key to its configuration::
+
+    ---
+    component:
+      type: !!python/name:myproject.MyRootComponent
+      components:
+        sqlalchemy:
+          url: postgresql://user:pass@postgres-master/dbname
+        replica:
+          type: sqlalchemy
+          resource_name: replica
+          url: postgresql://user:pass@postgres-replica/dbname
 
 Using data from environment variables and files
 -----------------------------------------------

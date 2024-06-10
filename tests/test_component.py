@@ -105,6 +105,22 @@ class TestComplexComponent:
 
         assert isinstance(container["dummy"], DummyComponent)
 
+    async def test_type_from_partitioned_alias(self) -> None:
+        container: dict[str, Component] = {}
+        async with Context():
+            await start_component(
+                Component,
+                {
+                    "components": {
+                        "dummy/first": {"alias": "first", "container": container},
+                        "dummy/second": {"alias": "second", "container": container},
+                    }
+                },
+            )
+
+        assert isinstance(container["first"], DummyComponent)
+        assert isinstance(container["second"], DummyComponent)
+
     @pytest.mark.parametrize(
         "alias, cls, exc_cls, message",
         [
