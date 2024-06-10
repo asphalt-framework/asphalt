@@ -146,33 +146,35 @@ component_types = PluginContainer("asphalt.components", Component)
 
 
 def _init_component(
-    component_or_config: Component | dict[str, Any],
+    config: dict[str, Any],
     path: str,
     child_components_by_alias: dict[str, dict[str, Component]],
 ) -> Component:
     # Separate the child components from the config
-    if isinstance(component_or_config, Component):
-        component = component_or_config
-        child_components_config = component._child_components or {}
-    else:
-        child_components_config = component_or_config.pop("components", {})
+    child_components_config = config.pop("components", {})
 
-        # Resolve the type to a class
-        component_type = component_or_config.pop("type")
-        component_class = component_types.resolve(component_type)
-
-        # Instantiate the component
-        component = component_class(**component_or_config)
-
-        # Merge the overrides to the hard-coded configuration
-        child_components_config = merge_config(
-            component._child_components, child_components_config
+    # Resolve the type to a class
+    component_type = config.pop("type")
+    component_class = component_types.resolve(component_type)
+    if not isclass(component_class) or not issubclass(component_class, Component):
+        raise TypeError(
+            f"{component_type!r} resolved to {component_class} which is not a subclass "
+            f"of Component"
         )
+
+    # Instantiate the component
+    component = component_class(**config)
+
+    # Merge the overrides to the hard-coded configuration
+    child_components_config = merge_config(
+        component._child_components, child_components_config
+    )
 
     # Create the child components
     child_components = child_components_by_alias[path] = {}
     for alias, child_config in child_components_config.items():
         final_path = f"{path}.{alias}" if path else alias
+        child_config.setdefault("type", alias)
         child_component = _init_component(
             child_config, final_path, child_components_by_alias
         )

@@ -95,6 +95,16 @@ class TestComplexComponent:
         assert components_container["dummy1"].kwargs == {"a": 5, "b": 2}
         assert components_container["dummy2"].kwargs == {"a": 8, "b": 7}
 
+    async def test_child_components_from_config(self) -> None:
+        container: dict[str, Component] = {}
+        async with Context():
+            await start_component(
+                Component,
+                {"components": {"dummy": {"alias": "dummy", "container": container}}},
+            )
+
+        assert isinstance(container["dummy"], DummyComponent)
+
     @pytest.mark.parametrize(
         "alias, cls, exc_cls, message",
         [
