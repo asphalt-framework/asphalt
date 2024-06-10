@@ -86,11 +86,13 @@ sibling and child components:
 
 * Initializer (``__init__()``):
 
+    * ✅ Can add child components
     * ❌ Cannot acquire resources
     * ❌ Cannot provide resources
 
 * :meth:`Component.prepare`:
 
+    * ❌ Cannot add child components
     * ✅ Can acquire resources provided by parent components in their
       :meth:`~Component.prepare` methods
     * ❌ Cannot acquire resources provided by parent components in their
@@ -102,6 +104,7 @@ sibling and child components:
 
 * :meth:`Component.start`:
 
+    * ❌ Cannot add child components
     * ✅ Can acquire resources provided by parent components in their
       :meth:`~Component.prepare` methods
     * ❌ Cannot acquire resources provided by parent components in their
