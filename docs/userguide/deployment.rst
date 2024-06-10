@@ -62,16 +62,13 @@ You could then write a configuration file like this::
     max_threads: 20
     component:
       type: !!python/name:myproject.MyRootComponent
-      config:
-        data_directory: /some/file/somewhere
+      data_directory: /some/file/somewhere
       components:
         mailer:
-          config:
-            host: smtp.mycompany.com
-            ssl: true
+          host: smtp.mycompany.com
+          ssl: true
         sqlalchemy:
-          config:
-            url: postgresql:///mydatabase
+          url: postgresql:///mydatabase
 
     logging:
       version: 1
@@ -82,7 +79,7 @@ You could then write a configuration file like this::
           formatter: generic
       formatters:
         generic:
-            format: "%(asctime)s:%(levelname)s:%(name)s:%(message)s"
+          format: "%(asctime)s:%(levelname)s:%(name)s:%(message)s"
       root:
         handlers: [console]
         level: INFO
