@@ -7,7 +7,6 @@ Components
 ----------
 
 .. autoclass:: Component
-.. autoclass:: ContainerComponent
 .. autoclass:: CLIApplicationComponent
 .. autofunction:: start_component
 

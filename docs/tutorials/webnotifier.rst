@@ -92,9 +92,10 @@ you installed in the beginning. The next modification will send the HTML formatt
 differences to you by email.
 
 But, you only have a single component in your app now. To use ``asphalt-mailer``, you
-will need to add its component to your application somehow. Enter
-:class:`ContainerComponent`. With that, you can create a hierarchy of components where
-the ``mailer`` component is a child component of your own container component.
+will need to add its component to your application somehow. This is exactly what
+:meth:`Component.add_component` is for. With that, you can create a hierarchy of
+components where the ``mailer`` component is a child component of your own container
+component.
 
 To use the mailer resource provided by ``asphalt-mailer``, inject it to the ``run()``
 function as a resource by adding a keyword-only argument, annotated with the type of
@@ -196,9 +197,9 @@ The ``component`` section defines parameters for the root component. Aside from 
 special ``type`` key which tells the runner where to find the component class, all the
 keys in this section are passed to the constructor of ``ApplicationComponent`` as
 keyword arguments. Keys under ``components`` will match the alias of each child
-component, which is given as the first argument to
-:meth:`ContainerComponent.add_component`. Any component parameters given here can now be
-removed from the ``add_component()`` call in ``ApplicationComponent``'s code.
+component, which is given as the first argument to :meth:`Component.add_component`. Any
+component parameters given here can now be removed from the ``add_component()`` call in
+``ApplicationComponent``'s code.
 
 The logging configuration here sets up two loggers, one for ``webnotifier`` and its
 descendants and another (``root``) as a catch-all for everything else. It specifies one

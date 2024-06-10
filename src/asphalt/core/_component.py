@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 from abc import ABCMeta, abstractmethod
-from collections import OrderedDict
 from collections.abc import Coroutine
 from dataclasses import dataclass, field
+from inspect import isclass
 from logging import getLogger
 from traceback import StackSummary
 from types import FrameType
-from typing import Any
+from typing import Any, TypeVar, overload
 
 from anyio import (
     CancelScope,
@@ -23,64 +23,26 @@ from ._context import current_context
 from ._exceptions import NoCurrentContext
 from ._utils import PluginContainer, merge_config, qualified_name
 
+TComponent = TypeVar("TComponent", bound="Component")
+
 
 class Component(metaclass=ABCMeta):
     """This is the base class for all Asphalt components."""
 
-    __slots__ = ()
-
-    @abstractmethod
-    async def start(self) -> None:
-        """
-        Perform any necessary tasks to start the services provided by this component.
-
-        In this method, components typically use the context to:
-          * add resources and/or resource factories to it
-            (:func:`add_resource` and :func:`add_resource_factory`)
-          * get resources from it asynchronously
-            (:func:`get_resource`)
-
-        It is advisable for Components to first add all the resources they can to the
-        context before requesting any from it. This will speed up the dependency
-        resolution and prevent deadlocks.
-
-        .. warning:: It's unadvisable to call this method directly (in case you're doing
-            it in a test suite). Instead, call :func:`start_component`, as it comes with
-            extra safeguards.
-        """
-
-
-class ContainerComponent(Component):
-    """
-    A component that can contain other components.
-
-    :param components: dictionary of component alias ⭢ component configuration
-        dictionary
-    :ivar child_components: dictionary of component alias ⭢ :class:`Component` instance
-        (of child components added with :meth:`add_component`)
-    :vartype child_components: Dict[str, Component]
-    :ivar component_configs: dictionary of component alias ⭢ externally provided
-        component configuration
-    :vartype component_configs: Dict[str, Optional[Dict[str, Any]]]
-    """
-
-    __slots__ = "child_components", "component_configs"
-
-    def __init__(
-        self, components: dict[str, dict[str, Any] | None] | None = None
-    ) -> None:
-        self.child_components: OrderedDict[str, Component] = OrderedDict()
-        self.component_configs = components or {}
+    _child_components: dict[str, dict[str, Any]] | None = None
+    _component_started = False
 
     def add_component(
-        self, alias: str, type: str | type | None = None, **config: Any
+        self, alias: str, /, type: str | type[Component] | None = None, **config: Any
     ) -> None:
         """
         Add a child component.
 
-        This will instantiate a component class, as specified by the ``type`` argument.
+        This will store the type and configuration options of the named child component,
+        to be later instantiated by :func:`start_component`.
 
-        If the second argument is omitted, the value of ``alias`` is used as its value.
+        If the ``type`` argument is omitted, then the value of the ``alias`` argument is
+        used to derive the type.
 
         The locally given configuration can be overridden by component configuration
         parameters supplied to the constructor (via the ``components`` argument).
@@ -94,43 +56,66 @@ class ContainerComponent(Component):
         :param alias: a name for the component instance, unique within this container
         :param type: name of and entry point in the ``asphalt.components`` namespace or
             a :class:`Component` subclass
-        :param config: keyword arguments passed to the component's constructor
+        :param config: mapping of keyword arguments passed to the component's
+            initializer
+        :raises RuntimeError: if there is already a child component with the same alias
 
         """
+        if self._component_started:
+            raise RuntimeError(
+                "child components cannot be added once start_component() has been "
+                "called on the component"
+            )
+
         if not isinstance(alias, str) or not alias:
-            raise TypeError("component_alias must be a nonempty string")
-        if alias in self.child_components:
+            raise TypeError("alias must be a nonempty string")
+
+        if type is None:
+            type = alias
+
+        if isclass(type):
+            if not issubclass(type, Component):
+                raise TypeError(
+                    f"{qualified_name(type)} is not a subclass of "
+                    f"asphalt.core.Component"
+                )
+        elif isinstance(type, str):
+            component_types.resolve(type)
+        else:
+            raise TypeError(
+                "type must be either a subclass of asphalt.core.Component or a string"
+            )
+
+        if self._child_components is None:
+            self._child_components = {}
+        elif alias in self._child_components:
             raise ValueError(f'there is already a child component named "{alias}"')
 
-        config["type"] = type or alias
+        self._child_components[alias] = {"type": type, **config}
 
-        # Allow the external configuration to override the constructor arguments
-        override_config = self.component_configs.get(alias) or {}
-        config = merge_config(config, override_config)
+    async def prepare(self) -> None:
+        """
+        Perform any necessary initialization before starting the component.
 
-        component = component_types.create_object(**config)
-        self.child_components[alias] = component
+        This method is called by :func:`start_component` *before* starting the child
+        components of this component, so it can be used to add any resources required
+        by the child components.
+        """
 
     async def start(self) -> None:
         """
-        Create child components that have been configured but not yet created and then
-        calls their :meth:`~Component.start` methods in separate tasks and waits until
-        they have completed.
+        Perform any necessary tasks to start the services provided by this component.
 
+        This method is called by :func:`start_component` *after* the child components of
+        this component have been started, so any resources provided by the child
+        components are available at this point.
+
+        .. warning:: Do not call this method directly; use :func:`start_component`
+            instead.
         """
-        for alias in self.component_configs:
-            if alias not in self.child_components:
-                self.add_component(alias)
-
-        async with create_task_group() as tg:
-            for alias, component in self.child_components.items():
-                tg.start_soon(
-                    component.start,
-                    name=f"Starting {qualified_name(component)} ({alias})",
-                )
 
 
-class CLIApplicationComponent(ContainerComponent):
+class CLIApplicationComponent(Component):
     """
     Specialized subclass of :class:`.ContainerComponent` for command line tools.
 
@@ -160,22 +145,119 @@ class CLIApplicationComponent(ContainerComponent):
 component_types = PluginContainer("asphalt.components", Component)
 
 
-async def start_component(
+def _init_component(
+    component_or_config: Component | dict[str, Any],
+    path: str,
+    child_components_by_alias: dict[str, dict[str, Component]],
+) -> Component:
+    # Separate the child components from the config
+    if isinstance(component_or_config, Component):
+        component = component_or_config
+        child_components_config = component._child_components or {}
+    else:
+        child_components_config = component_or_config.pop("components", {})
+
+        # Resolve the type to a class
+        component_type = component_or_config.pop("type")
+        component_class = component_types.resolve(component_type)
+
+        # Instantiate the component
+        component = component_class(**component_or_config)
+
+        # Merge the overrides to the hard-coded configuration
+        child_components_config = merge_config(
+            component._child_components, child_components_config
+        )
+
+    # Create the child components
+    child_components = child_components_by_alias[path] = {}
+    for alias, child_config in child_components_config.items():
+        final_path = f"{path}.{alias}" if path else alias
+        child_component = _init_component(
+            child_config, final_path, child_components_by_alias
+        )
+        child_components[alias] = child_component
+
+    return component
+
+
+async def _start_component(
     component: Component,
+    path: str,
+    child_components_by_alias: dict[str, dict[str, Component]],
+) -> None:
+    # Prevent add_component() from being called beyond this point
+    component._component_started = True
+
+    # Call prepare() on the component itself
+    await component.prepare()
+
+    # Start the child components
+    if child_components := child_components_by_alias.get(path):
+        async with create_task_group() as tg:
+            for alias, child_component in child_components.items():
+                final_path = f"{path}.{alias}" if path else alias
+                tg.start_soon(
+                    _start_component,
+                    child_component,
+                    final_path,
+                    child_components_by_alias,
+                    name=f"Starting {final_path} ({qualified_name(child_component)})",
+                )
+
+    await component.start()
+
+
+@overload
+async def start_component(
+    config_or_component_class: type[TComponent],
+    config: dict[str, Any] | None = ...,
+    *,
+    timeout: float | None = ...,
+) -> TComponent: ...
+
+
+@overload
+async def start_component(
+    config_or_component_class: dict[str, Any],
+    config: dict[str, Any] | None = ...,
+    *,
+    timeout: float | None = ...,
+) -> Component: ...
+
+
+async def start_component(
+    config_or_component_class: type[Component] | dict[str, Any],
+    config: dict[str, Any] | None = None,
     *,
     timeout: float | None = 20,
-) -> None:
+) -> Component:
     """
     Start a component and its subcomponents.
 
-    :param component: the (root) component to start
+    :param config_or_component_class: the (root) component to start, or a configuration
+    :param config: configuration overrides for the root component and subcomponents
     :param timeout: seconds to wait for all the components in the hierarchy to start
         (default: ``20``; set to ``None`` to disable timeout)
     :raises RuntimeError: if this function is called without an active :class:`Context`
     :raises TimeoutError: if the startup of the component hierarchy takes more than
         ``timeout`` seconds
+    :raises TypeError: if ``config_or_component_class`` is neither a dict or a
+        :class:`Component` subclass
 
     """
+    if isinstance(config_or_component_class, dict):
+        configuration = config_or_component_class
+    elif isclass(config_or_component_class) and issubclass(
+        config_or_component_class, Component
+    ):
+        configuration = config or {}
+        configuration["type"] = config_or_component_class
+    else:
+        raise TypeError(
+            "config_or_component_class must either be a Component subclass or a dict"
+        )
+
     try:
         current_context()
     except NoCurrentContext:
@@ -183,27 +265,32 @@ async def start_component(
             "start_component() requires an active Asphalt context"
         ) from None
 
+    child_components_by_alias: dict[str, dict[str, Component]] = {}
+    root_component = _init_component(configuration, "", child_components_by_alias)
+
     with CancelScope() as startup_scope:
         startup_watcher_scope: CancelScope | None = None
         if timeout is not None:
             startup_watcher_scope = await start_service_task(
                 lambda task_status: _component_startup_watcher(
                     startup_scope,
-                    component,
+                    root_component,
                     timeout,
                     task_status=task_status,
                 ),
                 "Asphalt component startup watcher task",
             )
 
-        await component.start()
-
-        # Cancel the startup timeout, if any
-        if startup_watcher_scope:
-            startup_watcher_scope.cancel()
+        await _start_component(root_component, "", child_components_by_alias)
 
     if startup_scope.cancel_called:
         raise TimeoutError("timeout starting component")
+
+    # Cancel the startup timeout, if any
+    if startup_watcher_scope:
+        startup_watcher_scope.cancel()
+
+    return root_component
 
 
 async def _component_startup_watcher(
@@ -263,7 +350,7 @@ async def _component_startup_watcher(
         elif task.name and (match := component_task_re.match(task.name)):
             name: str
             alias: str
-            name, alias = match.groups()
+            alias, name = match.groups()
             status = ComponentStatus(name, alias, task.parent_id)
         else:
             continue
@@ -277,10 +364,6 @@ async def _component_startup_watcher(
             root_status = component_status
         elif parent_status := component_statuses.get(component_status.parent_task_id):
             parent_status.children.append(component_status)
-            if parent_status.alias:
-                component_status.alias = (
-                    f"{parent_status.alias}.{component_status.alias}"
-                )
 
     def format_status(status_: ComponentStatus, level: int) -> str:
         title = f"{status_.alias or 'root'} ({status_.name})"

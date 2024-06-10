@@ -1,6 +1,8 @@
 """This is the root component for the Asphalt webnotifier tutorial."""
 
 # isort: off
+from __future__ import annotations
+
 import logging
 from difflib import HtmlDiff
 
@@ -13,10 +15,9 @@ logger = logging.getLogger(__name__)
 
 
 class ApplicationComponent(CLIApplicationComponent):
-    async def start(self) -> None:
+    def __init__(self) -> None:
         self.add_component("detector", ChangeDetectorComponent)
         self.add_component("mailer", backend="smtp")
-        await super().start()
 
     @inject
     async def run(

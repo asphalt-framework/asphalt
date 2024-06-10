@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import sys
-from typing import Any, NoReturn, cast
+from typing import Any, NoReturn
 from unittest.mock import Mock
 
 import anyio
@@ -13,8 +13,9 @@ from pytest import MonkeyPatch
 from asphalt.core import (
     CLIApplicationComponent,
     Component,
-    ContainerComponent,
     Context,
+    add_resource,
+    get_resource_nowait,
     run_application,
     start_component,
 )
@@ -29,13 +30,20 @@ else:
 
 
 class DummyComponent(Component):
-    def __init__(self, **kwargs: Any):
+    def __init__(
+        self,
+        alias: str | None = None,
+        container: dict[str, DummyComponent] | None = None,
+        **kwargs: Any,
+    ):
         self.kwargs = kwargs
-        self.started = False
+        self.alias = alias
+        self.container = container
 
     async def start(self) -> None:
         await anyio.sleep(0.1)
-        self.started = True
+        if self.alias and self.container is not None:
+            self.container[self.alias] = self
 
 
 @pytest.fixture(autouse=True)
@@ -45,77 +53,102 @@ def monkeypatch_plugins(monkeypatch: MonkeyPatch) -> None:
     monkeypatch.setattr(component_types, "_entrypoints", {"dummy": entrypoint})
 
 
-class TestContainerComponent:
-    @pytest.fixture
-    def container(self) -> ContainerComponent:
-        return ContainerComponent({"dummy": {"a": 1, "c": 3}})
-
-    def test_add_component(self, container: ContainerComponent) -> None:
+class TestComplexComponent:
+    @pytest.mark.parametrize(
+        "component_type",
+        [
+            pytest.param(DummyComponent, id="class"),
+            pytest.param("dummy", id="entrypoint"),
+        ],
+    )
+    async def test_add_component(self, component_type: type[Component] | str) -> None:
         """
         Test that add_component works with an without an entry point and that external
         configuration overriddes directly supplied configuration values.
 
         """
-        container.add_component("dummy", DummyComponent, a=5, b=2)
+        components_container: dict[str, DummyComponent] = {}
 
-        assert len(container.child_components) == 1
-        component = container.child_components["dummy"]
-        assert isinstance(component, DummyComponent)
-        assert component.kwargs == {"a": 1, "b": 2, "c": 3}
+        class ContainerComponent(Component):
+            def __init__(self) -> None:
+                self.add_component(
+                    "dummy1",
+                    component_type,
+                    alias="dummy1",
+                    container=components_container,
+                    a=5,
+                    b=2,
+                )
+                self.add_component(
+                    "dummy2",
+                    component_type,
+                    alias="dummy2",
+                    container=components_container,
+                    a=8,
+                    b=7,
+                )
 
-    def test_add_component_with_type(self) -> None:
-        """
-        Test that add_component works with a `type` specified in a
-        configuration overriddes directly supplied configuration values.
+        async with Context():
+            await start_component(ContainerComponent)
 
-        """
-        container = ContainerComponent({"dummy": {"type": DummyComponent}})
-        container.add_component("dummy")
-        assert len(container.child_components) == 1
-        component = container.child_components["dummy"]
-        assert isinstance(component, DummyComponent)
+        assert len(components_container) == 2
+        assert components_container["dummy1"].kwargs == {"a": 5, "b": 2}
+        assert components_container["dummy2"].kwargs == {"a": 8, "b": 7}
 
     @pytest.mark.parametrize(
         "alias, cls, exc_cls, message",
         [
-            ("", None, TypeError, "component_alias must be a nonempty string"),
-            (
+            pytest.param(
+                "", None, TypeError, "alias must be a nonempty string", id="empty_alias"
+            ),
+            pytest.param(
                 "foo",
                 None,
                 LookupError,
                 "no such entry point in asphalt.components: foo",
+                id="bogus_entry_point",
             ),
-            (
+            pytest.param(
                 "foo",
                 int,
                 TypeError,
                 "int is not a subclass of asphalt.core.Component",
+                id="wrong_subclass",
+            ),
+            pytest.param(
+                "foo",
+                4,
+                TypeError,
+                "type must be either a subclass of asphalt.core.Component or a string",
+                id="invalid_type",
             ),
         ],
-        ids=["empty_alias", "bogus_entry_point", "wrong_subclass"],
     )
     def test_add_component_errors(
         self,
-        container: ContainerComponent,
         alias: str,
         cls: type | None,
         exc_cls: type[Exception],
         message: str,
     ) -> None:
+        container = Component()
         exc = pytest.raises(exc_cls, container.add_component, alias, cls)
         assert str(exc.value) == message
 
-    def test_add_duplicate_component(self, container: ContainerComponent) -> None:
+    def test_add_duplicate_component(self) -> None:
+        container = Component()
         container.add_component("dummy")
         exc = pytest.raises(ValueError, container.add_component, "dummy")
         assert str(exc.value) == 'there is already a child component named "dummy"'
 
-    async def test_start(self, container: ContainerComponent) -> None:
-        async with Context():
-            await start_component(container)
+    async def test_add_component_during_start(self) -> None:
+        class BadContainerComponent(Component):
+            async def start(self) -> None:
+                self.add_component("foo", DummyComponent)
 
-        dummy = cast(DummyComponent, container.child_components["dummy"])
-        assert dummy.started
+        async with Context():
+            with pytest.raises(RuntimeError, match="child components cannot be added"):
+                await start_component(BadContainerComponent)
 
 
 class TestCLIApplicationComponent:
@@ -125,7 +158,7 @@ class TestCLIApplicationComponent:
                 pass
 
         # No exception should be raised here
-        run_application(DummyCLIComponent(), backend=anyio_backend_name)
+        run_application(DummyCLIComponent, backend=anyio_backend_name)
 
     def test_run_return_5(self, anyio_backend_name: str) -> None:
         class DummyCLIComponent(CLIApplicationComponent):
@@ -133,7 +166,7 @@ class TestCLIApplicationComponent:
                 return 5
 
         with pytest.raises(SystemExit) as exc:
-            run_application(DummyCLIComponent(), backend=anyio_backend_name)
+            run_application(DummyCLIComponent, backend=anyio_backend_name)
 
         assert exc.value.code == 5
 
@@ -144,7 +177,7 @@ class TestCLIApplicationComponent:
 
         with pytest.raises(SystemExit) as exc:
             with pytest.warns(UserWarning) as record:
-                run_application(DummyCLIComponent(), backend=anyio_backend_name)
+                run_application(DummyCLIComponent, backend=anyio_backend_name)
 
         assert exc.value.code == 1
         assert len(record) == 1
@@ -157,7 +190,7 @@ class TestCLIApplicationComponent:
 
         with pytest.raises(SystemExit) as exc:
             with pytest.warns(UserWarning) as record:
-                run_application(DummyCLIComponent(), backend=anyio_backend_name)
+                run_application(DummyCLIComponent, backend=anyio_backend_name)
 
         assert exc.value.code == 1
         assert len(record) == 1
@@ -169,14 +202,14 @@ class TestCLIApplicationComponent:
                 raise Exception("blah")
 
         with raises_in_exception_group(Exception, match="blah"):
-            run_application(DummyCLIComponent(), backend=anyio_backend_name)
+            run_application(DummyCLIComponent, backend=anyio_backend_name)
 
 
 async def test_start_component_no_context() -> None:
     with pytest.raises(
         RuntimeError, match=r"start_component\(\) requires an active Asphalt context"
     ):
-        await start_component(ContainerComponent())
+        await start_component(DummyComponent)
 
 
 async def test_start_component_timeout() -> None:
@@ -187,4 +220,25 @@ async def test_start_component_timeout() -> None:
 
     async with Context():
         with pytest.raises(TimeoutError, match="timeout starting component"):
-            await start_component(StallingComponent(), timeout=0.01)
+            await start_component(StallingComponent, timeout=0.01)
+
+
+async def test_prepare() -> None:
+    class ParentComponent(Component):
+        def __init__(self) -> None:
+            self.add_component("child", ChildComponent)
+
+        async def prepare(self) -> None:
+            add_resource("foo")
+
+        async def start(self) -> None:
+            get_resource_nowait(str, "bar")
+
+    class ChildComponent(Component):
+        async def start(self) -> None:
+            foo = get_resource_nowait(str)
+            add_resource(foo + "bar", "bar")
+
+    async with Context():
+        await start_component(ParentComponent)
+        assert get_resource_nowait(str, "bar") == "foobar"

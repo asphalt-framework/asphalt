@@ -16,7 +16,6 @@ from anyio.lowlevel import checkpoint
 from asphalt.core import (
     CLIApplicationComponent,
     Component,
-    ContainerComponent,
     add_teardown_callback,
     get_resource,
     run_application,
@@ -66,11 +65,10 @@ class DummyCLIApp(CLIApplicationComponent):
     def __init__(self, exit_code: int | None = None):
         super().__init__()
         self.exit_code = exit_code
-        self.teardown_callback_called = False
         self.exception: BaseException | None = None
 
     def teardown_callback(self, exception: BaseException | None) -> None:
-        self.teardown_callback_called = True
+        logging.getLogger(__name__).info("Teardown callback called")
         self.exception = exception
 
     async def start(self) -> None:
@@ -97,9 +95,7 @@ def test_run_logging_config(
     with patch("asphalt.core._runner.basicConfig") as basicConfig, patch(
         "asphalt.core._runner.dictConfig"
     ) as dictConfig:
-        run_application(
-            DummyCLIApp(), logging=logging_config, backend=anyio_backend_name
-        )
+        run_application(DummyCLIApp, logging=logging_config, backend=anyio_backend_name)
 
     assert basicConfig.call_count == (1 if logging_config == logging.INFO else 0)
     assert dictConfig.call_count == (1 if isinstance(logging_config, dict) else 0)
@@ -125,11 +121,12 @@ def test_run_max_threads(max_threads: int | None, anyio_backend_name: str) -> No
         limiter = to_thread.current_default_thread_limiter()
         return limiter.total_tokens
 
-    component = MaxThreadsComponent()
     expected_total_tokens = max_threads or anyio.run(
         get_default_total_tokens, backend=anyio_backend_name
     )
-    run_application(component, max_threads=max_threads, backend=anyio_backend_name)
+    run_application(
+        MaxThreadsComponent, max_threads=max_threads, backend=anyio_backend_name
+    )
     assert observed_total_tokens == expected_total_tokens
 
 
@@ -140,18 +137,14 @@ def test_run_callbacks(caplog: LogCaptureFixture, anyio_backend_name: str) -> No
 
     """
     caplog.set_level(logging.INFO)
-    component = DummyCLIApp()
-    run_application(component, backend=anyio_backend_name)
+    run_application(DummyCLIApp, backend=anyio_backend_name)
 
-    assert component.teardown_callback_called
-    records = [
-        record for record in caplog.records if record.name == "asphalt.core._runner"
-    ]
-    assert len(records) == 4
-    assert records[0].message == "Running in development mode"
-    assert records[1].message == "Starting application"
-    assert records[2].message == "Application started"
-    assert records[3].message == "Application stopped"
+    assert len(caplog.messages) == 5
+    assert caplog.messages[0] == "Running in development mode"
+    assert caplog.messages[1] == "Starting application"
+    assert caplog.messages[2] == "Application started"
+    assert caplog.messages[3] == "Teardown callback called"
+    assert caplog.messages[4] == "Application stopped"
 
 
 @pytest.mark.parametrize(
@@ -183,8 +176,7 @@ def test_clean_exit(
 
     """
     caplog.set_level(logging.INFO)
-    component = ShutdownComponent(method=method)
-    run_application(component, backend=anyio_backend_name)
+    run_application(ShutdownComponent, {"method": method}, backend=anyio_backend_name)
 
     records = [
         record for record in caplog.records if record.name == "asphalt.core._runner"
@@ -233,9 +225,8 @@ def test_start_exception(
 
     """
     caplog.set_level(logging.INFO)
-    component = CrashComponent(method=method)
     with pytest.raises(SystemExit) as exc_info:
-        run_application(component, backend=anyio_backend_name)
+        run_application(CrashComponent, {"method": method}, backend=anyio_backend_name)
 
     assert exc_info.value.code == 1
     records = [
@@ -252,25 +243,27 @@ def test_start_exception(
 def test_start_timeout(
     caplog: LogCaptureFixture, anyio_backend_name: str, levels: int
 ) -> None:
-    class StallingComponent(ContainerComponent):
+    class StallingComponent(Component):
         def __init__(self, level: int):
             super().__init__()
             self.level = level
+            if self.level < levels:
+                self.add_component("child1", StallingComponent, level=self.level + 1)
+                self.add_component("child2", StallingComponent, level=self.level + 1)
 
         async def start(self) -> None:
             if self.level == levels:
                 # Wait forever for a non-existent resource
                 await get_resource(float, wait=True)
-            else:
-                self.add_component("child1", StallingComponent, level=self.level + 1)
-                self.add_component("child2", StallingComponent, level=self.level + 1)
-
-            await super().start()
 
     caplog.set_level(logging.INFO)
-    component = StallingComponent(1)
     with pytest.raises(SystemExit) as exc_info:
-        run_application(component, start_timeout=0.1, backend=anyio_backend_name)
+        run_application(
+            StallingComponent,
+            {"level": 1},
+            start_timeout=0.1,
+            backend=anyio_backend_name,
+        )
 
     assert exc_info.value.code == 1
     assert len(caplog.messages) == 4
@@ -325,16 +318,16 @@ def test_start_timeout(
 def test_dict_config(caplog: LogCaptureFixture, anyio_backend_name: str) -> None:
     """Test that component configuration passed as a dictionary works."""
     caplog.set_level(logging.INFO)
-    run_application(component={"type": DummyCLIApp}, backend=anyio_backend_name)
+    run_application(
+        config_or_component_class={"type": DummyCLIApp}, backend=anyio_backend_name
+    )
 
-    records = [
-        record for record in caplog.records if record.name == "asphalt.core._runner"
-    ]
-    assert len(records) == 4
-    assert records[0].message == "Running in development mode"
-    assert records[1].message == "Starting application"
-    assert records[2].message == "Application started"
-    assert records[3].message == "Application stopped"
+    assert len(caplog.messages) == 5
+    assert caplog.messages[0] == "Running in development mode"
+    assert caplog.messages[1] == "Starting application"
+    assert caplog.messages[2] == "Application started"
+    assert caplog.messages[3] == "Teardown callback called"
+    assert caplog.messages[4] == "Application stopped"
 
 
 def test_run_cli_application(
@@ -342,15 +335,13 @@ def test_run_cli_application(
 ) -> None:
     caplog.set_level(logging.INFO)
     with pytest.raises(SystemExit) as exc:
-        run_application(DummyCLIApp(20), backend=anyio_backend_name)
+        run_application(DummyCLIApp, {"exit_code": 20}, backend=anyio_backend_name)
 
     assert exc.value.code == 20
 
-    records = [
-        record for record in caplog.records if record.name == "asphalt.core._runner"
-    ]
-    assert len(records) == 4
-    assert records[0].message == "Running in development mode"
-    assert records[1].message == "Starting application"
-    assert records[2].message == "Application started"
-    assert records[3].message == "Application stopped"
+    assert len(caplog.messages) == 5
+    assert caplog.messages[0] == "Running in development mode"
+    assert caplog.messages[1] == "Starting application"
+    assert caplog.messages[2] == "Application started"
+    assert caplog.messages[3] == "Teardown callback called"
+    assert caplog.messages[4] == "Application stopped"

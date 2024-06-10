@@ -32,5 +32,4 @@ class ServerComponent(Component):
 
 
 if __name__ == "__main__":
-    component = ServerComponent()
-    run_application(component)
+    run_application(ServerComponent)

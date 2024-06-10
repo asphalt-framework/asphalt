@@ -2,7 +2,6 @@ from typing import Any
 
 from ._component import CLIApplicationComponent as CLIApplicationComponent
 from ._component import Component as Component
-from ._component import ContainerComponent as ContainerComponent
 from ._component import start_component as start_component
 from ._concurrent import TaskFactory as TaskFactory
 from ._concurrent import TaskHandle as TaskHandle

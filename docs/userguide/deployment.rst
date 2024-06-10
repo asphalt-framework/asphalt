@@ -49,15 +49,12 @@ A production-ready configuration file should contain at least the following opti
 
 Suppose you had the following component class as your root component::
 
-    class MyRootComponent(ContainerComponent):
+    class MyRootComponent(Component):
         def __init__(self, components, data_directory: str):
             super().__init__(components)
             self.data_directory = data_directory
-
-        async def start() -> None:
             self.add_component('mailer', backend='smtp')
             self.add_component('sqlalchemy')
-            await super().start()
 
 You could then write a configuration file like this::
 
@@ -82,7 +79,7 @@ You could then write a configuration file like this::
           formatter: generic
       formatters:
         generic:
-            format: "%(asctime)s:%(levelname)s:%(name)s:%(message)s"
+          format: "%(asctime)s:%(levelname)s:%(name)s:%(message)s"
       root:
         handlers: [console]
         level: INFO
@@ -151,7 +148,7 @@ Configuration overlays
 
 Component configuration can be specified on several levels:
 
-* Hard-coded arguments to :meth:`ContainerComponent.add_component`
+* Hard-coded arguments to :meth:`Component.add_component`
 * First configuration file argument to ``asphalt run``
 * Second configuration file argument to ``asphalt run``
 * ...

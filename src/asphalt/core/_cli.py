@@ -130,9 +130,11 @@ def run(configfile: Sequence[str], service: str | None, set_: list[str]) -> None
     config = merge_config(config, service_config)
 
     # Start the application
+    component = config.pop("component")
     backend = config.pop("backend", "asyncio")
     backend_options = config.pop("backend_options", {})
     run_application(
+        component,
         **config,
         backend=backend,
         backend_options=backend_options,
