@@ -66,6 +66,7 @@ This library adheres to `Semantic Versioning 2.0 <https://semver.org/>`_.
     ``super().__init__()`` anymore
 - **BACKWARD INCOMPATIBLE** Moved all exported functions and classes directly to
   ``asphalt.core`` and made submodules private
+- Added support for Python 3.13
 - Dropped support for Python 3.7
 
 **4.12.0**
