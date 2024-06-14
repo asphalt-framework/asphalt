@@ -89,6 +89,20 @@ def test_run_bad_override(runner: CliRunner) -> None:
         )
 
 
+def test_run_missing_root_component_type(runner: CliRunner) -> None:
+    config = """\
+        services:
+            default:
+    """
+    with runner.isolated_filesystem():
+        Path("test.yml").write_text(config)
+        result = runner.invoke(_cli.run, ["test.yml"])
+        assert result.exit_code == 1
+        assert result.stdout == (
+            "Error: Service configuration is missing the 'component' key\n"
+        )
+
+
 def test_run_bad_path(runner: CliRunner) -> None:
     config = """\
     component:

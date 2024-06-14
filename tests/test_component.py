@@ -100,7 +100,12 @@ class TestComplexComponent:
         async with Context():
             await start_component(
                 Component,
-                {"components": {"dummy": {"alias": "dummy", "container": container}}},
+                {
+                    "components": {
+                        "dummy": {"alias": "dummy", "container": container},
+                        "dummy/2": None,
+                    }
+                },
             )
 
         assert isinstance(container["dummy"], DummyComponent)

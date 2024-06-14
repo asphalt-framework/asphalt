@@ -129,12 +129,19 @@ def run(configfile: Sequence[str], service: str | None, set_: list[str]) -> None
     # Merge the service-level configuration with the top level one
     config = merge_config(config, service_config)
 
+    # Extract the root component type
+    try:
+        root_component = config.pop("component")
+    except KeyError as exc:
+        raise click.ClickException(
+            "Service configuration is missing the 'component' key"
+        ) from exc
+
     # Start the application
-    component = config.pop("component")
     backend = config.pop("backend", "asyncio")
     backend_options = config.pop("backend_options", {})
     run_application(
-        component,
+        root_component,
         **config,
         backend=backend,
         backend_options=backend_options,

@@ -315,21 +315,6 @@ def test_start_timeout(
         }
 
 
-def test_dict_config(caplog: LogCaptureFixture, anyio_backend_name: str) -> None:
-    """Test that component configuration passed as a dictionary works."""
-    caplog.set_level(logging.INFO)
-    run_application(
-        config_or_component_class={"type": DummyCLIApp}, backend=anyio_backend_name
-    )
-
-    assert len(caplog.messages) == 5
-    assert caplog.messages[0] == "Running in development mode"
-    assert caplog.messages[1] == "Starting application"
-    assert caplog.messages[2] == "Application started"
-    assert caplog.messages[3] == "Teardown callback called"
-    assert caplog.messages[4] == "Application stopped"
-
-
 def test_run_cli_application(
     caplog: LogCaptureFixture, anyio_backend_name: str
 ) -> None:

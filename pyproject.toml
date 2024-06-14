@@ -116,5 +116,5 @@ package = editable
 
 [testenv:docs]
 extras = doc
-commands = sphinx-build -W docs build/sphinx {posargs}
+commands = sphinx-build -n docs build/sphinx {posargs}
 """

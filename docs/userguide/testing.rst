@@ -35,7 +35,7 @@ functions in the module to be run via AnyIO's pytest plugin.
 The next item in the module is the ``server`` asynchronous generator fixture. Fixtures
 like these are run by AnyIO's pytest plugin in their respective tasks, making the
 practice of straddling a :class:`Context` on a ``yield`` safe. This would normally be
-bad, as the context contains a :class:`~anyio.TaskGroup` which usually should not be
+bad, as the context contains a :class:`~anyio.abc.TaskGroup` which usually should not be
 used together with ``yield``, unless it's carefully managed like it is here.
 
 The actual test function, ``test_client_and_server()`` first declares a dependency

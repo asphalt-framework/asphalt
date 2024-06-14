@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from abc import ABCMeta, abstractmethod
-from collections.abc import Coroutine
+from collections.abc import Coroutine, MutableMapping
 from dataclasses import dataclass, field
 from inspect import isclass
 from logging import getLogger
@@ -117,7 +117,7 @@ class Component(metaclass=ABCMeta):
 
 class CLIApplicationComponent(Component):
     """
-    Specialized subclass of :class:`.ContainerComponent` for command line tools.
+    Specialized :class:`.Component` subclass for command line tools.
 
     Command line tools and similar applications should use this as their root component
     and implement their main code in the :meth:`run` method.
@@ -146,10 +146,15 @@ component_types = PluginContainer("asphalt.components", Component)
 
 
 def _init_component(
-    config: dict[str, Any],
+    config: object,
     path: str,
     child_components_by_alias: dict[str, dict[str, Component]],
 ) -> Component:
+    if not isinstance(config, MutableMapping):
+        raise TypeError(
+            f"{path}: config must be a mutable mapping, not {qualified_name(config)}"
+        )
+
     # Separate the child components from the config
     child_components_config = config.pop("components", {})
 
@@ -173,10 +178,13 @@ def _init_component(
     # Create the child components
     child_components = child_components_by_alias[path] = {}
     for alias, child_config in child_components_config.items():
+        if child_config is None:
+            child_config = {}
+
         # If the type was specified only via an alias, use that as a type
-        if "type" not in child_config:
+        if isinstance(child_config, MutableMapping) and "type" not in child_config:
             # Use the first part of the alias as type, partitioned by "/"
-            child_config.setdefault("type", alias.split("/")[0])
+            child_config["type"] = alias.split("/")[0]
 
         final_path = f"{path}.{alias}" if path else alias
 
@@ -217,7 +225,7 @@ async def _start_component(
 
 @overload
 async def start_component(
-    config_or_component_class: type[TComponent],
+    component_class: type[TComponent],
     config: dict[str, Any] | None = ...,
     *,
     timeout: float | None = ...,
@@ -226,7 +234,7 @@ async def start_component(
 
 @overload
 async def start_component(
-    config_or_component_class: dict[str, Any],
+    component_class: str,
     config: dict[str, Any] | None = ...,
     *,
     timeout: float | None = ...,
@@ -234,7 +242,7 @@ async def start_component(
 
 
 async def start_component(
-    config_or_component_class: type[Component] | dict[str, Any],
+    component_class: type[Component] | str,
     config: dict[str, Any] | None = None,
     *,
     timeout: float | None = 20,
@@ -242,29 +250,19 @@ async def start_component(
     """
     Start a component and its subcomponents.
 
-    :param config_or_component_class: the (root) component to start, or a configuration
-    :param config: configuration overrides for the root component and subcomponents
+    :param component_class: the root component class, an entry point name in the
+        ``asphalt.components`` namespace or a ``modulename:varname`` reference
+    :param config: configuration for the root component (and its child components)
     :param timeout: seconds to wait for all the components in the hierarchy to start
         (default: ``20``; set to ``None`` to disable timeout)
     :raises RuntimeError: if this function is called without an active :class:`Context`
     :raises TimeoutError: if the startup of the component hierarchy takes more than
         ``timeout`` seconds
-    :raises TypeError: if ``config_or_component_class`` is neither a dict or a
-        :class:`Component` subclass
+    :raises TypeError: if ``component_class`` is neither a :class:`Component` subclass
+        or a string
+    :return: the root component instance
 
     """
-    if isinstance(config_or_component_class, dict):
-        configuration = config_or_component_class
-    elif isclass(config_or_component_class) and issubclass(
-        config_or_component_class, Component
-    ):
-        configuration = config or {}
-        configuration["type"] = config_or_component_class
-    else:
-        raise TypeError(
-            "config_or_component_class must either be a Component subclass or a dict"
-        )
-
     try:
         current_context()
     except NoCurrentContext:
@@ -272,8 +270,12 @@ async def start_component(
             "start_component() requires an active Asphalt context"
         ) from None
 
+    if config is None:
+        config = {}
+
+    config.setdefault("type", component_class)
     child_components_by_alias: dict[str, dict[str, Component]] = {}
-    root_component = _init_component(configuration, "", child_components_by_alias)
+    root_component = _init_component(config, "", child_components_by_alias)
 
     with CancelScope() as startup_scope:
         startup_watcher_scope: CancelScope | None = None

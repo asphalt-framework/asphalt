@@ -905,7 +905,7 @@ def inject(func: Callable[P, Any]) -> Callable[P, Any]:
 
     Parameters with dependencies need to be annotated and have :func:`resource` as the
     default value. When the wrapped function is called, values for such parameters will
-    be automatically filled in by calling :func:`require_resource` using the parameter's
+    be automatically filled in by calling :func:`get_resource` using the parameter's
     type annotation and the resource name passed to :func:`resource` (or ``"default"``)
     as the arguments.
 
