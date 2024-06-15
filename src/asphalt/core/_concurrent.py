@@ -27,7 +27,7 @@ T_Retval = TypeVar("T_Retval")
 TeardownAction: TypeAlias = Union[Callable[[], Any], Literal["cancel"], None]
 ExceptionHandler: TypeAlias = Callable[[Exception], bool]
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("asphalt.core")
 
 
 @dataclass(unsafe_hash=True)

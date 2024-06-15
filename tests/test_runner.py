@@ -175,20 +175,17 @@ def test_clean_exit(
     directly from a service task, it exits cleanly.
 
     """
-    caplog.set_level(logging.INFO)
+    caplog.set_level(logging.INFO, "asphalt.core")
     run_application(ShutdownComponent, {"method": method}, backend=anyio_backend_name)
 
-    records = [
-        record for record in caplog.records if record.name == "asphalt.core._runner"
-    ]
-    assert len(records) == 5 if expected_stop_message else 4
-    assert records[0].message == "Running in development mode"
-    assert records[1].message == "Starting application"
-    assert records[2].message == "Application started"
-    assert records[-1].message == "Application stopped"
+    assert len(caplog.messages) == 5 if expected_stop_message else 4
+    assert caplog.messages[0] == "Running in development mode"
+    assert caplog.messages[1] == "Starting application"
+    assert caplog.messages[2] == "Application started"
+    assert caplog.messages[-1] == "Application stopped"
 
     if expected_stop_message:
-        assert records[3].message == expected_stop_message
+        assert caplog.messages[3] == expected_stop_message
 
 
 @pytest.mark.parametrize(
@@ -224,19 +221,16 @@ def test_start_exception(
     application context and made available to teardown callbacks.
 
     """
-    caplog.set_level(logging.INFO)
+    caplog.set_level(logging.INFO, "asphalt.core")
     with pytest.raises(SystemExit) as exc_info:
         run_application(CrashComponent, {"method": method}, backend=anyio_backend_name)
 
     assert exc_info.value.code == 1
-    records = [
-        record for record in caplog.records if record.name.startswith("asphalt.core.")
-    ]
-    assert len(records) == 4
-    assert records[0].message == "Running in development mode"
-    assert records[1].message == "Starting application"
-    assert records[2].message == expected_stop_message
-    assert records[3].message == "Application stopped"
+    assert len(caplog.messages) == 4
+    assert caplog.messages[0] == "Running in development mode"
+    assert caplog.messages[1] == "Starting application"
+    assert caplog.messages[2] == expected_stop_message
+    assert caplog.messages[3] == "Application stopped"
 
 
 @pytest.mark.parametrize("levels", [1, 2, 3])

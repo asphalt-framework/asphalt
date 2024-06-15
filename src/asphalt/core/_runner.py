@@ -5,7 +5,7 @@ import signal
 import sys
 from contextlib import AsyncExitStack
 from functools import partial
-from logging import INFO, Logger, basicConfig, getLogger
+from logging import INFO, basicConfig, getLogger
 from logging.config import dictConfig
 from typing import Any
 from warnings import warn
@@ -28,11 +28,12 @@ from ._concurrent import start_service_task
 from ._context import Context
 from ._utils import qualified_name
 
+logger = getLogger("asphalt.core")
+
 
 async def handle_signals(
     startup_scope: CancelScope, event: Event, *, task_status: TaskStatus[None]
 ) -> None:
-    logger = getLogger(__name__)
     with anyio.open_signal_receiver(signal.SIGTERM, signal.SIGINT) as signals:
         task_status.started()
         async for signum in signals:
@@ -48,7 +49,6 @@ async def handle_signals(
 async def _run_application_async(
     component_class: type[Component] | str,
     config: dict[str, Any] | None,
-    logger: Logger,
     max_threads: int | None,
     start_timeout: float | None,
 ) -> int:
@@ -162,14 +162,12 @@ def run_application(
         basicConfig(level=logging)
 
     # Inform the user whether -O or PYTHONOPTIMIZE was set when Python was launched
-    logger = getLogger(__name__)
     logger.info("Running in %s mode", "development" if __debug__ else "production")
 
     if exit_code := anyio.run(
         _run_application_async,
         component_class,
         config,
-        logger,
         max_threads,
         start_timeout,
         backend=backend,

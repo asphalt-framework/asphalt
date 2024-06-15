@@ -1,10 +1,10 @@
 from __future__ import annotations
 
+import logging
 from abc import ABCMeta, abstractmethod
 from collections.abc import Coroutine, MutableMapping
 from dataclasses import dataclass, field
 from inspect import isclass
-from logging import getLogger
 from traceback import StackSummary
 from types import FrameType
 from typing import Any, TypeVar, overload
@@ -22,6 +22,8 @@ from ._concurrent import start_service_task
 from ._context import current_context
 from ._exceptions import NoCurrentContext
 from ._utils import PluginContainer, merge_config, qualified_name
+
+logger = logging.getLogger("asphalt.core")
 
 TComponent = TypeVar("TComponent", bound="Component")
 
@@ -396,7 +398,7 @@ async def _component_startup_watcher(
 
         return output
 
-    getLogger(__name__).error(
+    logger.error(
         "Timeout waiting for the root component to start\n"
         "Components still waiting to finish startup:\n%s",
         textwrap.indent(format_status(root_status, 0).rstrip(), "  "),

@@ -68,7 +68,7 @@ else:
     from exceptiongroup import BaseExceptionGroup
     from typing_extensions import Self
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("asphalt.core")
 FactoryCallback: TypeAlias = Callable[[], Any]
 TeardownCallback: TypeAlias = Union[
     Callable[[], Any], Callable[[Optional[BaseException]], Any]
