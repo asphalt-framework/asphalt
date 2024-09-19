@@ -81,7 +81,6 @@ class TestComplexComponent:
                 )
                 self.add_component(
                     "dummy/alt",
-                    component_type,
                     alias="dummy/alt",
                     container=components_container,
                     a=8,

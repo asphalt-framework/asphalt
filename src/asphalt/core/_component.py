@@ -167,10 +167,18 @@ def _init_component(
         if child_config is None:
             child_config = {}
 
+        if not isinstance(child_config, MutableMapping):
+            raise TypeError(
+                f"{path}: child component configuration must be either None or a dict "
+                f"(or other mutable mapping type)"
+            )
+
         # If the type was specified only via an alias, use that as a type
-        if isinstance(child_config, MutableMapping) and "type" not in child_config:
-            # Use the first part of the alias as type, partitioned by "/"
-            child_config["type"] = alias.split("/")[0]
+        child_config.setdefault("type", alias)
+
+        # If the type contains a forward slash, split the latter part out of it
+        if isinstance(child_config["type"], str) and "/" in child_config["type"]:
+            child_config["type"] = child_config["type"].split("/")[0]
 
         final_path = f"{path}.{alias}" if path else alias
 
