@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import Any
 from unittest.mock import patch
@@ -8,18 +9,23 @@ import pytest
 from click.testing import CliRunner
 from pytest import MonkeyPatch
 
-from asphalt.core import Component, _cli
+from asphalt.core import CLIApplicationComponent, _cli
 
 pytestmark = pytest.mark.anyio()
 
 
-class DummyComponent(Component):
-    def __init__(self, dummyval1: Any = None, dummyval2: Any = None):
-        self.dummyval1 = dummyval1
-        self.dummyval2 = dummyval2
+class DummyComponent(CLIApplicationComponent):
+    def __init__(self, **kwargs: Any) -> None:
+        self.kwargs = kwargs
 
-    async def start(self) -> None:
-        pass
+    async def run(self) -> None:
+        def convert_binary(val: Any) -> Any:
+            if isinstance(val, bytes):
+                return repr(val)
+
+            return val
+
+        print(json.dumps(self.kwargs, default=convert_binary))
 
 
 @pytest.fixture
@@ -50,28 +56,17 @@ logging:
   version: 1
   disable_existing_loggers: false
 """
-    with runner.isolated_filesystem(), patch(
-        "asphalt.core._cli.run_application"
-    ) as run_app:
+    with runner.isolated_filesystem():
         Path("test.yml").write_text(config)
         result = runner.invoke(_cli.run, ["test.yml"])
 
         assert result.exit_code == 0
-        assert run_app.call_count == 1
-        args, kwargs = run_app.call_args
-        assert args == (
-            {
-                "type": DummyComponent,
-                "dummyval1": "testval",
-                "envval": "from environment",
-                "textfileval": "Hello, World!",
-                "binaryfileval": b"Hello, World!",
-            },
-        )
+        kwargs = json.loads(result.stdout)
         assert kwargs == {
-            "backend": anyio_backend_name,
-            "backend_options": {},
-            "logging": {"version": 1, "disable_existing_loggers": False},
+            "dummyval1": "testval",
+            "envval": "from environment",
+            "textfileval": "Hello, World!",
+            "binaryfileval": "b'Hello, World!'",
         }
 
 
@@ -89,7 +84,7 @@ def test_run_bad_override(runner: CliRunner) -> None:
         )
 
 
-def test_run_missing_root_component_type(runner: CliRunner) -> None:
+def test_run_missing_root_component_config(runner: CliRunner) -> None:
     config = """\
         services:
             default:
@@ -100,6 +95,21 @@ def test_run_missing_root_component_type(runner: CliRunner) -> None:
         assert result.exit_code == 1
         assert result.stdout == (
             "Error: Service configuration is missing the 'component' key\n"
+        )
+
+
+def test_run_missing_root_component_type(runner: CliRunner) -> None:
+    config = """\
+        services:
+            default:
+                component: {}
+    """
+    with runner.isolated_filesystem():
+        Path("test.yml").write_text(config)
+        result = runner.invoke(_cli.run, ["test.yml"])
+        assert result.exit_code == 1
+        assert result.stdout == (
+            "Error: Root component configuration is missing the 'type' key\n"
         )
 
 
@@ -161,8 +171,8 @@ component:
         assert run_app.call_count == 1
         args, kwargs = run_app.call_args
         assert args == (
+            component_class,
             {
-                "type": component_class,
                 "dummyval1": "alternate",
                 "dummyval2": 10,
                 "dummyval3": "bar",
@@ -223,8 +233,8 @@ logging:
             args, kwargs = run_app.call_args
             if service == "server":
                 assert args == (
+                    "myproject.server.ServerComponent",
                     {
-                        "type": "myproject.server.ServerComponent",
                         "components": {
                             "wamp": {
                                 "host": "wamp.example.org",
@@ -245,8 +255,8 @@ logging:
                 }
             else:
                 assert args == (
+                    "myproject.client.ClientComponent",
                     {
-                        "type": "myproject.client.ClientComponent",
                         "components": {
                             "wamp": {
                                 "host": "wamp.example.org",
@@ -352,7 +362,7 @@ logging:
             assert result.exit_code == 0
             assert run_app.call_count == 1
             args, kwargs = run_app.call_args
-            assert args == ({"type": "myproject.client.ClientComponent"},)
+            assert args == ("myproject.client.ClientComponent", {})
             assert kwargs == {
                 "backend": "asyncio",
                 "backend_options": {},
@@ -383,7 +393,7 @@ logging:
             assert result.exit_code == 0
             assert run_app.call_count == 1
             args, kwargs = run_app.call_args
-            assert args == ({"type": "myproject.server.ServerComponent"},)
+            assert args == ("myproject.server.ServerComponent", {})
             assert kwargs == {
                 "backend": "asyncio",
                 "backend_options": {},
@@ -417,7 +427,7 @@ logging:
             assert result.exit_code == 0
             assert run_app.call_count == 1
             args, kwargs = run_app.call_args
-            assert args == ({"type": "myproject.client.ClientComponent"},)
+            assert args == ("myproject.client.ClientComponent", {})
             assert kwargs == {
                 "backend": "asyncio",
                 "backend_options": {},
@@ -451,7 +461,7 @@ logging:
             assert result.exit_code == 0
             assert run_app.call_count == 1
             args, kwargs = run_app.call_args
-            assert args == ({"type": "myproject.server.ServerComponent"},)
+            assert args == ("myproject.server.ServerComponent", {})
             assert kwargs == {
                 "backend": "asyncio",
                 "backend_options": {},
