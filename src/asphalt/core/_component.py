@@ -72,28 +72,12 @@ class Component(metaclass=ABCMeta):
         if not isinstance(alias, str) or not alias:
             raise TypeError("alias must be a nonempty string")
 
-        if type is None:
-            type = alias
-
-        if isclass(type):
-            if not issubclass(type, Component):
-                raise TypeError(
-                    f"{qualified_name(type)} is not a subclass of "
-                    f"asphalt.core.Component"
-                )
-        elif isinstance(type, str):
-            component_types.resolve(type)
-        else:
-            raise TypeError(
-                "type must be either a subclass of asphalt.core.Component or a string"
-            )
-
         if self._child_components is None:
             self._child_components = {}
         elif alias in self._child_components:
             raise ValueError(f'there is already a child component named "{alias}"')
 
-        self._child_components[alias] = {"type": type, **config}
+        self._child_components[alias] = {"type": type or alias, **config}
 
     async def prepare(self) -> None:
         """

@@ -72,17 +72,17 @@ class TestComplexComponent:
         class ContainerComponent(Component):
             def __init__(self) -> None:
                 self.add_component(
-                    "dummy1",
+                    "dummy",
                     component_type,
-                    alias="dummy1",
+                    alias="dummy",
                     container=components_container,
                     a=5,
                     b=2,
                 )
                 self.add_component(
-                    "dummy2",
+                    "dummy/alt",
                     component_type,
-                    alias="dummy2",
+                    alias="dummy/alt",
                     container=components_container,
                     a=8,
                     b=7,
@@ -92,8 +92,8 @@ class TestComplexComponent:
             await start_component(ContainerComponent)
 
         assert len(components_container) == 2
-        assert components_container["dummy1"].kwargs == {"a": 5, "b": 2}
-        assert components_container["dummy2"].kwargs == {"a": 8, "b": 7}
+        assert components_container["dummy"].kwargs == {"a": 5, "b": 2}
+        assert components_container["dummy/alt"].kwargs == {"a": 8, "b": 7}
 
     async def test_child_components_from_config(self) -> None:
         container: dict[str, Component] = {}
@@ -125,46 +125,6 @@ class TestComplexComponent:
 
         assert isinstance(container["first"], DummyComponent)
         assert isinstance(container["second"], DummyComponent)
-
-    @pytest.mark.parametrize(
-        "alias, cls, exc_cls, message",
-        [
-            pytest.param(
-                "", None, TypeError, "alias must be a nonempty string", id="empty_alias"
-            ),
-            pytest.param(
-                "foo",
-                None,
-                LookupError,
-                "no such entry point in asphalt.components: foo",
-                id="bogus_entry_point",
-            ),
-            pytest.param(
-                "foo",
-                int,
-                TypeError,
-                "int is not a subclass of asphalt.core.Component",
-                id="wrong_subclass",
-            ),
-            pytest.param(
-                "foo",
-                4,
-                TypeError,
-                "type must be either a subclass of asphalt.core.Component or a string",
-                id="invalid_type",
-            ),
-        ],
-    )
-    def test_add_component_errors(
-        self,
-        alias: str,
-        cls: type | None,
-        exc_cls: type[Exception],
-        message: str,
-    ) -> None:
-        container = Component()
-        exc = pytest.raises(exc_cls, container.add_component, alias, cls)
-        assert str(exc.value) == message
 
     def test_add_duplicate_component(self) -> None:
         container = Component()
