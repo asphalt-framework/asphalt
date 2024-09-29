@@ -196,10 +196,12 @@ async def test_component_resource_isolation() -> None:
 
             # Both ChildComponents should see this
             add_resource("parent")
+            add_resource("explicit", "parent")
 
         async def start(self) -> None:
             # Here we only see the string resource we added in our own prepare() method
             assert get_resource_nowait(str) == "parent"
+            assert get_resource_nowait(str, "parent") == "explicit"
 
             # Resources from both ChildComponents should be visible here
             assert get_resources(int) == {

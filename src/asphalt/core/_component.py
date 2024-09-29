@@ -181,7 +181,7 @@ class ComponentContext(Context):
         description: str | None = None,
         teardown_callback: Callable[[], Any] | None = None,
     ) -> None:
-        if self.status == "preparing":
+        if name is None and self.status == "preparing":
             name = "default"
 
         super().add_resource(
@@ -209,7 +209,7 @@ class ComponentContext(Context):
         types: Sequence[type] | None = None,
         description: str | None = None,
     ) -> None:
-        if self.status == "preparing":
+        if name is None and self.status == "preparing":
             name = "default"
 
         super().add_resource_factory(
