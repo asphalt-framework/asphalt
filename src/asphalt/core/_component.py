@@ -3,12 +3,12 @@ from __future__ import annotations
 import logging
 import sys
 from abc import ABCMeta, abstractmethod
-from collections.abc import Coroutine, MutableMapping
+from collections.abc import Coroutine, MutableMapping, Sequence
 from dataclasses import dataclass, field
 from inspect import isclass
 from traceback import StackSummary
 from types import FrameType
-from typing import Any, Callable, Literal, Sequence, TypeVar, overload
+from typing import Any, Callable, Literal, TypeVar, overload
 
 from anyio import (
     CancelScope,
