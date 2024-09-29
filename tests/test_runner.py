@@ -17,7 +17,6 @@ from asphalt.core import (
     CLIApplicationComponent,
     Component,
     add_teardown_callback,
-    get_resource,
     run_application,
     start_service_task,
 )
@@ -141,11 +140,13 @@ def test_run_callbacks(caplog: LogCaptureFixture, anyio_backend_name: str) -> No
     run_application(DummyCLIApp, backend=anyio_backend_name)
 
     assert len(caplog.messages) == 5
-    assert caplog.messages[0] == "Running in development mode"
-    assert caplog.messages[1] == "Starting application"
-    assert caplog.messages[2] == "Application started"
-    assert caplog.messages[3] == "Teardown callback called"
-    assert caplog.messages[4] == "Application stopped"
+    assert caplog.messages == [
+        "Running in development mode",
+        "Starting application",
+        "Application started",
+        "Teardown callback called",
+        "Application stopped",
+    ]
 
 
 @pytest.mark.parametrize(
@@ -179,14 +180,16 @@ def test_clean_exit(
     caplog.set_level(logging.INFO, "asphalt.core")
     run_application(ShutdownComponent, {"method": method}, backend=anyio_backend_name)
 
-    assert len(caplog.messages) == 5 if expected_stop_message else 4
-    assert caplog.messages[0] == "Running in development mode"
-    assert caplog.messages[1] == "Starting application"
-    assert caplog.messages[2] == "Application started"
-    assert caplog.messages[-1] == "Application stopped"
-
+    expected_messages = [
+        "Running in development mode",
+        "Starting application",
+        "Application started",
+        "Application stopped",
+    ]
     if expected_stop_message:
-        assert caplog.messages[3] == expected_stop_message
+        expected_messages.insert(3, expected_stop_message)
+
+    assert caplog.messages == expected_messages
 
 
 @pytest.mark.parametrize(
@@ -227,11 +230,12 @@ def test_start_exception(
         run_application(CrashComponent, {"method": method}, backend=anyio_backend_name)
 
     assert exc_info.value.code == 1
-    assert len(caplog.messages) == 4
-    assert caplog.messages[0] == "Running in development mode"
-    assert caplog.messages[1] == "Starting application"
-    assert caplog.messages[2] == expected_stop_message
-    assert caplog.messages[3] == "Application stopped"
+    assert caplog.messages == [
+        "Running in development mode",
+        "Starting application",
+        expected_stop_message,
+        "Application stopped",
+    ]
 
 
 @pytest.mark.parametrize("levels", [1, 2, 3])
@@ -248,8 +252,7 @@ def test_start_timeout(
 
         async def start(self) -> None:
             if self.level == levels:
-                # Wait forever for a non-existent resource
-                await get_resource(float, wait=True)
+                await sleep(1)  # wait past the timeout
 
     caplog.set_level(logging.INFO)
     with pytest.raises(SystemExit) as exc_info:
@@ -319,9 +322,10 @@ def test_run_cli_application(
 
     assert exc.value.code == 20
 
-    assert len(caplog.messages) == 5
-    assert caplog.messages[0] == "Running in development mode"
-    assert caplog.messages[1] == "Starting application"
-    assert caplog.messages[2] == "Application started"
-    assert caplog.messages[3] == "Teardown callback called"
-    assert caplog.messages[4] == "Application stopped"
+    assert caplog.messages == [
+        "Running in development mode",
+        "Starting application",
+        "Application started",
+        "Teardown callback called",
+        "Application stopped",
+    ]

@@ -25,6 +25,7 @@ from inspect import (
     iscoroutinefunction,
     signature,
 )
+from itertools import count
 from types import TracebackType
 from typing import (
     Any,
@@ -48,7 +49,7 @@ from anyio import (
 )
 from anyio.abc import TaskGroup
 
-from ._event import Event, Signal, wait_event
+from ._event import Event, Signal
 from ._exceptions import (
     AsyncResourceError,
     NoCurrentContext,
@@ -152,22 +153,31 @@ class Context:
     _task_group: TaskGroup
     _reset_token: Token[Context]
     _exit_stack: AsyncExitStack
+    _default_resource_name = "default"
 
-    def __init__(self) -> None:
+    def __init__(self, *, lookup_depth: int | None = None) -> None:
         self._parent = _current_context.get(None)
         self._state = ContextState.inactive
         self._resources: dict[tuple[type, str], ResourceContainer] = {}
         self._resource_factories: dict[tuple[type, str], ResourceContainer] = {}
         self._teardown_callbacks: list[tuple[TeardownCallback, bool]] = []
+        self._lookup_depth: float = (
+            lookup_depth if lookup_depth is not None else float("inf")
+        )
 
     @property
-    def context_chain(self) -> list[Context]:
-        """Return a list of contexts starting from this one, its parent and so on."""
+    def context_chain(self) -> Sequence[Context]:
+        """Return a sequence of contexts starting from this one, its parent and so on."""
         contexts = []
         ctx: Context | None = self
-        while ctx is not None:
+        for depth in count():
+            if ctx is None or (
+                self._lookup_depth is None or depth > self._lookup_depth
+            ):
+                break
+
             contexts.append(ctx)
-            ctx = ctx.parent
+            ctx = ctx._parent
 
         return contexts
 
@@ -288,7 +298,7 @@ class Context:
     def add_resource(
         self,
         value: T_Resource,
-        name: str = "default",
+        name: str | None = None,
         types: type | Sequence[type] = (),
         *,
         description: str | None = None,
@@ -332,34 +342,35 @@ class Context:
         if value is None:
             raise ValueError('"value" must not be None')
 
-        if not resource_name_re.fullmatch(name):
+        resource_name = name or self._default_resource_name
+        if not resource_name_re.fullmatch(resource_name):
             raise ValueError(
                 '"name" must be a nonempty string consisting only of alphanumeric '
                 "characters and underscores"
             )
 
         for resource_type in types_:
-            if (resource_type, name) in self._resources:
+            if (resource_type, resource_name) in self._resources:
                 raise ResourceConflict(
                     f"this context already contains a resource of type "
-                    f"{qualified_name(resource_type)} using the name {name!r}"
+                    f"{qualified_name(resource_type)} using the name {resource_name!r}"
                 )
 
-        container = ResourceContainer(value, types_, name, description, False)
+        container = ResourceContainer(value, types_, resource_name, description, False)
         for type_ in types_:
-            self._resources[(type_, name)] = container
+            self._resources[(type_, resource_name)] = container
 
         # Add the teardown callback, if any
         if teardown_callback is not None:
             self.add_teardown_callback(teardown_callback)
 
         # Notify listeners that a new resource has been made available
-        self.resource_added.dispatch(ResourceEvent(types_, name, False))
+        self.resource_added.dispatch(ResourceEvent(types_, resource_name, False))
 
     def add_resource_factory(
         self,
         factory_callback: FactoryCallback,
-        name: str = "default",
+        name: str | None = None,
         *,
         types: Sequence[type] | None = None,
         description: str | None = None,
@@ -398,7 +409,9 @@ class Context:
         import types as stdlib_types
 
         self._ensure_state(ContextState.open)
-        if not resource_name_re.fullmatch(name):
+
+        resource_name = name or self._default_resource_name
+        if not resource_name_re.fullmatch(resource_name):
             raise ValueError(
                 '"name" must be a nonempty string consisting only of alphanumeric '
                 "characters and underscores"
@@ -436,7 +449,7 @@ class Context:
 
         # Check for conflicts with existing resource factories
         for type_ in resource_types:
-            if (type_, name) in self._resource_factories:
+            if (type_, resource_name) in self._resource_factories:
                 raise ResourceConflict(
                     f"this context already contains a resource factory for the "
                     f"type {qualified_name(type_)}"
@@ -444,13 +457,13 @@ class Context:
 
         # Add the resource factory to the appropriate lookup tables
         resource = ResourceContainer(
-            factory_callback, resource_types, name, description, True
+            factory_callback, resource_types, resource_name, description, True
         )
         for type_ in resource_types:
-            self._resource_factories[(type_, name)] = resource
+            self._resource_factories[(type_, resource_name)] = resource
 
         # Notify listeners that a new resource has been made available
-        self.resource_added.dispatch(ResourceEvent(resource_types, name, True))
+        self.resource_added.dispatch(ResourceEvent(resource_types, resource_name, True))
 
     @overload
     def get_resource_nowait(
@@ -538,7 +551,6 @@ class Context:
         type: type[T_Resource],
         name: str = ...,
         *,
-        wait: bool = False,
         optional: Literal[True],
     ) -> T_Resource | None: ...
 
@@ -548,13 +560,12 @@ class Context:
         type: type[T_Resource],
         name: str = ...,
         *,
-        wait: bool = ...,
         optional: Literal[False],
     ) -> T_Resource: ...
 
     @overload
     async def get_resource(
-        self, type: type[T_Resource], name: str = ..., *, wait: bool = False
+        self, type: type[T_Resource], name: str = ...
     ) -> T_Resource: ...
 
     async def get_resource(
@@ -562,7 +573,6 @@ class Context:
         type: type[T_Resource],
         name: str = "default",
         *,
-        wait: bool = False,
         optional: Literal[False, True] = False,
     ) -> T_Resource | None:
         """
@@ -570,8 +580,6 @@ class Context:
 
         :param type: type of the requested resource
         :param name: name of the requested resource
-        :param wait: if ``True``, wait for the resource to become available if it's not
-            already available in the context chain
         :param optional: if ``True``, return ``None`` if the resource was not available
         :raises ValueError: if both ``optional=True`` and ``wait=True`` were specified,
             as it doesn't make sense
@@ -580,9 +588,6 @@ class Context:
 
         """
         self._ensure_state(ContextState.open, ContextState.closing)
-
-        if wait and optional:
-            raise ValueError("combining wait=True and optional=True doesn't make sense")
 
         # First check if there's already a matching resource in this context
         key = (type, name)
@@ -617,19 +622,11 @@ class Context:
             if key in ctx._resources:
                 return cast(T_Resource, ctx._resources[key].value_or_factory)
 
-        if wait:
-            # Wait until a matching resource or resource factory is available
-            signals = [ctx.resource_added for ctx in self.context_chain]
-            await wait_event(
-                signals,
-                lambda event: event.resource_name == name
-                and type in event.resource_types,
-            )
-            return await self.get_resource(type, name)
-        elif optional:
-            return None
+        # If the resource is required, raise ResourceNotFound
+        if not optional:
+            raise ResourceNotFound(type, name)
 
-        raise ResourceNotFound(type, name)
+        return None
 
     def get_resources(self, type: type[T_Resource]) -> Mapping[str, T_Resource]:
         """
@@ -742,7 +739,7 @@ def current_context() -> Context:
 
 def add_resource(
     value: T_Resource,
-    name: str = "default",
+    name: str | None = None,
     types: type | Sequence[type] = (),
     *,
     description: str | None = None,
@@ -760,7 +757,7 @@ def add_resource(
 
 def add_resource_factory(
     factory_callback: FactoryCallback,
-    name: str = "default",
+    name: str | None = None,
     *,
     types: Sequence[type] | None = None,
     description: str | None = None,
@@ -802,7 +799,6 @@ async def get_resource(
     type: type[T_Resource],
     name: str = ...,
     *,
-    wait: bool = False,
     optional: Literal[True],
 ) -> T_Resource | None: ...
 
@@ -812,14 +808,14 @@ async def get_resource(
     type: type[T_Resource],
     name: str = ...,
     *,
-    wait: bool = ...,
     optional: Literal[False],
 ) -> T_Resource: ...
 
 
 @overload
 async def get_resource(
-    type: type[T_Resource], name: str = ..., *, wait: bool = False
+    type: type[T_Resource],
+    name: str = ...,
 ) -> T_Resource: ...
 
 
@@ -827,7 +823,6 @@ async def get_resource(
     type: type[T_Resource],
     name: str = "default",
     *,
-    wait: bool = False,
     optional: Literal[False, True] = False,
 ) -> T_Resource | None:
     """
@@ -836,27 +831,23 @@ async def get_resource(
     .. seealso:: :meth:`Context.get_resource`
 
     """
-    return await current_context().get_resource(
-        type, name, wait=wait, optional=optional
-    )
+    return await current_context().get_resource(type, name, optional=optional)
 
 
 @overload
 def get_resource_nowait(
-    type: type[T_Resource], name: str = "default", *, optional: Literal[True]
+    type: type[T_Resource], name: str = ..., *, optional: Literal[True]
 ) -> T_Resource | None: ...
 
 
 @overload
 def get_resource_nowait(
-    type: type[T_Resource], name: str = "default", *, optional: Literal[False]
+    type: type[T_Resource], name: str = ..., *, optional: Literal[False]
 ) -> T_Resource: ...
 
 
 @overload
-def get_resource_nowait(
-    type: type[T_Resource], name: str = "default"
-) -> T_Resource: ...
+def get_resource_nowait(type: type[T_Resource], name: str = ...) -> T_Resource: ...
 
 
 def get_resource_nowait(

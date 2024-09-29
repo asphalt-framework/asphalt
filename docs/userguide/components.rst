@@ -93,23 +93,23 @@ sibling and child components:
 * :meth:`Component.prepare`:
 
     * ❌ Cannot add child components
-    * ✅ Can acquire resources provided by parent components in their
-      :meth:`~Component.prepare` methods
-    * ❌ Cannot acquire resources provided by parent components in their
-      :meth:`~Component.start` methods
+    * ✅ Can acquire resources provided by the immediate parent component in its
+      :meth:`~Component.prepare` method
+    * ❌ Cannot acquire resources provided by the immediate parent component in its
+      :meth:`~Component.start` method
     * ✅ Can acquire resources provided by sibling components (but you must use
       :func:`get_resource` to avoid race conditions)
     * ❌ Cannot acquire resources provided by child components
-    * ✅ Can provide resources to child components
+    * ✅ Can provide resources for direct child components (one level down)
 
 * :meth:`Component.start`:
 
     * ❌ Cannot add child components
-    * ✅ Can acquire resources provided by parent components in their
-      :meth:`~Component.prepare` methods
-    * ❌ Cannot acquire resources provided by parent components in their
-      :meth:`~Component.start` methods
+    * ✅ Can acquire resources provided by the immediate parent component (one level up)
+      in its :meth:`~Component.prepare` method
+    * ❌ Cannot acquire resources provided by the immediate parent component in its
+      :meth:`~Component.start` method
     * ✅ Can acquire resources provided by sibling components (but you must use
       :func:`get_resource` to avoid race conditions)
-    * ✅ Can acquire resources provided by child components
-    * ❌ Cannot provide resources to child components
+    * ✅ Can acquire resources provided by direct child components (one level down)
+    * ❌ Cannot provide resources for child components

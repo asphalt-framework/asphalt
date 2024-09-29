@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sys
+from dataclasses import dataclass
 from typing import Any, NoReturn
 from unittest.mock import Mock
 
@@ -16,6 +17,7 @@ from asphalt.core import (
     Context,
     add_resource,
     get_resource_nowait,
+    get_resources,
     run_application,
     start_component,
 )
@@ -141,6 +143,91 @@ class TestComplexComponent:
                 await start_component(BadContainerComponent)
 
 
+async def test_component_resource_isolation() -> None:
+    """
+    This test starts the following component structure:
+
+    - GrandParentComponent (the root component)
+      - ParentComponent (parent/first)
+        - ChildComponent (parent/first.child/first)
+        - ChildComponent (parent/first.child/second)
+      - ParentComponent (parent/second)
+        - ChildComponent (parent/second.child/first)
+        - ChildComponent (parent/second.child/second)
+
+    It ensures the following:
+    - ParentComponent sees resources added in GrandParentComponent.prepare()
+    - ChildComponent sees resources added in ParentComponent.prepare()
+    - GrandParentComponent sees resources added in ParentComponent.start()
+    - GrandParentComponent does not see resources added in ParentComponent.prepare()
+    - ChildComponent does not see resources added in GrandParentComponent.prepare()
+    - ChildComponent does not see resources added by their "cousin" components
+    - GrandParentComponent does not see resources added by any ChildComponent
+    """
+
+    class GrandParentComponent(Component):
+        def __init__(self) -> None:
+            self.add_component("parent/first", ParentComponent)
+            self.add_component("parent/second", ParentComponent)
+
+        async def prepare(self) -> None:
+            add_resource("grandparent")
+
+        async def start(self) -> None:
+            # Resources from both ParentComponents should be visible here
+            assert get_resources(str) == {
+                "default": "grandparent",
+                "first": "start",
+                "second": "start",
+            }
+
+            # Resources from ChildComponent should not be visible here
+            assert not get_resources(int)
+
+    class ParentComponent(Component):
+        def __init__(self) -> None:
+            self.add_component("child/first", ChildComponent, number=1)
+            self.add_component("child/second", ChildComponent, number=2)
+
+        async def prepare(self) -> None:
+            # Resources added in GrandParentComponent.prepare() should not be visible
+            # here
+            assert get_resource_nowait(str) == "grandparent"
+
+            # Both ChildComponents should see this
+            add_resource("parent")
+
+        async def start(self) -> None:
+            # Here we only see the string resource we added in our own prepare() method
+            assert get_resource_nowait(str) == "parent"
+
+            # Resources from both ChildComponents should be visible here
+            assert get_resources(int) == {
+                "first": 1,
+                "second": 2,
+            }
+
+            # GrandParentComponent should see this
+            add_resource("start")
+
+    @dataclass
+    class ChildComponent(Component):
+        number: int
+
+        async def prepare(self) -> None:
+            assert get_resource_nowait(str) == "parent"
+
+        async def start(self) -> None:
+            # Resources added in ParentComponent.prepare() should be visible here
+            assert get_resource_nowait(str) == "parent"
+
+            # The direct ParentComponent should see this
+            add_resource(self.number)
+
+    async with Context():
+        await start_component(GrandParentComponent)
+
+
 class TestCLIApplicationComponent:
     def test_run_return_none(self, anyio_backend_name: str) -> None:
         class DummyCLIComponent(CLIApplicationComponent):
@@ -211,24 +298,3 @@ async def test_start_component_timeout() -> None:
     async with Context():
         with pytest.raises(TimeoutError, match="timeout starting component"):
             await start_component(StallingComponent, timeout=0.01)
-
-
-async def test_prepare() -> None:
-    class ParentComponent(Component):
-        def __init__(self) -> None:
-            self.add_component("child", ChildComponent)
-
-        async def prepare(self) -> None:
-            add_resource("foo")
-
-        async def start(self) -> None:
-            get_resource_nowait(str, "bar")
-
-    class ChildComponent(Component):
-        async def start(self) -> None:
-            foo = get_resource_nowait(str)
-            add_resource(foo + "bar", "bar")
-
-    async with Context():
-        await start_component(ParentComponent)
-        assert get_resource_nowait(str, "bar") == "foobar"

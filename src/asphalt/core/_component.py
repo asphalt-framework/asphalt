@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 import logging
+import sys
 from abc import ABCMeta, abstractmethod
 from collections.abc import Coroutine, MutableMapping
 from dataclasses import dataclass, field
 from inspect import isclass
 from traceback import StackSummary
 from types import FrameType
-from typing import Any, TypeVar, overload
+from typing import Any, Callable, Literal, Sequence, TypeVar, overload
 
 from anyio import (
     CancelScope,
@@ -19,9 +20,20 @@ from anyio import (
 from anyio.abc import TaskStatus
 
 from ._concurrent import start_service_task
-from ._context import current_context
+from ._context import (
+    Context,
+    FactoryCallback,
+    T_Resource,
+    TeardownCallback,
+    current_context,
+)
 from ._exceptions import NoCurrentContext
 from ._utils import PluginContainer, merge_config, qualified_name
+
+if sys.version_info >= (3, 11):
+    pass
+else:
+    pass
 
 logger = logging.getLogger("asphalt.core")
 
@@ -86,18 +98,37 @@ class Component(metaclass=ABCMeta):
         This method is called by :func:`start_component` *before* starting the child
         components of this component, so it can be used to add any resources required
         by the child components.
+
+        The rules for resource handling during component startup are as follows:
+
+        * Any resources added here without an explicit name will use the default
+          resource name of ``default``, regardless of what alias this component was
+          configured with, in contrast to how :meth:`start` works.
+        * Any resources added here will only be seen by the direct children of this
+          component. Parent and sibling components will not be able to see these
+          resources.
         """
 
     async def start(self) -> None:
         """
         Perform any necessary tasks to start the services provided by this component.
 
+        .. warning:: Do not call this method directly; use :func:`start_component`
+            instead.
+
         This method is called by :func:`start_component` *after* the child components of
         this component have been started, so any resources provided by the child
         components are available at this point.
 
-        .. warning:: Do not call this method directly; use :func:`start_component`
-            instead.
+        The rules for resource handling during component startup are as follows:
+
+        * Any resources added here without an explicit name will use the default
+          resource name that may not be ``default``. For example, if this component is
+          started as a child component of another component, with the alias of
+          ``foo/bar``, then the default resource name used by
+          :meth:`Context.add_resource` will be ``bar``.
+        * Any resources added here will only be seen by sibling components and direct
+          parent components.
         """
 
 
@@ -129,6 +160,77 @@ class CLIApplicationComponent(Component):
 
 
 component_types = PluginContainer("asphalt.components", Component)
+
+
+class ComponentContext(Context):
+    def __init__(
+        self, component: Component, path: str, default_resource_name: str
+    ) -> None:
+        super().__init__(lookup_depth=1)
+        self.description = f"{component.__class__.__qualname__} ({path or '(root)'})"
+        self.path = path
+        self._default_resource_name = default_resource_name
+        self.status: Literal["preparing", "starting"] = "preparing"
+
+    def add_resource(
+        self,
+        value: T_Resource,
+        name: str | None = None,
+        types: type | Sequence[type] = (),
+        *,
+        description: str | None = None,
+        teardown_callback: Callable[[], Any] | None = None,
+    ) -> None:
+        if self.status == "preparing":
+            name = "default"
+
+        super().add_resource(
+            value,
+            name,
+            types,
+            description=description,
+            teardown_callback=teardown_callback,
+        )
+        if self._parent is not None and self.status == "starting":
+            Context.add_resource(
+                self._parent,
+                value,
+                name or self._default_resource_name,
+                types,
+                description=description,
+                teardown_callback=teardown_callback,
+            )
+
+    def add_resource_factory(
+        self,
+        factory_callback: FactoryCallback,
+        name: str | None = None,
+        *,
+        types: Sequence[type] | None = None,
+        description: str | None = None,
+    ) -> None:
+        if self.status == "preparing":
+            name = "default"
+
+        super().add_resource_factory(
+            factory_callback,
+            name,
+            types=types,
+            description=description,
+        )
+        if self._parent is not None and self.status == "starting":
+            self._parent.add_resource_factory(
+                factory_callback,
+                name,
+                types=types,
+                description=description,
+            )
+
+    def add_teardown_callback(
+        self, callback: TeardownCallback, pass_exception: bool = False
+    ) -> None:
+        assert self._parent is not None
+        self._parent.add_teardown_callback(callback, pass_exception)
 
 
 def _init_component(
@@ -193,28 +295,37 @@ def _init_component(
 async def _start_component(
     component: Component,
     path: str,
+    default_resource_name: str,
     child_components_by_alias: dict[str, dict[str, Component]],
 ) -> None:
     # Prevent add_component() from being called beyond this point
     component._component_started = True
 
     # Call prepare() on the component itself
-    await component.prepare()
+    async with ComponentContext(component, path, default_resource_name) as ctx:
+        await component.prepare()
+        ctx.status = "starting"
 
-    # Start the child components
-    if child_components := child_components_by_alias.get(path):
-        async with create_task_group() as tg:
-            for alias, child_component in child_components.items():
-                final_path = f"{path}.{alias}" if path else alias
-                tg.start_soon(
-                    _start_component,
-                    child_component,
-                    final_path,
-                    child_components_by_alias,
-                    name=f"Starting {final_path} ({qualified_name(child_component)})",
-                )
+        # Start the child components
+        if child_components := child_components_by_alias.get(path):
+            async with create_task_group() as tg:
+                for alias, child_component in child_components.items():
+                    if "/" in alias:
+                        default_resource_name = alias.split("/", 1)[1]
+                    else:
+                        default_resource_name = "default"
 
-    await component.start()
+                    final_path = f"{path}.{alias}" if path else alias
+                    tg.start_soon(
+                        _start_component,
+                        child_component,
+                        final_path,
+                        default_resource_name,
+                        child_components_by_alias,
+                        name=f"Starting {final_path} ({qualified_name(child_component)})",
+                    )
+
+        await component.start()
 
 
 @overload
@@ -284,7 +395,7 @@ async def start_component(
                 "Asphalt component startup watcher task",
             )
 
-        await _start_component(root_component, "", child_components_by_alias)
+        await _start_component(root_component, "", "default", child_components_by_alias)
 
     if startup_scope.cancel_called:
         raise TimeoutError("timeout starting component")
