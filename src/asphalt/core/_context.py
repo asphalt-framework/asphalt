@@ -499,16 +499,20 @@ class Context:
             if key in ctx._resource_factories:
                 # Call the factory callback to generate the resource
                 factory = ctx._resource_factories[key]
-                resource = factory.value_or_factory()
+                generated_resource = factory.value_or_factory()
 
                 # Raise AsyncResourceError if the factory returns a coroutine object
-                if iscoroutine(resource):
-                    resource.close()
+                if iscoroutine(generated_resource):
+                    generated_resource.close()
                     raise AsyncResourceError()
 
                 # Store the generated resource in the context
                 container = ResourceContainer(
-                    resource, factory.types, factory.name, factory.description, False
+                    generated_resource,
+                    factory.types,
+                    factory.name,
+                    factory.description,
+                    False,
                 )
                 for type_ in factory.types:
                     self._resources[(type_, factory.name)] = container
@@ -516,7 +520,7 @@ class Context:
                 # Dispatch the resource_added event to notify any listeners
                 self.resource_added.dispatch(ResourceEvent(factory.types, name, False))
 
-                return cast(T_Resource, resource)
+                return cast(T_Resource, generated_resource)
 
         # Finally, check parents for a matching resource
         for ctx in self.context_chain:
@@ -589,12 +593,16 @@ class Context:
         for ctx in self.context_chain:
             if key in ctx._resource_factories:
                 factory = ctx._resource_factories[key]
-                resource = factory.value_or_factory()
-                if isawaitable(resource):
-                    resource = await resource
+                generated_resource = factory.value_or_factory()
+                if isawaitable(generated_resource):
+                    generated_resource = await generated_resource
 
                 container = ResourceContainer(
-                    resource, factory.types, factory.name, factory.description, False
+                    generated_resource,
+                    factory.types,
+                    factory.name,
+                    factory.description,
+                    False,
                 )
                 for type_ in factory.types:
                     self._resources[(type_, factory.name)] = container
@@ -602,7 +610,7 @@ class Context:
                 # Dispatch the resource_added event to notify any listeners
                 self.resource_added.dispatch(ResourceEvent(factory.types, name, False))
 
-                return cast(T_Resource, resource)
+                return cast(T_Resource, generated_resource)
 
         # Finally, check parents for a matching resource
         for ctx in self.context_chain:

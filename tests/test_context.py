@@ -348,7 +348,7 @@ class TestContext:
         """
         exc = pytest.raises(ResourceNotFound, context.get_resource_nowait, int, "foo")
         exc.match("no matching resource was found for type=int name='foo'")
-        assert exc.value.type == int
+        assert exc.value.type is int
         assert exc.value.name == "foo"
 
     async def test_get_resource_optional_wait(self, context: Context) -> None:
