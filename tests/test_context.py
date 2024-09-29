@@ -4,7 +4,7 @@ import sys
 from collections.abc import AsyncGenerator, Callable
 from contextlib import AsyncExitStack, ExitStack
 from itertools import count
-from typing import Any, NoReturn, Optional, Tuple, Union
+from typing import Any, NoReturn, Optional, Union
 
 import anyio
 import pytest
@@ -568,7 +568,7 @@ class TestDependencyInjection:
         @inject
         async def injected(
             foo: int, bar: str = resource(), *, baz: str = resource("alt")
-        ) -> Tuple[int, str, str]:  # noqa: UP006
+        ) -> tuple[int, str, str]:
             return foo, bar, baz
 
         async with Context() as ctx:
@@ -584,7 +584,7 @@ class TestDependencyInjection:
         @inject
         def injected(
             foo: int, bar: str = resource(), *, baz: str = resource("alt")
-        ) -> Tuple[int, str, str]:  # noqa: UP006
+        ) -> tuple[int, str, str]:
             return foo, bar, baz
 
         async with Context() as ctx:

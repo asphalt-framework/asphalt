@@ -26,7 +26,6 @@ repos:
     rev: v1.10.0
     hooks:
       - id: mypy
-        language_version: python3.8
         additional_dependencies:
           - anyio
           - click

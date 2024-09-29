@@ -92,9 +92,10 @@ def test_run_logging_config(
     logging_config: dict[str, Any] | int | None, anyio_backend_name: str
 ) -> None:
     """Test that logging initialization happens as expected."""
-    with patch("asphalt.core._runner.basicConfig") as basicConfig, patch(
-        "asphalt.core._runner.dictConfig"
-    ) as dictConfig:
+    with (
+        patch("asphalt.core._runner.basicConfig") as basicConfig,
+        patch("asphalt.core._runner.dictConfig") as dictConfig,
+    ):
         run_application(DummyCLIApp, logging=logging_config, backend=anyio_backend_name)
 
     assert basicConfig.call_count == (1 if logging_config == logging.INFO else 0)

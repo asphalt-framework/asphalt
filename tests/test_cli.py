@@ -150,9 +150,10 @@ component:
   dummyval3: foo
 """
 
-    with runner.isolated_filesystem(), patch(
-        "asphalt.core._cli.run_application"
-    ) as run_app:
+    with (
+        runner.isolated_filesystem(),
+        patch("asphalt.core._cli.run_application") as run_app,
+    ):
         Path("conf1.yml").write_text(config1)
         Path("conf2.yml").write_text(config2)
         result = runner.invoke(
@@ -222,9 +223,10 @@ logging:
 
     @pytest.mark.parametrize("service", ["server", "client"])
     def test_run_service(self, runner: CliRunner, service: str) -> None:
-        with runner.isolated_filesystem(), patch(
-            "asphalt.core._cli.run_application"
-        ) as run_app:
+        with (
+            runner.isolated_filesystem(),
+            patch("asphalt.core._cli.run_application") as run_app,
+        ):
             self.write_config()
             result = runner.invoke(_cli.run, ["-s", service, "config.yml"])
 
@@ -276,9 +278,10 @@ logging:
                 }
 
     def test_service_not_found(self, runner: CliRunner) -> None:
-        with runner.isolated_filesystem(), patch(
-            "asphalt.core._cli.run_application"
-        ) as run_app:
+        with (
+            runner.isolated_filesystem(),
+            patch("asphalt.core._cli.run_application") as run_app,
+        ):
             self.write_config()
             result = runner.invoke(_cli.run, ["-s", "foobar", "config.yml"])
 
@@ -287,9 +290,10 @@ logging:
             assert result.output == "Error: Service 'foobar' has not been defined\n"
 
     def test_no_service_selected(self, runner: CliRunner) -> None:
-        with runner.isolated_filesystem(), patch(
-            "asphalt.core._cli.run_application"
-        ) as run_app:
+        with (
+            runner.isolated_filesystem(),
+            patch("asphalt.core._cli.run_application") as run_app,
+        ):
             self.write_config()
             result = runner.invoke(_cli.run, ["config.yml"])
 
@@ -302,9 +306,10 @@ logging:
             )
 
     def test_bad_services_type(self, runner: CliRunner) -> None:
-        with runner.isolated_filesystem(), patch(
-            "asphalt.core._cli.run_application"
-        ) as run_app:
+        with (
+            runner.isolated_filesystem(),
+            patch("asphalt.core._cli.run_application") as run_app,
+        ):
             Path("config.yml").write_text(
                 """\
 ---
@@ -323,9 +328,10 @@ logging:
             )
 
     def test_no_services_defined(self, runner: CliRunner) -> None:
-        with runner.isolated_filesystem(), patch(
-            "asphalt.core._cli.run_application"
-        ) as run_app:
+        with (
+            runner.isolated_filesystem(),
+            patch("asphalt.core._cli.run_application") as run_app,
+        ):
             Path("config.yml").write_text(
                 """\
 ---
@@ -342,9 +348,10 @@ logging:
             assert result.output == "Error: No services have been defined\n"
 
     def test_run_only_service(self, runner: CliRunner) -> None:
-        with runner.isolated_filesystem(), patch(
-            "asphalt.core._cli.run_application"
-        ) as run_app:
+        with (
+            runner.isolated_filesystem(),
+            patch("asphalt.core._cli.run_application") as run_app,
+        ):
             Path("config.yml").write_text(
                 """\
 ---
@@ -370,9 +377,10 @@ logging:
             }
 
     def test_run_default_service(self, runner: CliRunner) -> None:
-        with runner.isolated_filesystem(), patch(
-            "asphalt.core._cli.run_application"
-        ) as run_app:
+        with (
+            runner.isolated_filesystem(),
+            patch("asphalt.core._cli.run_application") as run_app,
+        ):
             Path("config.yml").write_text(
                 """\
 ---
@@ -403,9 +411,10 @@ logging:
     def test_service_env_variable(
         self, runner: CliRunner, monkeypatch: MonkeyPatch
     ) -> None:
-        with runner.isolated_filesystem(), patch(
-            "asphalt.core._cli.run_application"
-        ) as run_app:
+        with (
+            runner.isolated_filesystem(),
+            patch("asphalt.core._cli.run_application") as run_app,
+        ):
             Path("config.yml").write_text(
                 """\
 ---
@@ -437,9 +446,10 @@ logging:
     def test_service_env_variable_override(
         self, runner: CliRunner, monkeypatch: MonkeyPatch
     ) -> None:
-        with runner.isolated_filesystem(), patch(
-            "asphalt.core._cli.run_application"
-        ) as run_app:
+        with (
+            runner.isolated_filesystem(),
+            patch("asphalt.core._cli.run_application") as run_app,
+        ):
             Path("config.yml").write_text(
                 """\
 ---
