@@ -213,7 +213,8 @@ async def stream_events(
     async with AsyncExitStack() as exit_stack:
         filtered_receive = filter_events()
         exit_stack.push_async_callback(filtered_receive.aclose)
-        await exit_stack.enter_async_context(receive)
+        exit_stack.enter_context(send)
+        exit_stack.enter_context(receive)
         for signal in signals:
             exit_stack.enter_context(signal._subscribe(send))
 
