@@ -4,14 +4,14 @@ import logging
 import platform
 import re
 import signal
+from textwrap import dedent
 from typing import Any, Literal
 from unittest.mock import patch
 
 import anyio
 import pytest
 from _pytest.logging import LogCaptureFixture
-from anyio import sleep, to_thread
-from anyio.lowlevel import checkpoint
+from anyio import sleep, to_thread, wait_all_tasks_blocked
 
 from asphalt.core import (
     CLIApplicationComponent,
@@ -34,7 +34,7 @@ class ShutdownComponent(Component):
         self.teardown_callback_called = False
 
     async def stop_app(self) -> None:
-        await checkpoint()
+        await wait_all_tasks_blocked()
         if self.method == "keyboard":
             signal.raise_signal(signal.SIGINT)
         elif self.method == "sigterm":
@@ -140,12 +140,13 @@ def test_run_callbacks(caplog: LogCaptureFixture, anyio_backend_name: str) -> No
     caplog.set_level(logging.INFO)
     run_application(DummyCLIApp, backend=anyio_backend_name)
 
-    assert len(caplog.messages) == 5
-    assert caplog.messages[0] == "Running in development mode"
-    assert caplog.messages[1] == "Starting application"
-    assert caplog.messages[2] == "Application started"
-    assert caplog.messages[3] == "Teardown callback called"
-    assert caplog.messages[4] == "Application stopped"
+    assert caplog.messages == [
+        "Running in development mode",
+        "Starting application",
+        "Application started",
+        "Teardown callback called",
+        "Application stopped",
+    ]
 
 
 @pytest.mark.parametrize(
@@ -179,14 +180,16 @@ def test_clean_exit(
     caplog.set_level(logging.INFO, "asphalt.core")
     run_application(ShutdownComponent, {"method": method}, backend=anyio_backend_name)
 
-    assert len(caplog.messages) == 5 if expected_stop_message else 4
-    assert caplog.messages[0] == "Running in development mode"
-    assert caplog.messages[1] == "Starting application"
-    assert caplog.messages[2] == "Application started"
-    assert caplog.messages[-1] == "Application stopped"
-
+    expected_messages = [
+        "Running in development mode",
+        "Starting application",
+        "Application started",
+        "Application stopped",
+    ]
     if expected_stop_message:
-        assert caplog.messages[3] == expected_stop_message
+        expected_messages.insert(3, expected_stop_message)
+
+    assert caplog.messages == expected_messages
 
 
 @pytest.mark.parametrize(
@@ -227,87 +230,100 @@ def test_start_exception(
         run_application(CrashComponent, {"method": method}, backend=anyio_backend_name)
 
     assert exc_info.value.code == 1
-    assert len(caplog.messages) == 4
-    assert caplog.messages[0] == "Running in development mode"
-    assert caplog.messages[1] == "Starting application"
-    assert caplog.messages[2] == expected_stop_message
-    assert caplog.messages[3] == "Application stopped"
+    assert caplog.messages == [
+        "Running in development mode",
+        "Starting application",
+        expected_stop_message,
+        "Application stopped",
+    ]
 
 
-@pytest.mark.parametrize("levels", [1, 2, 3])
-def test_start_timeout(
-    caplog: LogCaptureFixture, anyio_backend_name: str, levels: int
-) -> None:
+def test_start_timeout(caplog: LogCaptureFixture, anyio_backend_name: str) -> None:
     class StallingComponent(Component):
-        def __init__(self, level: int):
+        def __init__(self, level: int = 1):
             super().__init__()
-            self.level = level
-            if self.level < levels:
-                self.add_component("child1", StallingComponent, level=self.level + 1)
-                self.add_component("child2", StallingComponent, level=self.level + 1)
+            self.is_leaf = level == 4
+            if not self.is_leaf:
+                self.add_component("child1", StallingComponent, level=level + 1)
+                self.add_component("child2", StallingComponent, level=level + 1)
 
         async def start(self) -> None:
-            if self.level == levels:
+            if self.is_leaf:
                 # Wait forever for a non-existent resource
-                await get_resource(float, wait=True)
+                await get_resource(float)
 
     caplog.set_level(logging.INFO)
     with pytest.raises(SystemExit) as exc_info:
         run_application(
             StallingComponent,
-            {"level": 1},
+            {},
             start_timeout=0.1,
             backend=anyio_backend_name,
         )
 
     assert exc_info.value.code == 1
-    assert len(caplog.messages) == 4
-    assert caplog.messages[0] == "Running in development mode"
-    assert caplog.messages[1] == "Starting application"
+    assert caplog.messages == [
+        "Running in development mode",
+        "Starting application",
+        caplog.messages[2],
+        "Application stopped",
+    ]
     assert caplog.messages[2].startswith(
-        "Timeout waiting for the root component to start\n"
-        "Components still waiting to finish startup:\n"
+        dedent(
+            """\
+            Timeout waiting for the component tree to start
+
+            Current status of the components still waiting to finish startup
+            ----------------------------------------------------------------
+
+            (root): starting children
+              child1: starting children
+                child1: starting children
+                  child1: starting
+                  child2: starting
+                child2: starting children
+                  child1: starting
+                  child2: starting
+              child2: starting children
+                child1: starting children
+                  child1: starting
+                  child2: starting
+                child2: starting children
+                  child1: starting
+                  child2: starting
+
+            Stack summaries of components still waiting to start
+            ----------------------------------------------------
+
+            """
+        )
     )
-    assert caplog.messages[3] == "Application stopped"
 
-    child_component_re = re.compile(r"([ |]+)\+-([a-z.12]+) \((.+)\)")
-    lines = caplog.messages[2].splitlines()
-    expected_test_name = f"{__name__}.test_start_timeout"
-    assert lines[2] == f"  root ({expected_test_name}.<locals>.StallingComponent)"
-    component_aliases: set[str] = set()
-    depths: list[int] = [0] * levels
-    expected_indent = "  |  "
-    for line in lines[3:]:
-        if match := child_component_re.match(line):
-            indent, alias, component_name = match.groups()
-            depth = len(alias.split("."))
-            depths[depth - 1] += 1
-            depths[depth:] = [0] * (len(depths) - depth)
-            assert len(depths) == levels
-            assert all(d < 3 for d in depths)
-            expected_indent = "  " + "".join(
-                ("  " if d > 1 else "| ") for d in depths[:depth]
-            )
-            assert component_name == (
-                f"{expected_test_name}.<locals>.StallingComponent"
-            )
-            component_aliases.add(alias)
-        else:
-            assert line.startswith(expected_indent)
+    expected_component_name = (
+        f"{__name__}.test_start_timeout.<locals>.StallingComponent"
+    )
+    paths = set()
+    for line in caplog.messages[2].splitlines()[24:]:
+        if line.startswith("    "):
+            pass
+        elif line.startswith("  "):
+            assert line.startswith('  File "')
+        elif line:
+            match = re.match(r"(child\d\.child\d\.child\d) \((.+)\):$", line)
+            assert match
+            paths.add(match.group(1))
+            assert match.group(2) == expected_component_name
 
-    if levels == 1:
-        assert not component_aliases
-    elif levels == 2:
-        assert component_aliases == {"child1", "child2"}
-    else:
-        assert component_aliases == {
-            "child1",
-            "child2",
-            "child1.child1",
-            "child1.child2",
-            "child2.child1",
-            "child2.child2",
-        }
+    assert paths == {
+        "child1.child1.child1",
+        "child1.child1.child2",
+        "child1.child2.child1",
+        "child1.child2.child2",
+        "child2.child1.child1",
+        "child2.child1.child2",
+        "child2.child2.child1",
+        "child2.child2.child2",
+    }
 
 
 def test_run_cli_application(
@@ -319,9 +335,10 @@ def test_run_cli_application(
 
     assert exc.value.code == 20
 
-    assert len(caplog.messages) == 5
-    assert caplog.messages[0] == "Running in development mode"
-    assert caplog.messages[1] == "Starting application"
-    assert caplog.messages[2] == "Application started"
-    assert caplog.messages[3] == "Teardown callback called"
-    assert caplog.messages[4] == "Application stopped"
+    assert caplog.messages == [
+        "Running in development mode",
+        "Starting application",
+        "Application started",
+        "Teardown callback called",
+        "Application stopped",
+    ]

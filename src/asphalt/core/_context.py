@@ -48,7 +48,7 @@ from anyio import (
 )
 from anyio.abc import TaskGroup
 
-from ._event import Event, Signal, wait_event
+from ._event import Event, Signal
 from ._exceptions import (
     AsyncResourceError,
     NoCurrentContext,
@@ -113,12 +113,14 @@ class ResourceEvent(Event):
     :ivar resource_types: types the resource was registered under
     :vartype resource_types: tuple[type, ...]
     :ivar str name: name of the resource
+    :ivar resource_description: an optional human-readable description of the resource
     :ivar bool is_factory: ``True`` if a resource factory was added, ``False`` if a
         regular resource was added
     """
 
     resource_types: tuple[type, ...]
     resource_name: str
+    resource_description: str | None
     is_factory: bool
 
 
@@ -354,7 +356,7 @@ class Context:
             self.add_teardown_callback(teardown_callback)
 
         # Notify listeners that a new resource has been made available
-        self.resource_added.dispatch(ResourceEvent(types_, name, False))
+        self.resource_added.dispatch(ResourceEvent(types_, name, description, False))
 
     def add_resource_factory(
         self,
@@ -450,7 +452,9 @@ class Context:
             self._resource_factories[(type_, name)] = resource
 
         # Notify listeners that a new resource has been made available
-        self.resource_added.dispatch(ResourceEvent(resource_types, name, True))
+        self.resource_added.dispatch(
+            ResourceEvent(resource_types, name, description, True)
+        )
 
     @overload
     def get_resource_nowait(
@@ -518,7 +522,9 @@ class Context:
                     self._resources[(type_, factory.name)] = container
 
                 # Dispatch the resource_added event to notify any listeners
-                self.resource_added.dispatch(ResourceEvent(factory.types, name, False))
+                self.resource_added.dispatch(
+                    ResourceEvent(factory.types, name, factory.description, False)
+                )
 
                 return cast(T_Resource, generated_resource)
 
@@ -538,7 +544,6 @@ class Context:
         type: type[T_Resource],
         name: str = ...,
         *,
-        wait: bool = False,
         optional: Literal[True],
     ) -> T_Resource | None: ...
 
@@ -548,13 +553,12 @@ class Context:
         type: type[T_Resource],
         name: str = ...,
         *,
-        wait: bool = ...,
         optional: Literal[False],
     ) -> T_Resource: ...
 
     @overload
     async def get_resource(
-        self, type: type[T_Resource], name: str = ..., *, wait: bool = False
+        self, type: type[T_Resource], name: str = ...
     ) -> T_Resource: ...
 
     async def get_resource(
@@ -562,7 +566,6 @@ class Context:
         type: type[T_Resource],
         name: str = "default",
         *,
-        wait: bool = False,
         optional: Literal[False, True] = False,
     ) -> T_Resource | None:
         """
@@ -570,19 +573,12 @@ class Context:
 
         :param type: type of the requested resource
         :param name: name of the requested resource
-        :param wait: if ``True``, wait for the resource to become available if it's not
-            already available in the context chain
         :param optional: if ``True``, return ``None`` if the resource was not available
-        :raises ValueError: if both ``optional=True`` and ``wait=True`` were specified,
-            as it doesn't make sense
         :return: the requested resource, or ``None`` if none was available and
             ``optional`` was ``False``
 
         """
         self._ensure_state(ContextState.open, ContextState.closing)
-
-        if wait and optional:
-            raise ValueError("combining wait=True and optional=True doesn't make sense")
 
         # First check if there's already a matching resource in this context
         key = (type, name)
@@ -608,7 +604,9 @@ class Context:
                     self._resources[(type_, factory.name)] = container
 
                 # Dispatch the resource_added event to notify any listeners
-                self.resource_added.dispatch(ResourceEvent(factory.types, name, False))
+                self.resource_added.dispatch(
+                    ResourceEvent(factory.types, name, factory.description, False)
+                )
 
                 return cast(T_Resource, generated_resource)
 
@@ -617,16 +615,7 @@ class Context:
             if key in ctx._resources:
                 return cast(T_Resource, ctx._resources[key].value_or_factory)
 
-        if wait:
-            # Wait until a matching resource or resource factory is available
-            signals = [ctx.resource_added for ctx in self.context_chain]
-            await wait_event(
-                signals,
-                lambda event: event.resource_name == name
-                and type in event.resource_types,
-            )
-            return await self.get_resource(type, name)
-        elif optional:
+        if optional:
             return None
 
         raise ResourceNotFound(type, name)
@@ -802,7 +791,6 @@ async def get_resource(
     type: type[T_Resource],
     name: str = ...,
     *,
-    wait: bool = False,
     optional: Literal[True],
 ) -> T_Resource | None: ...
 
@@ -812,22 +800,18 @@ async def get_resource(
     type: type[T_Resource],
     name: str = ...,
     *,
-    wait: bool = ...,
     optional: Literal[False],
 ) -> T_Resource: ...
 
 
 @overload
-async def get_resource(
-    type: type[T_Resource], name: str = ..., *, wait: bool = False
-) -> T_Resource: ...
+async def get_resource(type: type[T_Resource], name: str = ...) -> T_Resource: ...
 
 
 async def get_resource(
     type: type[T_Resource],
     name: str = "default",
     *,
-    wait: bool = False,
     optional: Literal[False, True] = False,
 ) -> T_Resource | None:
     """
@@ -836,9 +820,7 @@ async def get_resource(
     .. seealso:: :meth:`Context.get_resource`
 
     """
-    return await current_context().get_resource(
-        type, name, wait=wait, optional=optional
-    )
+    return await current_context().get_resource(type, name, optional=optional)
 
 
 @overload
