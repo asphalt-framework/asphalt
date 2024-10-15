@@ -246,6 +246,7 @@ def test_start_timeout(caplog: LogCaptureFixture, anyio_backend_name: str) -> No
             if not self.is_leaf:
                 self.add_component("child1", StallingComponent, level=level + 1)
                 self.add_component("child2", StallingComponent, level=level + 1)
+                self.add_component("child3", Component)
 
         async def start(self) -> None:
             if self.is_leaf:

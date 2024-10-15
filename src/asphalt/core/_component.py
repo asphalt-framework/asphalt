@@ -10,7 +10,7 @@ from collections.abc import (
     MutableMapping,
     Sequence,
 )
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from inspect import isclass
 from traceback import StackSummary
 from types import FrameType
@@ -25,10 +25,10 @@ from typing import (
 )
 
 from anyio import (
+    Event,
     create_task_group,
     move_on_after,
 )
-from anyio.abc import TaskStatus
 
 from ._context import (
     Context,
@@ -37,7 +37,7 @@ from ._context import (
     TeardownCallback,
     current_context,
 )
-from ._event import Event, Signal, wait_event
+from ._event import wait_event
 from ._exceptions import ComponentStartError, NoCurrentContext, ResourceNotFound
 from ._utils import (
     PluginContainer,
@@ -214,22 +214,6 @@ async def start_component(
     return await orchestrator.start_component_tree(timeout)
 
 
-class ComponentStartupEvent(Event):
-    __slots__ = "component_class", "path", "status", "coro"
-
-    def __init__(
-        self,
-        component_class: type[Component],
-        path: str,
-        status: str,
-        coro: Coroutine[Any, Any, Any] | None = None,
-    ):
-        self.component_class = component_class
-        self.path = path
-        self.status = status
-        self.coro = coro
-
-
 class ComponentContextProxy(Context):
     _parent: Context
 
@@ -397,19 +381,25 @@ class ComponentContextProxy(Context):
         self._parent.add_teardown_callback(callback, pass_exception)
 
 
+@dataclass
+class ComponentStatus:
+    component_class: type[Component]
+    status: str = "creating"
+    coro: Coroutine[Any, Any, Any] | None = None
+
+
+@dataclass
 class ComponentStartupOrchestrator:
-    component_status_changed = Signal(ComponentStartupEvent)
+    root_component_class: type[Component] | str
+    config: Mapping[str, Any]
 
-    _components_by_path: dict[str, Component]
-    _child_component_aliases: dict[str, set[str]]
-
-    def __init__(
-        self, root_component_class: type[Component] | str, config: Mapping[str, Any]
-    ):
-        self.root_component_class = root_component_class
-        self.config = config
-        self._components_by_path = {}
-        self._child_component_aliases = defaultdict(set)
+    _component_statuses: dict[str, ComponentStatus] = field(
+        init=False, default_factory=dict
+    )
+    _components_by_path: dict[str, Component] = field(init=False, default_factory=dict)
+    _child_component_aliases: dict[str, set[str]] = field(
+        init=False, default_factory=lambda: defaultdict(set)
+    )
 
     def _init_component(self, path: str, config: MutableMapping[str, Any]) -> None:
         if not isinstance(config, MutableMapping):
@@ -426,24 +416,20 @@ class ComponentStartupOrchestrator:
         component_class = component_types.resolve(component_type)
         if not isclass(component_class) or not issubclass(component_class, Component):
             raise TypeError(
-                f"{component_type!r} resolved to {component_class} which is not a subclass "
-                f"of Component"
+                f"{component_type!r} resolved to {component_class} which is not a "
+                f"subclass of Component"
             )
 
         # Instantiate the component
         logger.debug("Creating %s", format_component_name(path, component_class))
-        self.component_status_changed.dispatch(
-            ComponentStartupEvent(component_class, path, "creating")
-        )
+        self._component_statuses[path] = ComponentStatus(component_class)
         try:
             component = self._components_by_path[path] = component_class(**config)
         except Exception as exc:
             raise ComponentStartError("creating", path, component_class) from exc
 
         logger.debug("Created %s", format_component_name(path, component_class))
-        self.component_status_changed.dispatch(
-            ComponentStartupEvent(component_class, path, "created")
-        )
+        self._component_statuses[path].status = "created"
 
         # Merge the overrides to the hard-coded configuration
         child_components_config = merge_config(
@@ -471,15 +457,15 @@ class ComponentStartupOrchestrator:
         component._component_started = True
 
         component_class = type(component)
+        component_status = self._component_statuses[path]
         async with ComponentContextProxy(path, component_class, self):
             # Call prepare() on the component itself, if it's implemented on the component
             # class
             if component_class.prepare is not Component.prepare:
                 logger.debug("Calling prepare() of %s", format_component_name(path))
-                coro = component.prepare()
-                self.component_status_changed.dispatch(
-                    ComponentStartupEvent(component_class, path, "preparing", coro)
-                )
+                coro = component_status.coro = component.prepare()
+                component_status.status = "preparing"
+                component_status.coro = coro
                 try:
                     await coro
                 except Exception as exc:
@@ -490,15 +476,14 @@ class ComponentStartupOrchestrator:
                 logger.debug(
                     "Returned from prepare() of %s", format_component_name(path)
                 )
+                component_status.coro = None
 
             # Start the child components, if there are any
             if child_component_aliases := self._child_component_aliases.get(path):
                 logger.debug(
                     "Starting the child components of %s", format_component_name(path)
                 )
-                self.component_status_changed.dispatch(
-                    ComponentStartupEvent(component_class, path, "starting children")
-                )
+                component_status.status = "starting children"
                 async with create_task_group() as tg:
                     for alias in child_component_aliases:
                         final_path = f"{path}.{alias}" if path else alias
@@ -517,10 +502,8 @@ class ComponentStartupOrchestrator:
             # class
             if component_class.start is not Component.start:
                 logger.debug("Calling start() of %s", format_component_name(path))
-                coro = component.start()
-                self.component_status_changed.dispatch(
-                    ComponentStartupEvent(component_class, path, "starting", coro)
-                )
+                coro = component_status.coro = component.start()
+                component_status.status = "starting"
                 try:
                     await coro
                 except Exception as exc:
@@ -529,79 +512,62 @@ class ComponentStartupOrchestrator:
                     ) from exc
 
                 logger.debug("Returned from start() of %s", format_component_name(path))
+                component_status.coro = None
 
-        self.component_status_changed.dispatch(
-            ComponentStartupEvent(component_class, path, "started")
-        )
+        del self._component_statuses[path]
         return component
 
     async def start_component_tree(self, timeout: float | None) -> Component:
         with coalesce_exceptions():
             async with create_task_group() as tg:
-                await tg.start(self._watch_component_tree_startup, timeout)
+                component_started_event = Event()
+                tg.start_soon(
+                    self._watch_component_tree_startup, component_started_event, timeout
+                )
                 self._init_component(
                     "", {"type": self.root_component_class, **self.config}
                 )
-                return await self._start_component(self._components_by_path[""], "")
+                try:
+                    return await self._start_component(self._components_by_path[""], "")
+                finally:
+                    component_started_event.set()
 
     async def _watch_component_tree_startup(
-        self, timeout: float, *, task_status: TaskStatus[None]
+        self, component_started_event: Event, timeout: float | None
     ) -> None:
-        @dataclass
-        class ComponentStatus:
-            component_class: type[Component]
-            status: str
-            coro: Coroutine[Any, Any, Any] | None
+        with move_on_after(timeout):
+            await component_started_event.wait()
+            return
 
-        component_statuses: dict[str, ComponentStatus] = {}
-        async with self.component_status_changed.stream_events(
-            max_queue_size=200
-        ) as events:
-            task_status.started()
-            with move_on_after(timeout):
-                async for event in events:
-                    if event.status == "creating":
-                        component_statuses[event.path] = ComponentStatus(
-                            event.component_class, event.status, event.coro
-                        )
-                    elif event.status == "started":
-                        del component_statuses[event.path]
-                        if not component_statuses:
-                            break
-                    else:
-                        component_statuses[event.path].status = event.status
-                        component_statuses[event.path].coro = event.coro
+        status_summary_sections: list[str] = [
+            "Timeout waiting for the component tree to start"
+        ]
 
-        if component_statuses:
-            status_summary_sections: list[str] = [
-                "Timeout waiting for the component tree to start"
-            ]
+        status_summary: list[str] = []
+        for path, status in self._component_statuses.items():
+            parts = (path or "(root)").split(".")
+            indent = "  " * (len(parts) if path else 0)
+            status_summary.append(f"{indent}{parts[-1]}: {status.status}")
 
-            status_summary: list[str] = []
-            for path, status in component_statuses.items():
-                parts = (path or "(root)").split(".")
-                indent = "  " * (len(parts) if path else 0)
-                status_summary.append(f"{indent}{parts[-1]}: {status.status}")
+        title = "Current status of the components still waiting to finish startup"
+        status_summary_sections.append(f"{title}\n{'-' * len(title)}")
+        status_summary_sections.append("\n".join(status_summary))
 
-            title = "Current status of the components still waiting to finish startup"
+        stack_summaries: list[str] = []
+        for path, status in self._component_statuses.items():
+            if status.coro is not None:
+                stack_summary = self._get_coro_stack_summary(status.coro)
+                formatted_summary = "".join(stack_summary.format())
+                title = f"{path} ({qualified_name(status.component_class)})"
+                stack_summaries.append(f"{title}:\n{formatted_summary.rstrip()}")
+
+        if stack_summaries:
+            title = "Stack summaries of components still waiting to start"
             status_summary_sections.append(f"{title}\n{'-' * len(title)}")
-            status_summary_sections.append("\n".join(status_summary))
+            status_summary_sections.extend(stack_summaries)
 
-            stack_summaries: list[str] = []
-            for path, status in component_statuses.items():
-                if status.coro is not None:
-                    stack_summary = self._get_coro_stack_summary(status.coro)
-                    formatted_summary = "".join(stack_summary.format())
-                    title = f"{path} ({qualified_name(status.component_class)})"
-                    stack_summaries.append(f"{title}:\n{formatted_summary.rstrip()}")
-
-            if stack_summaries:
-                title = "Stack summaries of components still waiting to start"
-                status_summary_sections.append(f"{title}\n{'-' * len(title)}")
-                status_summary_sections.extend(stack_summaries)
-
-            logger.error("%s", "\n\n".join(status_summary_sections))
-            raise TimeoutError("timeout starting component tree")
+        logger.error("%s", "\n\n".join(status_summary_sections))
+        raise TimeoutError("timeout starting component tree")
 
     @staticmethod
     def _get_coro_stack_summary(coro: Coroutine[Any, Any, Any]) -> StackSummary:
