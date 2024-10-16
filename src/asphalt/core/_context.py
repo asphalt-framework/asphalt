@@ -147,7 +147,7 @@ class Context:
         resource has been published in this context
     """
 
-    resource_added = Signal(ResourceEvent)
+    resource_added: Signal[ResourceEvent] = Signal(ResourceEvent)
 
     _task_group: TaskGroup
     _reset_token: Token[Context]

@@ -113,6 +113,10 @@ commands = [["python", "-m", "pytest", { replace = "posargs", extend = true }]]
 package = "editable"
 extras = ["test"]
 
+[tool.tox.env.pyright]
+deps = ["pyright"]
+commands = [["pyright", "--verifytypes", "asphalt.core"]]
+
 [tool.tox.env.docs]
 commands = [["sphinx-build", "-n", "docs", "build/sphinx", { replace = "posargs", extend = true }]]
 extras = ["doc"]
