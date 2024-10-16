@@ -157,8 +157,8 @@ class PluginContainer:
     __slots__ = "namespace", "base_class", "_entrypoints", "_resolved"
 
     def __init__(self, namespace: str, base_class: type | None = None) -> None:
-        self.namespace = namespace
-        self.base_class = base_class
+        self.namespace: str = namespace
+        self.base_class: type | None = base_class
         group = entry_points(group=namespace)
         self._entrypoints = {ep.name: ep for ep in group}
         self._resolved: dict[str, Any] = {}

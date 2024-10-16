@@ -6,6 +6,23 @@ on:
   pull_request:
 
 jobs:
+  pyright:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: 3.x
+    - uses: actions/cache@v4
+      with:
+        path: ~/.cache/pip
+        key: pip-pyright
+    - name: Install dependencies
+      run: pip install -e . pyright
+    - name: Run pyright
+      run: pyright --verifytypes asphalt.core
+
   test:
     strategy:
       fail-fast: false
