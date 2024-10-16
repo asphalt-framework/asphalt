@@ -17,8 +17,10 @@ from asphalt.core import (
     ComponentStartError,
     Context,
     add_resource,
+    add_resource_factory,
     get_resource,
     get_resource_nowait,
+    get_resources,
     run_application,
     start_component,
 )
@@ -206,6 +208,80 @@ class TestCLIApplicationComponent:
             run_application(DummyCLIComponent, backend=anyio_backend_name)
 
 
+@pytest.mark.parametrize("alias", ["", 6])
+def test_component_bad_alias(alias: object) -> None:
+    component = Component()
+    with pytest.raises(TypeError, match="alias must be a nonempty string"):
+        component.add_component(alias, Component)  # type: ignore[arg-type]
+
+
+async def test_start_component_bad_root_config_type() -> None:
+    async with Context():
+        with pytest.raises(
+            TypeError,
+            match=r"config must be a dict \(or any other mutable mapping\) or None",
+        ):
+            await start_component(Component, "foo")  # type: ignore[call-overload]
+
+
+async def test_start_component_bad_child_config_type() -> None:
+    config = {"components": {"child": "foo"}}
+    async with Context():
+        with pytest.raises(
+            TypeError,
+            match=r"child: component configuration must be either None or a dict \(or "
+            r"any other mutable mapping type\), not str",
+        ):
+            await start_component(Component, config)
+
+
+async def test_start_component_bad_class() -> None:
+    config = {"components": {"child": {"type": 5}}}
+    async with Context():
+        with pytest.raises(
+            TypeError,
+            match=r"child: the declared component type \(5\) resolved to 5 which is "
+            r"not a subclass of Component",
+        ):
+            await start_component(Component, config)
+
+
+async def test_start_component_error_during_init() -> None:
+    class BadComponent(Component):
+        def __init__(self) -> None:
+            raise RuntimeError("component fail")
+
+    async with Context():
+        with pytest.raises(
+            ComponentStartError,
+            match=rf"error creating the root component \({__name__}"
+            rf".test_start_component_error_during_init.<locals>.BadComponent\): "
+            rf"RuntimeError: component fail",
+        ) as exc:
+            await start_component(BadComponent, {})
+
+    assert isinstance(exc.value.__cause__, RuntimeError)
+    assert str(exc.value.__cause__) == "component fail"
+
+
+async def test_start_component_error_during_prepare() -> None:
+    class BadComponent(Component):
+        async def prepare(self) -> None:
+            raise RuntimeError("component fail")
+
+    async with Context():
+        with pytest.raises(
+            ComponentStartError,
+            match=rf"error preparing the root component \({__name__}"
+            rf".test_start_component_error_during_prepare.<locals>"
+            rf".BadComponent\): RuntimeError: component fail",
+        ) as exc:
+            await start_component(BadComponent, {})
+
+    assert isinstance(exc.value.__cause__, RuntimeError)
+    assert str(exc.value.__cause__) == "component fail"
+
+
 async def test_start_component_no_context() -> None:
     with pytest.raises(
         RuntimeError, match=r"start_component\(\) requires an active Asphalt context"
@@ -262,6 +338,41 @@ async def test_prepare(caplog: LogCaptureFixture) -> None:
         "Component 'child' added a resource (type=str, name='bar')",
         "Returned from start() of component 'child'",
         "Calling start() of the root component",
+        "Returned from start() of the root component",
+    ]
+
+
+async def test_resource_descriptions(caplog: LogCaptureFixture) -> None:
+    class CustomComponent(Component):
+        async def start(self) -> None:
+            add_resource("foo", "bar", description="sample string")
+            add_resource_factory(
+                lambda: 3,
+                "bar",
+                types=[int, float],
+                description="sample integer factory",
+            )
+            assert await get_resource(float, optional=True) is None
+            assert get_resource_nowait(float, optional=True) is None
+            assert get_resources(str) == {"bar": "foo"}
+
+    caplog.set_level(logging.DEBUG, "asphalt.core")
+    async with Context():
+        await start_component(CustomComponent)
+        assert get_resource_nowait(str, "bar") == "foo"
+        assert get_resource_nowait(int, "bar") == 3
+        assert get_resource_nowait(float, "bar") == 3
+
+    assert caplog.messages == [
+        "Creating the root component "
+        "(test_component.test_resource_descriptions.<locals>.CustomComponent)",
+        "Created the root component "
+        "(test_component.test_resource_descriptions.<locals>.CustomComponent)",
+        "Calling start() of the root component",
+        "The root component added a resource (type=str, name='bar', "
+        "description='sample string')",
+        "The root component added a resource factory (types=[int, float], name='bar', "
+        "description='sample integer factory')",
         "Returned from start() of the root component",
     ]
 

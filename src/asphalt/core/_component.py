@@ -209,6 +209,8 @@ async def start_component(
 
     if config is None:
         config = {}
+    elif not isinstance(config, MutableMapping):
+        raise TypeError("config must be a dict (or any other mutable mapping) or None")
 
     orchestrator = ComponentStartupOrchestrator(component_class, config)
     return await orchestrator.start_component_tree(timeout)
@@ -238,8 +240,8 @@ class ComponentContextProxy(Context):
         if isclass(types):
             formatted = f"type={qualified_name(types)}"
         else:
-            formatted_types = [qualified_name(type_) for type_ in types]
-            formatted = f"types={formatted_types}"
+            formatted_types = ", ".join(qualified_name(type_) for type_ in types)
+            formatted = f"types=[{formatted_types}]"
 
         formatted += f", name={name!r}"
         if description:
@@ -402,12 +404,6 @@ class ComponentStartupOrchestrator:
     )
 
     def _init_component(self, path: str, config: MutableMapping[str, Any]) -> None:
-        if not isinstance(config, MutableMapping):
-            raise TypeError(
-                f"{path}: component configuration must be either None or a dict (or "
-                f"any other mutable mapping type)"
-            )
-
         # Separate the child components from the config
         child_components_config = config.pop("components", {})
 
@@ -416,8 +412,8 @@ class ComponentStartupOrchestrator:
         component_class = component_types.resolve(component_type)
         if not isclass(component_class) or not issubclass(component_class, Component):
             raise TypeError(
-                f"{component_type!r} resolved to {component_class} which is not a "
-                f"subclass of Component"
+                f"{path or '(root)'}: the declared component type ({component_type!r}) "
+                f"resolved to {component_class!r} which is not a subclass of Component"
             )
 
         # Instantiate the component
@@ -439,8 +435,16 @@ class ComponentStartupOrchestrator:
 
         # Create the child components
         for alias, child_config in child_components_config.items():
+            child_path = f"{path}.{alias}" if path else alias
+
             if child_config is None:
                 child_config = {}
+            elif not isinstance(child_config, MutableMapping):
+                raise TypeError(
+                    f"{child_path}: component configuration must be either None or a "
+                    f"dict (or any other mutable mapping type), not "
+                    f"{qualified_name(child_config)}"
+                )
 
             # If the type was specified only via an alias, use that as a type
             child_config.setdefault("type", alias)
@@ -449,8 +453,7 @@ class ComponentStartupOrchestrator:
             if isinstance(child_config["type"], str) and "/" in child_config["type"]:
                 child_config["type"] = child_config["type"].split("/")[0]
 
-            final_path = f"{path}.{alias}" if path else alias
-            self._init_component(final_path, child_config)
+            self._init_component(child_path, child_config)
 
     async def _start_component(self, component: Component, path: str) -> Component:
         # Prevent add_component() from being called beyond this point
