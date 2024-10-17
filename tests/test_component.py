@@ -446,10 +446,13 @@ async def test_default_resource_names(caplog: LogCaptureFixture) -> None:
         async def start(self) -> None:
             add_resource("default_resource")
             add_resource(f"special_resource_{self.name}", self.name)
+            add_resource_factory(lambda: 7, types=[int])
 
     caplog.set_level(logging.DEBUG, "asphalt.core")
     async with Context():
         await start_component(ParentComponent)
+        assert get_resource_nowait(int, "1") == 7
+        assert get_resource_nowait(int, "2") == 7
 
     assert caplog.messages[:7] == [
         "Creating the root component "
@@ -470,9 +473,11 @@ async def test_default_resource_names(caplog: LogCaptureFixture) -> None:
         "Calling start() of component 'child/1'",
         "Component 'child/1' added a resource (type=str, name='1')",
         "Component 'child/1' added a resource (type=str, name='child1')",
+        "Component 'child/1' added a resource factory (types=[int], name='1')",
         "Returned from start() of component 'child/1'",
         "Calling start() of component 'child/2'",
         "Component 'child/2' added a resource (type=str, name='2')",
         "Component 'child/2' added a resource (type=str, name='child2')",
+        "Component 'child/2' added a resource factory (types=[int], name='2')",
         "Returned from start() of component 'child/2'",
     ]
