@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import sys
+from dataclasses import dataclass
 from typing import Any, NoReturn
 from unittest.mock import Mock
 
@@ -429,4 +430,54 @@ async def test_wait_for_resource(caplog: LogCaptureFixture) -> None:
         "Component 'child2' got the resource it was waiting for (type=str, "
         "name='special')",
         "Returned from start() of component 'child2'",
+    ]
+
+
+async def test_default_resource_names(caplog: LogCaptureFixture) -> None:
+    class ParentComponent(Component):
+        def __init__(self) -> None:
+            self.add_component("child/1", ChildComponent, name="child1")
+            self.add_component("child/2", ChildComponent, name="child2")
+
+    @dataclass
+    class ChildComponent(Component):
+        name: str
+
+        async def start(self) -> None:
+            add_resource("default_resource")
+            add_resource(f"special_resource_{self.name}", self.name)
+            add_resource_factory(lambda: 7, types=[int])
+
+    caplog.set_level(logging.DEBUG, "asphalt.core")
+    async with Context():
+        await start_component(ParentComponent)
+        assert get_resource_nowait(int, "1") == 7
+        assert get_resource_nowait(int, "2") == 7
+
+    assert caplog.messages[:7] == [
+        "Creating the root component "
+        "(test_component.test_default_resource_names.<locals>.ParentComponent)",
+        "Created the root component "
+        "(test_component.test_default_resource_names.<locals>.ParentComponent)",
+        "Creating component 'child/1' "
+        "(test_component.test_default_resource_names.<locals>.ChildComponent)",
+        "Created component 'child/1' "
+        "(test_component.test_default_resource_names.<locals>.ChildComponent)",
+        "Creating component 'child/2' "
+        "(test_component.test_default_resource_names.<locals>.ChildComponent)",
+        "Created component 'child/2' "
+        "(test_component.test_default_resource_names.<locals>.ChildComponent)",
+        "Starting the child components of the root component",
+    ]
+    assert sorted(caplog.messages[7:], key=lambda line: "child/2" in line) == [
+        "Calling start() of component 'child/1'",
+        "Component 'child/1' added a resource (type=str, name='1')",
+        "Component 'child/1' added a resource (type=str, name='child1')",
+        "Component 'child/1' added a resource factory (types=[int], name='1')",
+        "Returned from start() of component 'child/1'",
+        "Calling start() of component 'child/2'",
+        "Component 'child/2' added a resource (type=str, name='2')",
+        "Component 'child/2' added a resource (type=str, name='child2')",
+        "Component 'child/2' added a resource factory (types=[int], name='2')",
+        "Returned from start() of component 'child/2'",
     ]

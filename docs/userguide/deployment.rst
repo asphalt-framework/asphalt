@@ -124,14 +124,12 @@ configuration won't work::
           url: postgresql://user:pass@postgres-master/dbname
         sqlalchemy:
           url: postgresql://user:pass@postgres-replica/dbname
-          resource_name: replica
 
-.. note:: The ``sqlalchemy`` component still requires the ``resource_name`` parameter in
-    order to publish its resources under a name other than ``default`` to prevent
-    resource name conflicts.
+Not only is there a conflict as you can't have two identical aliases within the same
+parent, but even if you could start the component tree like this, the two SQLALchemy
+components would try to publish resources with the same type and name combinations.
 
-The problem is obvious: you can't have duplicate keys under the same mapping.
-The correct solution to the problem is to use different aliases::
+The solution to the problem is to use different aliases::
 
     ---
     component:
@@ -141,25 +139,19 @@ The correct solution to the problem is to use different aliases::
           url: postgresql://user:pass@postgres-master/dbname
         sqlalchemy/replica:
           url: postgresql://user:pass@postgres-replica/dbname
-          resource_name: replica
 
-As of v5.0, the framework understands the ``type/name`` notation, and fills in the
-``type`` field of the child component with ``sqlalchemy``, if there's no existing
-``type`` key.
+As of v5.0, the framework understands the ``component-type/resource-name`` notation, and
+fills in the ``type`` field of the child component with ``sqlalchemy``, if there's no
+existing ``type`` key.
 
-An alternate solution would be to just rename the other component and explicitly add the
-``type`` key to its configuration::
+With this configuration, you get two distinct SQLAlchemy components, and the second one
+will publish its engine and session factory resources using the ``replica`` name rather
+than ``default``.
 
-    ---
-    component:
-      type: !!python/name:myproject.MyRootComponent
-      components:
-        sqlalchemy:
-          url: postgresql://user:pass@postgres-master/dbname
-        replica:
-          type: sqlalchemy
-          resource_name: replica
-          url: postgresql://user:pass@postgres-replica/dbname
+.. note:: The altered resource name only applies to the :meth:`Component.start` method,
+    **not** :meth:`Component.prepare`, as the latter is meant to provide resources to
+    child components, and they would need to know beforehand what resource name to
+    expect.
 
 Using data from environment variables and files
 -----------------------------------------------

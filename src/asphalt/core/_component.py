@@ -126,6 +126,12 @@ class Component(metaclass=ABCMeta):
         this component have been started, so any resources provided by the child
         components are available at this point.
 
+        .. note:: Resources added within this method with the default name may be
+            published under a different name if the component is deployed as a child
+            component with an alias like ``componenttype/resourcename``. In this
+            case, resources added with the default name will be published under the name
+            ``resourcename`` instead of ``default``.
+
         .. warning:: Do not call this method directly; use :func:`start_component`
             instead.
         """
@@ -223,11 +229,13 @@ class ComponentContextProxy(Context):
         self,
         path: str,
         component_class: type[Component],
+        default_resource_name: str,
         orchestrator: ComponentStartupOrchestrator,
     ):
         super().__init__()
         self.__path = path
         self.__component_class = component_class
+        self.__default_resource_name = default_resource_name
         self.__orchestrator = orchestrator
 
         # Proxy the real context, not another component proxy
@@ -258,6 +266,13 @@ class ComponentContextProxy(Context):
         description: str | None = None,
         teardown_callback: Callable[[], Any] | None = None,
     ) -> None:
+        if (
+            name == "default"
+            and self.__orchestrator._component_statuses[self.__path].status
+            == "starting"
+        ):
+            name = self.__default_resource_name
+
         self._parent.add_resource(
             value,
             name,
@@ -279,6 +294,13 @@ class ComponentContextProxy(Context):
         types: Sequence[type] | None = None,
         description: str | None = None,
     ) -> None:
+        if (
+            name == "default"
+            and self.__orchestrator._component_statuses[self.__path].status
+            == "starting"
+        ):
+            name = self.__default_resource_name
+
         self._parent.add_resource_factory(
             factory_callback, name, types=types, description=description
         )
@@ -399,8 +421,8 @@ class ComponentStartupOrchestrator:
         init=False, default_factory=dict
     )
     _components_by_path: dict[str, Component] = field(init=False, default_factory=dict)
-    _child_component_aliases: dict[str, set[str]] = field(
-        init=False, default_factory=lambda: defaultdict(set)
+    _child_component_aliases: dict[str, list[str]] = field(
+        init=False, default_factory=lambda: defaultdict(list)
     )
 
     def _init_component(self, path: str, config: MutableMapping[str, Any]) -> None:
@@ -431,7 +453,7 @@ class ComponentStartupOrchestrator:
         child_components_config = merge_config(
             component._child_components, child_components_config
         )
-        self._child_component_aliases[path] = set(child_components_config)
+        self._child_component_aliases[path] = list(child_components_config)
 
         # Create the child components
         for alias, child_config in child_components_config.items():
@@ -455,13 +477,17 @@ class ComponentStartupOrchestrator:
 
             self._init_component(child_path, child_config)
 
-    async def _start_component(self, component: Component, path: str) -> Component:
+    async def _start_component(
+        self, component: Component, path: str, default_resource_name: str = "default"
+    ) -> Component:
         # Prevent add_component() from being called beyond this point
         component._component_started = True
 
         component_class = type(component)
         component_status = self._component_statuses[path]
-        async with ComponentContextProxy(path, component_class, self):
+        async with ComponentContextProxy(
+            path, component_class, default_resource_name, self
+        ):
             # Call prepare() on the component itself, if it's implemented on the component
             # class
             if component_class.prepare is not Component.prepare:
@@ -489,14 +515,20 @@ class ComponentStartupOrchestrator:
                 component_status.status = "starting children"
                 async with create_task_group() as tg:
                     for alias in child_component_aliases:
-                        final_path = f"{path}.{alias}" if path else alias
-                        child_component = self._components_by_path[final_path]
+                        if "/" in alias:
+                            default_resource_name = alias.split("/", 1)[1]
+                        else:
+                            default_resource_name = "default"
+
+                        child_path = f"{path}.{alias}" if path else alias
+                        child_component = self._components_by_path[child_path]
                         tg.start_soon(
                             self._start_component,
                             child_component,
-                            final_path,
+                            child_path,
+                            default_resource_name,
                             name=(
-                                f"Starting component {final_path} "
+                                f"Starting component {child_path} "
                                 f"({qualified_name(child_component)})"
                             ),
                         )
