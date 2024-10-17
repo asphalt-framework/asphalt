@@ -128,7 +128,7 @@ class Component(metaclass=ABCMeta):
 
         .. note:: Resources added within this method with the default name may be
             published under a different name if the component is deployed as a child
-            component to with an alias like ``componenttype/resourcename``. In this
+            component with an alias like ``componenttype/resourcename``. In this
             case, resources added with the default name will be published under the name
             ``resourcename`` instead of ``default``.
 
