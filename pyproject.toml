@@ -101,7 +101,8 @@ branch = true
 [tool.coverage.report]
 show_missing = true
 exclude_also = [
-    "@overload"
+    "@overload",
+    "if TYPE_CHECKING:"
 ]
 
 [tool.tox]

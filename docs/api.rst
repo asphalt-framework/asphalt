@@ -46,6 +46,11 @@ Events
 .. autofunction:: stream_events
 .. autofunction:: wait_event
 
+Exceptions
+----------
+
+.. autoexception:: ComponentStartError
+
 Application runner
 ------------------
 

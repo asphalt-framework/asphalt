@@ -1,21 +1,26 @@
 from __future__ import annotations
 
+import logging
 import sys
 from typing import Any, NoReturn
 from unittest.mock import Mock
 
 import anyio
 import pytest
-from anyio import sleep
+from anyio import Event, sleep
 from common import raises_in_exception_group
-from pytest import MonkeyPatch
+from pytest import LogCaptureFixture, MonkeyPatch
 
 from asphalt.core import (
     CLIApplicationComponent,
     Component,
+    ComponentStartError,
     Context,
     add_resource,
+    add_resource_factory,
+    get_resource,
     get_resource_nowait,
+    get_resources,
     run_application,
     start_component,
 )
@@ -61,24 +66,19 @@ class TestComplexComponent:
             pytest.param("dummy", id="entrypoint"),
         ],
     )
-    async def test_add_component(self, component_type: type[Component] | str) -> None:
+    async def test_add_component(
+        self, component_type: type[Component] | str, caplog: LogCaptureFixture
+    ) -> None:
         """
         Test that add_component works with an without an entry point and that external
         configuration overriddes directly supplied configuration values.
 
         """
+        caplog.set_level(logging.DEBUG, "asphalt.core")
         components_container: dict[str, DummyComponent] = {}
 
         class ContainerComponent(Component):
             def __init__(self) -> None:
-                self.add_component(
-                    "dummy",
-                    component_type,
-                    alias="dummy",
-                    container=components_container,
-                    a=5,
-                    b=2,
-                )
                 self.add_component(
                     "dummy/alt",
                     alias="dummy/alt",
@@ -90,9 +90,19 @@ class TestComplexComponent:
         async with Context():
             await start_component(ContainerComponent)
 
-        assert len(components_container) == 2
-        assert components_container["dummy"].kwargs == {"a": 5, "b": 2}
+        assert len(components_container) == 1
         assert components_container["dummy/alt"].kwargs == {"a": 8, "b": 7}
+        assert caplog.messages == [
+            "Creating the root component (test_component.TestComplexComponent"
+            ".test_add_component.<locals>.ContainerComponent)",
+            "Created the root component (test_component.TestComplexComponent"
+            ".test_add_component.<locals>.ContainerComponent)",
+            "Creating component 'dummy/alt' (test_component.DummyComponent)",
+            "Created component 'dummy/alt' (test_component.DummyComponent)",
+            "Starting the child components of the root component",
+            "Calling start() of component 'dummy/alt'",
+            "Returned from start() of component 'dummy/alt'",
+        ]
 
     async def test_child_components_from_config(self) -> None:
         container: dict[str, Component] = {}
@@ -137,7 +147,9 @@ class TestComplexComponent:
                 self.add_component("foo", DummyComponent)
 
         async with Context():
-            with pytest.raises(RuntimeError, match="child components cannot be added"):
+            with pytest.raises(
+                ComponentStartError, match="child components cannot be added"
+            ):
                 await start_component(BadContainerComponent)
 
 
@@ -170,6 +182,7 @@ class TestCLIApplicationComponent:
                 run_application(DummyCLIComponent, backend=anyio_backend_name)
 
         assert exc.value.code == 1
+        print(str(record[0].message))
         assert len(record) == 1
         assert str(record[0].message) == "exit code out of range: 128"
 
@@ -195,6 +208,80 @@ class TestCLIApplicationComponent:
             run_application(DummyCLIComponent, backend=anyio_backend_name)
 
 
+@pytest.mark.parametrize("alias", ["", 6])
+def test_component_bad_alias(alias: object) -> None:
+    component = Component()
+    with pytest.raises(TypeError, match="alias must be a nonempty string"):
+        component.add_component(alias, Component)  # type: ignore[arg-type]
+
+
+async def test_start_component_bad_root_config_type() -> None:
+    async with Context():
+        with pytest.raises(
+            TypeError,
+            match=r"config must be a dict \(or any other mutable mapping\) or None",
+        ):
+            await start_component(Component, "foo")  # type: ignore[call-overload]
+
+
+async def test_start_component_bad_child_config_type() -> None:
+    config = {"components": {"child": "foo"}}
+    async with Context():
+        with pytest.raises(
+            TypeError,
+            match=r"child: component configuration must be either None or a dict \(or "
+            r"any other mutable mapping type\), not str",
+        ):
+            await start_component(Component, config)
+
+
+async def test_start_component_bad_class() -> None:
+    config = {"components": {"child": {"type": 5}}}
+    async with Context():
+        with pytest.raises(
+            TypeError,
+            match=r"child: the declared component type \(5\) resolved to 5 which is "
+            r"not a subclass of Component",
+        ):
+            await start_component(Component, config)
+
+
+async def test_start_component_error_during_init() -> None:
+    class BadComponent(Component):
+        def __init__(self) -> None:
+            raise RuntimeError("component fail")
+
+    async with Context():
+        with pytest.raises(
+            ComponentStartError,
+            match=rf"error creating the root component \({__name__}"
+            rf".test_start_component_error_during_init.<locals>.BadComponent\): "
+            rf"RuntimeError: component fail",
+        ) as exc:
+            await start_component(BadComponent, {})
+
+    assert isinstance(exc.value.__cause__, RuntimeError)
+    assert str(exc.value.__cause__) == "component fail"
+
+
+async def test_start_component_error_during_prepare() -> None:
+    class BadComponent(Component):
+        async def prepare(self) -> None:
+            raise RuntimeError("component fail")
+
+    async with Context():
+        with pytest.raises(
+            ComponentStartError,
+            match=rf"error preparing the root component \({__name__}"
+            rf".test_start_component_error_during_prepare.<locals>"
+            rf".BadComponent\): RuntimeError: component fail",
+        ) as exc:
+            await start_component(BadComponent, {})
+
+    assert isinstance(exc.value.__cause__, RuntimeError)
+    assert str(exc.value.__cause__) == "component fail"
+
+
 async def test_start_component_no_context() -> None:
     with pytest.raises(
         RuntimeError, match=r"start_component\(\) requires an active Asphalt context"
@@ -213,7 +300,7 @@ async def test_start_component_timeout() -> None:
             await start_component(StallingComponent, timeout=0.01)
 
 
-async def test_prepare() -> None:
+async def test_prepare(caplog: LogCaptureFixture) -> None:
     class ParentComponent(Component):
         def __init__(self) -> None:
             self.add_component("child", ChildComponent)
@@ -229,6 +316,117 @@ async def test_prepare() -> None:
             foo = get_resource_nowait(str)
             add_resource(foo + "bar", "bar")
 
+    caplog.set_level(logging.DEBUG, "asphalt.core")
     async with Context():
         await start_component(ParentComponent)
         assert get_resource_nowait(str, "bar") == "foobar"
+
+    assert caplog.messages == [
+        "Creating the root component "
+        "(test_component.test_prepare.<locals>.ParentComponent)",
+        "Created the root component "
+        "(test_component.test_prepare.<locals>.ParentComponent)",
+        "Creating component 'child' "
+        "(test_component.test_prepare.<locals>.ChildComponent)",
+        "Created component 'child' "
+        "(test_component.test_prepare.<locals>.ChildComponent)",
+        "Calling prepare() of the root component",
+        "The root component added a resource (type=str, name='default')",
+        "Returned from prepare() of the root component",
+        "Starting the child components of the root component",
+        "Calling start() of component 'child'",
+        "Component 'child' added a resource (type=str, name='bar')",
+        "Returned from start() of component 'child'",
+        "Calling start() of the root component",
+        "Returned from start() of the root component",
+    ]
+
+
+async def test_resource_descriptions(caplog: LogCaptureFixture) -> None:
+    class CustomComponent(Component):
+        async def start(self) -> None:
+            add_resource("foo", "bar", description="sample string")
+            add_resource_factory(
+                lambda: 3,
+                "bar",
+                types=[int, float],
+                description="sample integer factory",
+            )
+            assert await get_resource(float, optional=True) is None
+            assert get_resource_nowait(float, optional=True) is None
+            assert get_resources(str) == {"bar": "foo"}
+
+    caplog.set_level(logging.DEBUG, "asphalt.core")
+    async with Context():
+        await start_component(CustomComponent)
+        assert get_resource_nowait(str, "bar") == "foo"
+        assert get_resource_nowait(int, "bar") == 3
+        assert get_resource_nowait(float, "bar") == 3
+
+    assert caplog.messages == [
+        "Creating the root component "
+        "(test_component.test_resource_descriptions.<locals>.CustomComponent)",
+        "Created the root component "
+        "(test_component.test_resource_descriptions.<locals>.CustomComponent)",
+        "Calling start() of the root component",
+        "The root component added a resource (type=str, name='bar', "
+        "description='sample string')",
+        "The root component added a resource factory (types=[int, float], name='bar', "
+        "description='sample integer factory')",
+        "Returned from start() of the root component",
+    ]
+
+
+async def test_wait_for_resource(caplog: LogCaptureFixture) -> None:
+    class ParentComponent(Component):
+        def __init__(self) -> None:
+            self.add_component("child1", Child1Component)
+            self.add_component("child2", Child2Component)
+
+    class Child1Component(Component):
+        async def start(self) -> None:
+            child1_ready_event.set()
+            await child2_ready_event.wait()
+            add_resource("from_child1", "special")
+
+    class Child2Component(Component):
+        async def start(self) -> None:
+            await child1_ready_event.wait()
+            child2_ready_event.set()
+            assert await get_resource(str, "special") == "from_child1"
+
+    caplog.set_level(logging.DEBUG, "asphalt.core")
+    child1_ready_event = Event()
+    child2_ready_event = Event()
+    async with Context():
+        await start_component(ParentComponent)
+
+    assert caplog.messages[:7] == [
+        "Creating the root component "
+        "(test_component.test_wait_for_resource.<locals>.ParentComponent)",
+        "Created the root component "
+        "(test_component.test_wait_for_resource.<locals>.ParentComponent)",
+        "Creating component 'child1' "
+        "(test_component.test_wait_for_resource.<locals>.Child1Component)",
+        "Created component 'child1' "
+        "(test_component.test_wait_for_resource.<locals>.Child1Component)",
+        "Creating component 'child2' "
+        "(test_component.test_wait_for_resource.<locals>.Child2Component)",
+        "Created component 'child2' "
+        "(test_component.test_wait_for_resource.<locals>.Child2Component)",
+        "Starting the child components of the root component",
+    ]
+    # Trio's nondeterministic scheduling forces us to do this
+    assert sorted(caplog.messages[7:9]) == [
+        "Calling start() of component 'child1'",
+        "Calling start() of component 'child2'",
+    ]
+    assert caplog.messages[9:] == [
+        "Component 'child2' is waiting for another component to provide a resource "
+        "(type=str, name='special')",
+        "Component 'child1' added a resource (type=str, name='special')",
+        "Returned from start() of component 'child1'",
+        "Component 'child2' got the resource it was waiting for (type=str, "
+        "name='special')",
+        "Returned from start() of component 'child2'",
+    ]

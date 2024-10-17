@@ -25,6 +25,7 @@ from ._event import SignalQueueFull as SignalQueueFull
 from ._event import stream_events as stream_events
 from ._event import wait_event as wait_event
 from ._exceptions import AsyncResourceError as AsyncResourceError
+from ._exceptions import ComponentStartError as ComponentStartError
 from ._exceptions import NoCurrentContext as NoCurrentContext
 from ._exceptions import ResourceConflict as ResourceConflict
 from ._exceptions import ResourceNotFound as ResourceNotFound

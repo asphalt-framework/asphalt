@@ -1,16 +1,23 @@
 from __future__ import annotations
 
 import sys
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Iterator, Mapping
+from contextlib import contextmanager
 from functools import partial
 from importlib import import_module
 from inspect import isclass
-from typing import Any, TypeVar, overload
+from typing import TYPE_CHECKING, Any, TypeVar, overload
 
 if sys.version_info >= (3, 10):
     from importlib.metadata import entry_points
 else:
     from importlib_metadata import entry_points
+
+if sys.version_info < (3, 11):
+    from exceptiongroup import ExceptionGroup
+
+if TYPE_CHECKING:
+    from ._component import Component
 
 T_Object = TypeVar("T_Object")
 
@@ -106,6 +113,35 @@ def merge_config(
                 copied[key] = value
 
     return copied
+
+
+@contextmanager
+def coalesce_exceptions() -> Iterator[None]:
+    try:
+        yield
+    except ExceptionGroup as excgrp:
+        if len(excgrp.exceptions) == 1 and not isinstance(
+            excgrp.exceptions[0], ExceptionGroup
+        ):
+            raise excgrp.exceptions[0]
+
+        raise
+
+
+def format_component_name(
+    path: str,
+    component_class: type[Component] | None = None,
+    *,
+    capitalize: bool = False,
+) -> str:
+    formatted = f"component {path!r}" if path else "the root component"
+    if component_class is not None:
+        formatted += f" ({qualified_name(component_class)})"
+
+    if capitalize:
+        formatted = formatted[0].upper() + formatted[1:]
+
+    return formatted
 
 
 class PluginContainer:
