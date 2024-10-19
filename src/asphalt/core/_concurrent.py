@@ -258,9 +258,6 @@ async def start_service_task(
         logger.debug("Service task %r finished", name)
 
     ctx = current_context()
-    while ctx.parent is not None:
-        ctx = ctx.parent
-
     ctx._ensure_state(ContextState.open)
 
     if (

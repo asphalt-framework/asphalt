@@ -37,7 +37,6 @@ from ._context import (
     TeardownCallback,
     current_context,
 )
-from ._event import wait_event
 from ._exceptions import ComponentStartError, NoCurrentContext, ResourceNotFound
 from ._utils import (
     PluginContainer,
@@ -239,6 +238,7 @@ class ComponentContextProxy(Context):
         self.__orchestrator = orchestrator
 
         # Proxy the real context, not another component proxy
+        self._parent = current_context()
         while isinstance(self._parent, ComponentContextProxy):
             self._parent = self._parent._parent
 
@@ -355,13 +355,11 @@ class ComponentContextProxy(Context):
             )
 
             # Wait until a matching resource or resource factory is available
-            signals = [ctx.resource_added for ctx in self._parent.context_chain]
-            await wait_event(
-                signals,
+            await self._parent.resource_added.wait_event(
                 lambda event: event.resource_name == name
                 and type in event.resource_types,
             )
-            res = await self.get_resource(type, name)
+            res = await self._parent.get_resource(type, name)
             logger.debug(
                 "%s got the resource it was waiting for (%s)",
                 format_component_name(self.__path, capitalize=True),
