@@ -87,22 +87,37 @@ _current_context: ContextVar[Context | None] = ContextVar(
 @dataclass(frozen=True)
 class ResourceContainer:
     """
-    Contains the resource value or its factory callable, plus some metadata.
+    Contains the resource value, plus some metadata.
 
-    :ivar value_or_factory: the resource value or the factory callback
+    :ivar value: the resource value
     :ivar types: type names the resource was registered with
     :vartype types: Tuple[type, ...]
     :ivar str name: name of the resource
     :ivar description: free-form description of the resource
-    :ivar bool is_factory: ``True`` if ``value_or_factory`` if this is a resource
-        factory
     """
 
-    value_or_factory: Any
+    value: Any
     types: tuple[type, ...]
     name: str
     description: str | None
-    is_factory: bool
+
+
+@dataclass(frozen=True)
+class ResourceFactory:
+    """
+    Contains the resource value or its factory callable, plus some metadata.
+
+    :ivar callback: the factory callback
+    :ivar types: type names the resource factory was registered with
+    :vartype types: Tuple[type, ...]
+    :ivar str name: name of the resource factory
+    :ivar description: free-form description of the resource factory
+    """
+
+    callback: Callable[..., Any]
+    types: tuple[type, ...]
+    name: str
+    description: str | None
 
 
 @dataclass
@@ -159,7 +174,7 @@ class Context:
         self._parent = _current_context.get(None)
         self._state = ContextState.inactive
         self._resources: dict[tuple[type, str], ResourceContainer] = {}
-        self._resource_factories: dict[tuple[type, str], ResourceContainer] = {}
+        self._resource_factories: dict[tuple[type, str], ResourceFactory] = {}
         self._teardown_callbacks: list[tuple[TeardownCallback, bool]] = []
 
     @property
@@ -347,7 +362,7 @@ class Context:
                     f"{qualified_name(resource_type)} using the name {name!r}"
                 )
 
-        container = ResourceContainer(value, types_, name, description, False)
+        container = ResourceContainer(value, types_, name, description)
         for type_ in types_:
             self._resources[(type_, name)] = container
 
@@ -445,9 +460,7 @@ class Context:
                 )
 
         # Add the resource factory to the appropriate lookup tables
-        resource = ResourceContainer(
-            factory_callback, resource_types, name, description, True
-        )
+        resource = ResourceFactory(factory_callback, resource_types, name, description)
         for type_ in resource_types:
             self._resource_factories[(type_, name)] = resource
 
@@ -496,14 +509,14 @@ class Context:
         # First check if there's already a matching resource in this context
         resource = self._resources.get(key)
         if resource is not None:
-            return cast(T_Resource, resource.value_or_factory)
+            return cast(T_Resource, resource.value)
 
         # Next, check if there's a resource factory available on the context chain
         for ctx in self.context_chain:
             if key in ctx._resource_factories:
                 # Call the factory callback to generate the resource
                 factory = ctx._resource_factories[key]
-                generated_resource = factory.value_or_factory()
+                generated_resource = factory.callback()
 
                 # Raise AsyncResourceError if the factory returns a coroutine object
                 if iscoroutine(generated_resource):
@@ -516,7 +529,6 @@ class Context:
                     factory.types,
                     factory.name,
                     factory.description,
-                    False,
                 )
                 for type_ in factory.types:
                     self._resources[(type_, factory.name)] = container
@@ -531,7 +543,7 @@ class Context:
         # Finally, check parents for a matching resource
         for ctx in self.context_chain:
             if key in ctx._resources:
-                return cast(T_Resource, ctx._resources[key].value_or_factory)
+                return cast(T_Resource, ctx._resources[key].value)
 
         if optional:
             return None
@@ -583,13 +595,13 @@ class Context:
         # First check if there's already a matching resource in this context
         key = (type, name)
         if (resource := self._resources.get(key)) is not None:
-            return cast(T_Resource, resource.value_or_factory)
+            return cast(T_Resource, resource.value)
 
         # Next, check if there's a resource factory available on the context chain
         for ctx in self.context_chain:
             if key in ctx._resource_factories:
                 factory = ctx._resource_factories[key]
-                generated_resource = factory.value_or_factory()
+                generated_resource = factory.callback()
                 if isawaitable(generated_resource):
                     generated_resource = await generated_resource
 
@@ -598,7 +610,6 @@ class Context:
                     factory.types,
                     factory.name,
                     factory.description,
-                    False,
                 )
                 for type_ in factory.types:
                     self._resources[(type_, factory.name)] = container
@@ -613,7 +624,7 @@ class Context:
         # Finally, check parents for a matching resource
         for ctx in self.context_chain:
             if key in ctx._resources:
-                return cast(T_Resource, ctx._resources[key].value_or_factory)
+                return cast(T_Resource, ctx._resources[key].value)
 
         if optional:
             return None
@@ -633,20 +644,16 @@ class Context:
         """
         # Collect all the matching resources from this context
         resources: dict[str, T_Resource] = {
-            container.name: container.value_or_factory
-            for container in self._resources.values()
-            if not container.is_factory and type in container.types
+            container.name: container.value for container in self._resources.values()
         }
 
         # Finally, add the resource values from the parent contexts
         resources.update(
             {
-                container.name: container.value_or_factory
+                container.name: container.value
                 for ctx in self.context_chain[1:]
                 for container in ctx._resources.values()
-                if not container.is_factory
-                and type in container.types
-                and container.name not in resources
+                if type in container.types and container.name not in resources
             }
         )
 
