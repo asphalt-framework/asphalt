@@ -8,7 +8,7 @@ from unittest.mock import Mock
 
 import anyio
 import pytest
-from anyio import Event, sleep
+from anyio import Event, fail_after, sleep
 from common import raises_in_exception_group
 from pytest import LogCaptureFixture, MonkeyPatch
 
@@ -394,7 +394,8 @@ async def test_wait_for_resource(caplog: LogCaptureFixture) -> None:
         async def start(self) -> None:
             await child1_ready_event.wait()
             child2_ready_event.set()
-            assert await get_resource(str, "special") == "from_child1"
+            with fail_after(3):
+                assert await get_resource(str, "special") == "from_child1"
 
     caplog.set_level(logging.DEBUG, "asphalt.core")
     child1_ready_event = Event()

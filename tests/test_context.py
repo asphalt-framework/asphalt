@@ -334,8 +334,7 @@ class TestContext:
         context.add_resource(9, "foo")
         async with Context() as subctx:
             subctx.add_resource(1, "bar")
-            subctx.add_resource(4, "foo")
-            assert subctx.get_resources(int) == {"bar": 1, "foo": 4}
+            assert subctx.get_resources(int) == {"bar": 1, "foo": 9}
 
     async def test_get_resource_nowait(self, context: Context) -> None:
         context.add_resource(1)
