@@ -271,7 +271,7 @@ class Context:
                 _reset_token = _current_context.set(self)
                 exit_stack.callback(_current_context.reset, _reset_token)
 
-                # If this is the root task group, create and enter a task group
+                # If this is the root context, create and enter a task group
                 if not hasattr(self, "_task_group"):
                     self._task_group = await exit_stack.enter_async_context(
                         create_task_group()
