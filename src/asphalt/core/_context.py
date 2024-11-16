@@ -151,9 +151,9 @@ class Context:
     """
     Contexts give request handlers and callbacks access to resources.
 
-    Contexts are stacked in a way that accessing an attribute that is not present in the
-    current context causes the attribute to be looked up in the parent instance and so
-    on, until the attribute is found (or :class:`AttributeError` is raised).
+    When a context is created, all resource factories and resources (except
+    factory-generated resources, all of which are scoped to a specific context instance)
+    are copied from the parent context.
 
     :var Signal resource_added: a signal (:class:`ResourceEvent`) dispatched when a
         resource has been published in this context
@@ -170,6 +170,7 @@ class Context:
     def __init__(self) -> None:
         self._state = ContextState.inactive
         self._teardown_callbacks: list[tuple[TeardownCallback, bool]] = []
+        self._child_contexts = set[Context]()
         self._parent = _current_context.get(None)
         if self._parent is not None:
             self._resources = {
@@ -266,6 +267,10 @@ class Context:
         self._state = ContextState.open
         try:
             async with AsyncExitStack() as exit_stack:
+                if self._parent:
+                    self._parent._child_contexts.add(self)
+                    exit_stack.callback(self._parent._child_contexts.remove, self)
+
                 self._host_task = get_current_task()
                 exit_stack.callback(delattr, self, "_host_task")
                 _reset_token = _current_context.set(self)
@@ -296,6 +301,12 @@ class Context:
             await self._exit_stack.__aexit__(exc_type, exc_val, exc_tb)
         finally:
             self._state = ContextState.closed
+
+        if self._child_contexts:
+            raise RuntimeError(
+                f"Context stack corruption detected: context {id(self):x} still has "
+                f"{len(self._child_contexts)} active child context(s)"
+            )
 
     def add_resource(
         self,
@@ -617,7 +628,7 @@ class Context:
 
     def get_resources(self, type: type[T_Resource]) -> Mapping[str, T_Resource]:
         """
-        Retrieve all the resources of the given type in this context and its parents.
+        Retrieve all the resources of the given type in this context.
 
         This method does not trigger resource factories; it only retrieves resources
         already in the context chain.
