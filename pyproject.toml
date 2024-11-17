@@ -77,7 +77,8 @@ extend-select = [
     "W",            # pycodestyle warnings
 ]
 ignore = [
-    "ASYNC109"
+    "ASYNC109",
+    "ASYNC115"
 ]
 
 [tool.ruff.lint.isort]

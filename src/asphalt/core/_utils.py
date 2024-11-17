@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import sys
-from collections.abc import Callable, Iterator, Mapping
-from contextlib import contextmanager
+from collections.abc import AsyncIterator, Callable, Mapping
+from contextlib import asynccontextmanager
 from functools import partial
 from importlib import import_module
 from inspect import isclass
@@ -115,15 +115,15 @@ def merge_config(
     return copied
 
 
-@contextmanager
-def coalesce_exceptions() -> Iterator[None]:
+@asynccontextmanager
+async def coalesce_exceptions() -> AsyncIterator[None]:
     try:
         yield
     except ExceptionGroup as excgrp:
         if len(excgrp.exceptions) == 1 and not isinstance(
             excgrp.exceptions[0], ExceptionGroup
         ):
-            raise excgrp.exceptions[0]
+            raise excgrp.exceptions[0] from excgrp.exceptions[0].__cause__
 
         raise
 

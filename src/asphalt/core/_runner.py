@@ -4,7 +4,6 @@ import platform
 import signal
 import sys
 from contextlib import AsyncExitStack
-from functools import partial
 from logging import INFO, basicConfig, getLogger
 from logging.config import dictConfig
 from typing import Any
@@ -14,6 +13,7 @@ import anyio
 from anyio import (
     CancelScope,
     Event,
+    create_task_group,
     get_cancelled_exc_class,
     to_thread,
 )
@@ -24,9 +24,8 @@ from ._component import (
     Component,
     start_component,
 )
-from ._concurrent import start_service_task
 from ._context import Context
-from ._utils import qualified_name
+from ._utils import coalesce_exceptions, qualified_name
 
 logger = getLogger("asphalt.core")
 
@@ -44,6 +43,7 @@ async def handle_signals(
             )
             startup_scope.cancel()
             event.set()
+            break
 
 
 async def _run_application_async(
@@ -63,10 +63,12 @@ async def _run_application_async(
 
             await exit_stack.enter_async_context(Context())
             if platform.system() != "Windows":
+                await exit_stack.enter_async_context(coalesce_exceptions())
+                startup_tg = await exit_stack.enter_async_context(create_task_group())
                 startup_scope = exit_stack.enter_context(CancelScope())
-                await start_service_task(
-                    partial(handle_signals, startup_scope, event),
-                    "Asphalt signal handler",
+                exit_stack.callback(startup_tg.cancel_scope.cancel)
+                await startup_tg.start(
+                    handle_signals, startup_scope, event, name="Asphalt signal handler"
                 )
 
             try:

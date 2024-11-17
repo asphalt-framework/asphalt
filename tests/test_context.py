@@ -6,18 +6,14 @@ from contextlib import AsyncExitStack, ExitStack
 from itertools import count
 from typing import Any, NoReturn, Optional, Union
 
-import anyio
 import pytest
 from anyio import (
     create_task_group,
     fail_after,
-    get_current_task,
-    sleep,
     wait_all_tasks_blocked,
 )
 from anyio.abc import TaskStatus
 from anyio.lowlevel import checkpoint
-from common import raises_in_exception_group
 
 from asphalt.core import (
     AsyncResourceError,
@@ -32,7 +28,6 @@ from asphalt.core import (
     get_resource_nowait,
     inject,
     resource,
-    start_service_task,
 )
 
 if sys.version_info < (3, 11):
@@ -78,7 +73,7 @@ class TestContext:
         ] = []
         async with AsyncExitStack() as exit_stack:
             if exception:
-                exit_stack.enter_context(pytest.raises(ExceptionGroup))
+                exit_stack.enter_context(pytest.raises(Exception, match="foo"))
 
             context = await exit_stack.enter_async_context(Context())
             context.add_teardown_callback(callback, pass_exception=True)
@@ -350,60 +345,6 @@ class TestContext:
         assert exc.value.type is int
         assert exc.value.name == "foo"
 
-    async def test_start_service_task_cancel_on_exit(self) -> None:
-        started = False
-        finished = False
-
-        async def taskfunc() -> None:
-            nonlocal started, finished
-            assert get_current_task().name == "Service task: taskfunc"
-            started = True
-            await sleep(3)
-            finished = True
-
-        async with Context():
-            await start_service_task(taskfunc, "taskfunc")
-
-        assert started
-        assert not finished
-
-    async def test_start_service_task_custom_teardown_callback(self) -> None:
-        started = False
-        finished = False
-        event = anyio.Event()
-
-        async def taskfunc() -> None:
-            nonlocal started, finished
-            started = True
-            with fail_after(3):
-                await event.wait()
-
-            finished = True
-
-        async with Context():
-            await start_service_task(taskfunc, "taskfunc", teardown_action=event.set)
-
-        assert started
-        assert finished
-
-    async def test_start_service_task_status(self) -> None:
-        started = False
-        finished = False
-
-        async def taskfunc(task_status: TaskStatus[str]) -> None:
-            nonlocal started, finished
-            assert get_current_task().name == "Service task: taskfunc"
-            started = True
-            task_status.started("startval")
-            await sleep(3)
-            finished = True
-
-        async with Context():
-            assert await start_service_task(taskfunc, "taskfunc") == "startval"
-
-        assert started
-        assert not finished
-
 
 class TestContextTeardown:
     @pytest.mark.parametrize(
@@ -425,7 +366,7 @@ class TestContextTeardown:
                 await start(context)
                 assert phase == "started"
                 if expected_exc:
-                    exit_stack.enter_context(pytest.raises(ExceptionGroup))
+                    exit_stack.enter_context(pytest.raises(Exception, match="foo"))
                     raise expected_exc
 
         assert phase == "finished"
@@ -451,7 +392,7 @@ class TestContextTeardown:
                 await SomeComponent().start()
                 assert phase == "started"
                 if expected_exc:
-                    exit_stack.enter_context(pytest.raises(ExceptionGroup))
+                    exit_stack.enter_context(pytest.raises(Exception, match="foo"))
                     raise expected_exc
 
         assert phase == "finished"
@@ -524,7 +465,7 @@ class TestContextFinisher:
                 await start()
                 assert phase == "started"
                 if expected_exc:
-                    exit_stack.enter_context(pytest.raises(ExceptionGroup))
+                    exit_stack.enter_context(pytest.raises(Exception, match="foo"))
                     raise expected_exc
 
         assert phase == "finished"
@@ -608,7 +549,7 @@ class TestDependencyInjection:
         async def injected(foo: int, bar: str = resource()) -> None:
             pass
 
-        with raises_in_exception_group(ResourceNotFound) as exc:
+        with pytest.raises(ResourceNotFound, match="type=str name='default'") as exc:
             async with Context():
                 await injected(2)
 

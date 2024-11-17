@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import sys
 from abc import ABCMeta, abstractmethod
 from collections import defaultdict
 from collections.abc import (
@@ -11,7 +12,8 @@ from collections.abc import (
     Sequence,
 )
 from dataclasses import dataclass, field
-from inspect import isclass
+from enum import Enum, auto
+from inspect import isawaitable, isclass
 from traceback import StackSummary
 from types import FrameType
 from typing import (
@@ -20,6 +22,7 @@ from typing import (
     ClassVar,
     Literal,
     TypeVar,
+    Union,
     get_type_hints,
     overload,
 )
@@ -30,6 +33,7 @@ from anyio import (
     move_on_after,
 )
 
+from ._concurrent import ExceptionHandler, TaskFactory, TaskHandle, run_background_task
 from ._context import (
     Context,
     FactoryCallback,
@@ -40,15 +44,23 @@ from ._context import (
 from ._exceptions import ComponentStartError, NoCurrentContext, ResourceNotFound
 from ._utils import (
     PluginContainer,
+    callable_name,
     coalesce_exceptions,
     format_component_name,
     merge_config,
     qualified_name,
 )
 
+if sys.version_info >= (3, 10):
+    from typing import TypeAlias
+else:
+    from typing_extensions import TypeAlias
+
 logger = logging.getLogger("asphalt.core")
 
 TComponent = TypeVar("TComponent", bound="Component")
+T_Retval = TypeVar("T_Retval")
+TeardownAction: TypeAlias = Union[Callable[[], Any], Literal["cancel"], None]
 
 
 class Component(metaclass=ABCMeta):
@@ -108,7 +120,7 @@ class Component(metaclass=ABCMeta):
 
         self._child_components[alias] = {"type": type or alias, **config}
 
-    async def prepare(self) -> None:
+    async def prepare(self, ctx: ComponentContext) -> None:
         """
         Perform any necessary initialization before starting the component.
 
@@ -117,7 +129,7 @@ class Component(metaclass=ABCMeta):
         by the child components.
         """
 
-    async def start(self) -> None:
+    async def start(self, ctx: ComponentContext) -> None:
         """
         Perform any necessary tasks to start the services provided by this component.
 
@@ -221,26 +233,29 @@ async def start_component(
     return await orchestrator.start_component_tree(timeout)
 
 
-class ComponentContextProxy(Context):
-    _parent: Context
+class ComponentState(Enum):
+    initialized = auto()
+    preparing = auto()
+    starting = auto()
+    started = auto()
+    closed = auto()
+
+
+class ComponentContext:
+    _context: Context
 
     def __init__(
         self,
         path: str,
         component_class: type[Component],
         default_resource_name: str,
-        orchestrator: ComponentStartupOrchestrator,
     ):
         super().__init__()
-        self.__path = path
-        self.__component_class = component_class
-        self.__default_resource_name = default_resource_name
-        self.__orchestrator = orchestrator
-
-        # Proxy the real context, not another component proxy
-        self._parent = current_context()
-        while isinstance(self._parent, ComponentContextProxy):
-            self._parent = self._parent._parent
+        self._path = path
+        self._component_class = component_class
+        self._default_resource_name = default_resource_name
+        self._context = current_context()
+        self._state: ComponentState = ComponentState.initialized
 
     def __format_resource_description(
         self, types: Any, name: str, description: str | None = None
@@ -257,6 +272,17 @@ class ComponentContextProxy(Context):
 
         return formatted
 
+    def _ensure_state(self, *allowed_states: ComponentState) -> None:
+        if self._state not in allowed_states:
+            raise RuntimeError(
+                f"cannot perform this operation while the component is in the "
+                f"{self._state} state"
+            )
+
+    @property
+    def state(self) -> ComponentState:
+        return self._state
+
     def add_resource(
         self,
         value: T_Resource,
@@ -266,14 +292,11 @@ class ComponentContextProxy(Context):
         description: str | None = None,
         teardown_callback: Callable[[], Any] | None = None,
     ) -> None:
-        if (
-            name == "default"
-            and self.__orchestrator._component_statuses[self.__path].status
-            == "starting"
-        ):
-            name = self.__default_resource_name
+        self._ensure_state(ComponentState.preparing, ComponentState.starting)
+        if name == "default" and self._state is ComponentState.starting:
+            name = self._default_resource_name
 
-        self._parent.add_resource(
+        self._context.add_resource(
             value,
             name,
             types,
@@ -282,7 +305,7 @@ class ComponentContextProxy(Context):
         )
         logger.debug(
             "%s added a resource (%s)",
-            format_component_name(self.__path, capitalize=True),
+            format_component_name(self._path, capitalize=True),
             self.__format_resource_description(types or type(value), name, description),
         )
 
@@ -294,19 +317,16 @@ class ComponentContextProxy(Context):
         types: Sequence[type] | None = None,
         description: str | None = None,
     ) -> None:
-        if (
-            name == "default"
-            and self.__orchestrator._component_statuses[self.__path].status
-            == "starting"
-        ):
-            name = self.__default_resource_name
+        self._ensure_state(ComponentState.preparing, ComponentState.starting)
+        if name == "default" and self._state is ComponentState.starting:
+            name = self._default_resource_name
 
-        self._parent.add_resource_factory(
+        self._context.add_resource_factory(
             factory_callback, name, types=types, description=description
         )
         logger.debug(
             "%s added a resource factory (%s)",
-            format_component_name(self.__path, capitalize=True),
+            format_component_name(self._path, capitalize=True),
             self.__format_resource_description(
                 types or get_type_hints(factory_callback)["return"], name, description
             ),
@@ -342,27 +362,28 @@ class ComponentContextProxy(Context):
         *,
         optional: Literal[False, True] = False,
     ) -> T_Resource | None:
+        self._ensure_state(ComponentState.preparing, ComponentState.starting)
         if optional:
-            return await self._parent.get_resource(type, name, optional=True)
+            return await self._context.get_resource(type, name, optional=True)
 
         try:
-            return await self._parent.get_resource(type, name)
+            return await self._context.get_resource(type, name)
         except ResourceNotFound:
             logger.debug(
                 "%s is waiting for another component to provide a resource (%s)",
-                format_component_name(self.__path, capitalize=True),
+                format_component_name(self._path, capitalize=True),
                 self.__format_resource_description(type, name),
             )
 
             # Wait until a matching resource or resource factory is available
-            await self._parent.resource_added.wait_event(
+            await self._context.resource_added.wait_event(
                 lambda event: event.resource_name == name
                 and type in event.resource_types,
             )
-            res = await self._parent.get_resource(type, name)
+            res = await self._context.get_resource(type, name)
             logger.debug(
                 "%s got the resource it was waiting for (%s)",
-                format_component_name(self.__path, capitalize=True),
+                format_component_name(self._path, capitalize=True),
                 self.__format_resource_description(type, name),
             )
             return res
@@ -389,18 +410,131 @@ class ComponentContextProxy(Context):
         *,
         optional: Literal[False, True] = False,
     ) -> T_Resource | None:
+        self._ensure_state(ComponentState.preparing, ComponentState.starting)
         if optional:
-            return self._parent.get_resource_nowait(type, name, optional=True)
+            return self._context.get_resource_nowait(type, name, optional=True)
 
-        return self._parent.get_resource_nowait(type, name)
+        return self._context.get_resource_nowait(type, name)
 
     def get_resources(self, type: type[T_Resource]) -> Mapping[str, T_Resource]:
-        return self._parent.get_resources(type)
+        return self._context.get_resources(type)
 
     def add_teardown_callback(
         self, callback: TeardownCallback, pass_exception: bool = False
     ) -> None:
-        self._parent.add_teardown_callback(callback, pass_exception)
+        self._ensure_state(ComponentState.preparing, ComponentState.starting)
+        self._context.add_teardown_callback(callback, pass_exception)
+
+    async def start_background_task_factory(
+        self, *, exception_handler: ExceptionHandler | None = None
+    ) -> TaskFactory:
+        """
+        Start a service task that hosts ad-hoc background tasks.
+
+        Each of the tasks started by this factory is run in its own, separate Asphalt
+        context, inherited from this context.
+
+        When the service task is torn down, it will wait for all the background tasks to
+        finish before returning.
+
+        It is imperative to ensure that the task factory is set up after any of the
+        resources potentially needed by the ad-hoc tasks are set up first. Failing to do
+        so risks those resources being removed from the context before all the tasks
+        have finished.
+
+        :param exception_handler: a callback called to handle an exception raised from the
+            task. Takes the exception (:exc:`Exception`) as the argument, and should return
+            ``True`` if it successfully handled the exception.
+        :return: the task factory
+
+        .. seealso:: :func:`start_service_task`
+
+        """
+        self._ensure_state(ComponentState.preparing, ComponentState.starting)
+        factory = TaskFactory(exception_handler)
+        await self.start_service_task(
+            factory._run,
+            f"Background task factory ({id(factory):x})",
+            teardown_action=factory._finished_event.set,
+        )
+        return factory
+
+    async def start_service_task(
+        self,
+        func: Callable[..., Coroutine[Any, Any, T_Retval]],
+        name: str,
+        *,
+        teardown_action: TeardownAction = "cancel",
+    ) -> Any:
+        """
+        Start a background task that gets shut down when the context shuts down.
+
+        This method is meant to be used by components to run their tasks like network
+        services that should be shut down with the application, because each call to this
+        functions registers a context teardown callback that waits for the service task to
+        finish before allowing the context teardown to continue..
+
+        If you supply a teardown callback, and it raises an exception, then the task
+        will be cancelled instead.
+
+        :param func: the coroutine function to run
+        :param name: descriptive name (e.g. "HTTP server") for the task, to which the
+            prefix "Service task: " will be added when the task is actually created
+            in the backing asynchronous event loop implementation (e.g. asyncio)
+        :param teardown_action: the action to take when the context is being shut down:
+
+            * ``'cancel'``: cancel the task
+            * ``None``: no action (the task must finish by itself)
+            * (function, or any callable, can be asynchronous): run this callable to signal
+                the task to finish
+        :return: any value passed to ``task_status.started()`` by the target callable if
+            it supports that, otherwise ``None``
+        """
+
+        async def finalize_service_task() -> None:
+            if teardown_action == "cancel":
+                logger.debug("Cancelling service task %r", name)
+                task_handle.cancel()
+            elif teardown_action is not None:
+                teardown_action_name = callable_name(teardown_action)
+                logger.debug(
+                    "Calling teardown callback (%s) for service task %r",
+                    teardown_action_name,
+                    name,
+                )
+                try:
+                    retval = teardown_action()
+                    if isawaitable(retval):
+                        await retval
+                except BaseException as exc:
+                    task_handle.cancel()
+                    if isinstance(exc, Exception):
+                        logger.exception(
+                            "Error calling teardown callback (%s) for service task %r",
+                            teardown_action_name,
+                            name,
+                        )
+
+            logger.debug("Waiting for service task %r to finish", name)
+            await task_handle.wait_finished()
+            logger.debug("Service task %r finished", name)
+
+        self._ensure_state(ComponentState.preparing, ComponentState.starting)
+        if (
+            teardown_action != "cancel"
+            and teardown_action is not None
+            and not callable(teardown_action)
+        ):
+            raise ValueError(
+                "teardown_action must be a callable, None, or the string 'cancel'"
+            )
+
+        task_handle = TaskHandle(f"Service task: {name}")
+        task_handle.start_value = await self._context._task_group.start(
+            run_background_task, func, task_handle, name=task_handle.name
+        )
+        self._context.add_teardown_callback(finalize_service_task)
+        return task_handle.start_value
 
 
 @dataclass
@@ -483,87 +617,78 @@ class ComponentStartupOrchestrator:
 
         component_class = type(component)
         component_status = self._component_statuses[path]
-        async with ComponentContextProxy(
-            path, component_class, default_resource_name, self
-        ):
-            # Call prepare() on the component itself, if it's implemented on the component
-            # class
-            if component_class.prepare is not Component.prepare:
-                logger.debug("Calling prepare() of %s", format_component_name(path))
-                coro = component_status.coro = component.prepare()
-                component_status.status = "preparing"
-                component_status.coro = coro
-                try:
-                    await coro
-                except Exception as exc:
-                    raise ComponentStartError(
-                        "preparing", path, component_class
-                    ) from exc
+        proxy = ComponentContext(path, component_class, default_resource_name)
+        # Call prepare() on the component itself, if it's implemented on the component
+        # class
+        if component_class.prepare is not Component.prepare:
+            logger.debug("Calling prepare() of %s", format_component_name(path))
+            component_status.status = "preparing"
+            coro = component_status.coro = component.prepare(proxy)
+            component_status.coro = coro
+            try:
+                await coro
+            except Exception as exc:
+                raise ComponentStartError("preparing", path, component_class) from exc
 
-                logger.debug(
-                    "Returned from prepare() of %s", format_component_name(path)
-                )
-                component_status.coro = None
+            logger.debug("Returned from prepare() of %s", format_component_name(path))
+            component_status.coro = None
 
-            # Start the child components, if there are any
-            if child_component_aliases := self._child_component_aliases.get(path):
-                logger.debug(
-                    "Starting the child components of %s", format_component_name(path)
-                )
-                component_status.status = "starting children"
-                async with create_task_group() as tg:
-                    for alias in child_component_aliases:
-                        if "/" in alias:
-                            default_resource_name = alias.split("/", 1)[1]
-                        else:
-                            default_resource_name = "default"
+        # Start the child components, if there are any
+        if child_component_aliases := self._child_component_aliases.get(path):
+            logger.debug(
+                "Starting the child components of %s", format_component_name(path)
+            )
+            component_status.status = "starting children"
+            async with coalesce_exceptions(), create_task_group() as tg:
+                for alias in child_component_aliases:
+                    if "/" in alias:
+                        default_resource_name = alias.split("/", 1)[1]
+                    else:
+                        default_resource_name = "default"
 
-                        child_path = f"{path}.{alias}" if path else alias
-                        child_component = self._components_by_path[child_path]
-                        tg.start_soon(
-                            self._start_component,
-                            child_component,
-                            child_path,
-                            default_resource_name,
-                            name=(
-                                f"Starting component {child_path} "
-                                f"({qualified_name(child_component)})"
-                            ),
-                        )
+                    child_path = f"{path}.{alias}" if path else alias
+                    child_component = self._components_by_path[child_path]
+                    tg.start_soon(
+                        self._start_component,
+                        child_component,
+                        child_path,
+                        default_resource_name,
+                        name=(
+                            f"Starting component {child_path} "
+                            f"({qualified_name(child_component)})"
+                        ),
+                    )
 
-            # Call start() on the component itself, if it's implemented on the component
-            # class
-            if component_class.start is not Component.start:
-                logger.debug("Calling start() of %s", format_component_name(path))
-                coro = component_status.coro = component.start()
-                component_status.status = "starting"
-                try:
-                    await coro
-                except Exception as exc:
-                    raise ComponentStartError(
-                        "starting", path, component_class
-                    ) from exc
+        # Call start() on the component itself, if it's implemented on the component
+        # class
+        if component_class.start is not Component.start:
+            proxy._state = ComponentState.starting
+            logger.debug("Calling start() of %s", format_component_name(path))
+            coro = component_status.coro = component.start(proxy)
+            component_status.status = "starting"
+            try:
+                await coro
+            except Exception as exc:
+                raise ComponentStartError("starting", path, component_class) from exc
 
-                logger.debug("Returned from start() of %s", format_component_name(path))
-                component_status.coro = None
+            logger.debug("Returned from start() of %s", format_component_name(path))
+            component_status.coro = None
 
+        proxy._state = ComponentState.started
         del self._component_statuses[path]
         return component
 
     async def start_component_tree(self, timeout: float | None) -> Component:
-        with coalesce_exceptions():
-            async with create_task_group() as tg:
-                component_started_event = Event()
-                tg.start_soon(
-                    self._watch_component_tree_startup, component_started_event, timeout
-                )
-                self._init_component(
-                    "", {"type": self.root_component_class, **self.config}
-                )
-                try:
-                    return await self._start_component(self._components_by_path[""], "")
-                finally:
-                    component_started_event.set()
+        async with coalesce_exceptions(), create_task_group() as tg:
+            component_started_event = Event()
+            tg.start_soon(
+                self._watch_component_tree_startup, component_started_event, timeout
+            )
+            self._init_component("", {"type": self.root_component_class, **self.config})
+            try:
+                return await self._start_component(self._components_by_path[""], "")
+            finally:
+                component_started_event.set()
 
     async def _watch_component_tree_startup(
         self, component_started_event: Event, timeout: float | None

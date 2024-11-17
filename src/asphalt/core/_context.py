@@ -54,7 +54,7 @@ from ._exceptions import (
     ResourceConflict,
     ResourceNotFound,
 )
-from ._utils import callable_name, qualified_name
+from ._utils import callable_name, coalesce_exceptions, qualified_name
 
 if sys.version_info >= (3, 10):
     from typing import ParamSpec, TypeAlias
@@ -278,6 +278,7 @@ class Context:
 
                 # If this is the root context, create and enter a task group
                 if not hasattr(self, "_task_group"):
+                    await exit_stack.enter_async_context(coalesce_exceptions())
                     self._task_group = await exit_stack.enter_async_context(
                         create_task_group()
                     )
@@ -661,7 +662,7 @@ def context_teardown(
 
         class SomeComponent(Component):
             @context_teardown
-            async def start(self):
+            async def start(self, ctx: ComponentContext):
                 service = SomeService()
                 add_resource(service)
                 exception = yield

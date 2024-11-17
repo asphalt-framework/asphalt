@@ -2,11 +2,10 @@ from typing import Any
 
 from ._component import CLIApplicationComponent as CLIApplicationComponent
 from ._component import Component as Component
+from ._component import ComponentContext as ComponentContext
 from ._component import start_component as start_component
 from ._concurrent import TaskFactory as TaskFactory
 from ._concurrent import TaskHandle as TaskHandle
-from ._concurrent import start_background_task_factory as start_background_task_factory
-from ._concurrent import start_service_task as start_service_task
 from ._context import Context as Context
 from ._context import ResourceEvent as ResourceEvent
 from ._context import add_resource as add_resource

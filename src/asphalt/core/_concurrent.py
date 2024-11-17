@@ -4,8 +4,8 @@ import logging
 import sys
 from collections.abc import Coroutine
 from dataclasses import dataclass, field
-from inspect import Parameter, isawaitable, signature
-from typing import Any, Callable, Literal, TypeVar, Union
+from inspect import Parameter, signature
+from typing import Any, Callable, TypeVar
 
 from anyio import (
     TASK_STATUS_IGNORED,
@@ -15,7 +15,7 @@ from anyio import (
 )
 from anyio.abc import TaskGroup, TaskStatus
 
-from ._context import Context, ContextState, current_context
+from ._context import Context
 from ._utils import callable_name
 
 if sys.version_info >= (3, 10):
@@ -24,7 +24,6 @@ else:
     from typing_extensions import TypeAlias
 
 T_Retval = TypeVar("T_Retval")
-TeardownAction: TypeAlias = Union[Callable[[], Any], Literal["cancel"], None]
 ExceptionHandler: TypeAlias = Callable[[Exception], bool]
 
 logger = logging.getLogger("asphalt.core")
@@ -41,7 +40,7 @@ class TaskHandle:
     """
 
     name: str = field(hash=False, compare=False)
-    start_value: Any = field(init=False, repr=False, compare=False)
+    start_value: Any = field(init=False, repr=False, compare=False, hash=False)
     _cancel_scope: CancelScope = field(
         init=False, default_factory=CancelScope, repr=False
     )
@@ -58,7 +57,7 @@ class TaskHandle:
         await self._finished_event.wait()
 
 
-async def _run_background_task(
+async def run_background_task(
     func: Callable[..., Coroutine[Any, Any, Any]],
     task_handle: TaskHandle,
     exception_handler: ExceptionHandler | None = None,
@@ -186,7 +185,7 @@ class TaskFactory:
     ) -> None:
         __tracebackhide__ = True  # trick supported by certain debugger frameworks
         try:
-            await _run_background_task(
+            await run_background_task(
                 func, task_handle, exception_handler, task_status=task_status
             )
         finally:
@@ -196,116 +195,3 @@ class TaskFactory:
         async with create_task_group() as self._task_group:
             task_status.started()
             await self._finished_event.wait()
-
-
-async def start_service_task(
-    func: Callable[..., Coroutine[Any, Any, T_Retval]],
-    name: str,
-    *,
-    teardown_action: TeardownAction = "cancel",
-) -> Any:
-    """
-    Start a background task that gets shut down when the context shuts down.
-
-    This method is meant to be used by components to run their tasks like network
-    services that should be shut down with the application, because each call to this
-    functions registers a context teardown callback that waits for the service task to
-    finish before allowing the context teardown to continue..
-
-    If you supply a teardown callback, and it raises an exception, then the task
-    will be cancelled instead.
-
-    :param func: the coroutine function to run
-    :param name: descriptive name (e.g. "HTTP server") for the task, to which the
-        prefix "Service task: " will be added when the task is actually created
-        in the backing asynchronous event loop implementation (e.g. asyncio)
-    :param teardown_action: the action to take when the context is being shut down:
-
-        * ``'cancel'``: cancel the task
-        * ``None``: no action (the task must finish by itself)
-        * (function, or any callable, can be asynchronous): run this callable to signal
-            the task to finish
-    :return: any value passed to ``task_status.started()`` by the target callable if
-        it supports that, otherwise ``None``
-    """
-
-    async def finalize_service_task() -> None:
-        if teardown_action == "cancel":
-            logger.debug("Cancelling service task %r", name)
-            task_handle.cancel()
-        elif teardown_action is not None:
-            teardown_action_name = callable_name(teardown_action)
-            logger.debug(
-                "Calling teardown callback (%s) for service task %r",
-                teardown_action_name,
-                name,
-            )
-            try:
-                retval = teardown_action()
-                if isawaitable(retval):
-                    await retval
-            except BaseException as exc:
-                task_handle.cancel()
-                if isinstance(exc, Exception):
-                    logger.exception(
-                        "Error calling teardown callback (%s) for service task %r",
-                        teardown_action_name,
-                        name,
-                    )
-
-        logger.debug("Waiting for service task %r to finish", name)
-        await task_handle.wait_finished()
-        logger.debug("Service task %r finished", name)
-
-    ctx = current_context()
-    ctx._ensure_state(ContextState.open)
-
-    if (
-        teardown_action != "cancel"
-        and teardown_action is not None
-        and not callable(teardown_action)
-    ):
-        raise ValueError(
-            "teardown_action must be a callable, None, or the string 'cancel'"
-        )
-
-    task_handle = TaskHandle(f"Service task: {name}")
-    task_handle.start_value = await ctx._task_group.start(
-        _run_background_task, func, task_handle, name=task_handle.name
-    )
-    ctx.add_teardown_callback(finalize_service_task)
-    return task_handle.start_value
-
-
-async def start_background_task_factory(
-    *, exception_handler: ExceptionHandler | None = None
-) -> TaskFactory:
-    """
-    Start a service task that hosts ad-hoc background tasks.
-
-    Each of the tasks started by this factory is run in its own, separate Asphalt
-    context, inherited from this context.
-
-    When the service task is torn down, it will wait for all the background tasks to
-    finish before returning.
-
-    It is imperative to ensure that the task factory is set up after any of the
-    resources potentially needed by the ad-hoc tasks are set up first. Failing to do
-    so risks those resources being removed from the context before all the tasks
-    have finished.
-
-    :param exception_handler: a callback called to handle an exception raised from the
-        task. Takes the exception (:exc:`Exception`) as the argument, and should return
-        ``True`` if it successfully handled the exception.
-    :return: the task factory
-
-    .. seealso:: :func:`start_service_task`
-
-    """
-    factory = TaskFactory(exception_handler)
-    await start_service_task(
-        factory._run,
-        f"Background task factory ({id(factory):x})",
-        teardown_action=factory._finished_event.set,
-    )
-    return factory
