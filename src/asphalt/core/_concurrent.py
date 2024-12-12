@@ -29,7 +29,7 @@ TeardownAction: TypeAlias = Union[Callable[[], Any], Literal["cancel"], None]
 logger = logging.getLogger("asphalt.core")
 
 
-@dataclass(unsafe_hash=True)
+@dataclass(eq=False)
 class TaskHandle:
     """
     A representation of a task started from :class:`TaskFactory`.
@@ -39,14 +39,12 @@ class TaskHandle:
         function supported that
     """
 
-    name: str = field(hash=False, compare=False)
-    start_value: Any = field(init=False, repr=False, compare=False, hash=False)
+    name: str
+    start_value: Any = field(init=False, repr=False)
     _cancel_scope: CancelScope = field(
         init=False, default_factory=CancelScope, repr=False
     )
-    _finished_event: Event = field(
-        init=False, default_factory=Event, repr=False, compare=False
-    )
+    _finished_event: Event = field(init=False, default_factory=Event, repr=False)
 
     def cancel(self) -> None:
         """Schedule the task to be cancelled."""
