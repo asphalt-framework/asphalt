@@ -171,7 +171,7 @@ For example::
     class FooComponent(Component):
         async def start():
             service = SomeService()
-            await service.start(ctx)
+            await service.start()
             add_teardown_callback(service.stop)
             add_resource(service)
 

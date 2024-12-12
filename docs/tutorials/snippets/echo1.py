@@ -1,11 +1,11 @@
 # isort: off
 from __future__ import annotations
 
-from asphalt.core import Component, run_application, ComponentContext
+from asphalt.core import Component, run_application
 
 
 class ServerComponent(Component):
-    async def start(self, ctx: ComponentContext) -> None:
+    async def start(self) -> None:
         print("Hello, world!")
 
 

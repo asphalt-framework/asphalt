@@ -22,10 +22,14 @@ from asphalt.core import (
     ResourceConflict,
     ResourceEvent,
     ResourceNotFound,
+    add_resource,
+    add_resource_factory,
+    add_teardown_callback,
     context_teardown,
     current_context,
     get_resource,
     get_resource_nowait,
+    get_resources,
     inject,
     resource,
 )
@@ -327,9 +331,9 @@ class TestContext:
 
     async def test_get_resources(self, context: Context) -> None:
         context.add_resource(9, "foo")
-        async with Context() as subctx:
-            subctx.add_resource(1, "bar")
-            assert subctx.get_resources(int) == {"bar": 1, "foo": 9}
+        async with Context():
+            add_resource(1, "bar")
+            assert get_resources(int) == {"bar": 1, "foo": 9}
 
     async def test_get_resource_nowait(self, context: Context) -> None:
         context.add_resource(1)
@@ -425,9 +429,9 @@ class TestContextTeardown:
             nonlocal resource
             resource = get_resource_nowait(str)
 
-        async with Context() as ctx:
-            ctx.add_resource("blah")
-            ctx.add_teardown_callback(teardown_callback)
+        async with Context():
+            add_resource("blah")
+            add_teardown_callback(teardown_callback)
 
         assert resource == "blah"
 
@@ -438,9 +442,9 @@ class TestContextTeardown:
             nonlocal resource
             resource = get_resource_nowait(str)
 
-        async with Context() as ctx:
-            ctx.add_resource_factory(lambda: "blah", types=[str])
-            ctx.add_teardown_callback(teardown_callback)
+        async with Context():
+            add_resource_factory(lambda: "blah", types=[str])
+            add_teardown_callback(teardown_callback)
 
         assert resource == "blah"
 
@@ -486,15 +490,15 @@ async def test_current_context() -> None:
 
 
 async def test_get_resource() -> None:
-    async with Context() as ctx:
-        ctx.add_resource("foo")
+    async with Context():
+        add_resource("foo")
         assert await get_resource(str) == "foo"
         assert await get_resource(int, optional=True) is None
 
 
 async def test_get_resource_nowait() -> None:
-    async with Context() as ctx:
-        ctx.add_resource("foo")
+    async with Context():
+        add_resource("foo")
         assert get_resource_nowait(str) == "foo"
         pytest.raises(ResourceNotFound, get_resource_nowait, int)
 
@@ -507,9 +511,9 @@ class TestDependencyInjection:
         ) -> tuple[int, str, str]:
             return foo, bar, baz
 
-        async with Context() as ctx:
-            ctx.add_resource("bar_test")
-            ctx.add_resource("baz_test", "alt")
+        async with Context():
+            add_resource("bar_test")
+            add_resource("baz_test", "alt")
             foo, bar, baz = await injected(2)
 
         assert foo == 2
@@ -523,9 +527,9 @@ class TestDependencyInjection:
         ) -> tuple[int, str, str]:
             return foo, bar, baz
 
-        async with Context() as ctx:
-            ctx.add_resource("bar_test")
-            ctx.add_resource("baz_test", "alt")
+        async with Context():
+            add_resource("bar_test")
+            add_resource("baz_test", "alt")
             foo, bar, baz = injected(2)
 
         assert foo == 2
@@ -597,10 +601,10 @@ class TestDependencyInjection:
             ) -> annotation:  # type: ignore[valid-type]
                 return res
 
-        async with Context() as ctx:
+        async with Context():
             retval: Any = injected() if sync else (await injected())
             assert retval is None
-            ctx.add_resource("hello")
+            add_resource("hello")
             retval = injected() if sync else (await injected())
             assert retval == "hello"
 

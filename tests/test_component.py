@@ -14,10 +14,13 @@ from pytest import LogCaptureFixture, MonkeyPatch
 from asphalt.core import (
     CLIApplicationComponent,
     Component,
-    ComponentContext,
     ComponentStartError,
     Context,
+    add_resource,
+    add_resource_factory,
+    get_resource,
     get_resource_nowait,
+    get_resources,
     run_application,
     start_component,
 )
@@ -42,7 +45,7 @@ class DummyComponent(Component):
         self.alias = alias
         self.container = container
 
-    async def start(self, ctx: ComponentContext) -> None:
+    async def start(self) -> None:
         await anyio.sleep(0.1)
         if self.alias and self.container is not None:
             self.container[self.alias] = self
@@ -140,7 +143,7 @@ class TestComplexComponent:
 
     async def test_add_component_during_start(self) -> None:
         class BadContainerComponent(Component):
-            async def start(self, ctx: ComponentContext) -> None:
+            async def start(self) -> None:
                 self.add_component("foo", DummyComponent)
 
         async with Context():
@@ -263,7 +266,7 @@ async def test_start_component_error_during_init() -> None:
 
 async def test_start_component_error_during_prepare() -> None:
     class BadComponent(Component):
-        async def prepare(self, ctx: ComponentContext) -> None:
+        async def prepare(self) -> None:
             raise RuntimeError("component fail")
 
     async with Context():
@@ -288,7 +291,7 @@ async def test_start_component_no_context() -> None:
 
 async def test_start_component_timeout() -> None:
     class StallingComponent(Component):
-        async def start(self, ctx: ComponentContext) -> None:
+        async def start(self) -> None:
             await sleep(3)
             pytest.fail("Shouldn't reach this point")
 
@@ -302,16 +305,16 @@ async def test_prepare(caplog: LogCaptureFixture) -> None:
         def __init__(self) -> None:
             self.add_component("child", ChildComponent)
 
-        async def prepare(self, ctx: ComponentContext) -> None:
-            ctx.add_resource("foo")
+        async def prepare(self) -> None:
+            add_resource("foo")
 
-        async def start(self, ctx: ComponentContext) -> None:
+        async def start(self) -> None:
             get_resource_nowait(str, "bar")
 
     class ChildComponent(Component):
-        async def start(self, ctx: ComponentContext) -> None:
-            foo = ctx.get_resource_nowait(str)
-            ctx.add_resource(foo + "bar", "bar")
+        async def start(self) -> None:
+            foo = get_resource_nowait(str)
+            add_resource(foo + "bar", "bar")
 
     caplog.set_level(logging.DEBUG, "asphalt.core")
     async with Context():
@@ -341,17 +344,17 @@ async def test_prepare(caplog: LogCaptureFixture) -> None:
 
 async def test_resource_descriptions(caplog: LogCaptureFixture) -> None:
     class CustomComponent(Component):
-        async def start(self, ctx: ComponentContext) -> None:
-            ctx.add_resource("foo", "bar", description="sample string")
-            ctx.add_resource_factory(
+        async def start(self) -> None:
+            add_resource("foo", "bar", description="sample string")
+            add_resource_factory(
                 lambda: 3,
                 "bar",
                 types=[int, float],
                 description="sample integer factory",
             )
-            assert await ctx.get_resource(float, optional=True) is None
-            assert ctx.get_resource_nowait(float, optional=True) is None
-            assert ctx.get_resources(str) == {"bar": "foo"}
+            assert await get_resource(float, optional=True) is None
+            assert get_resource_nowait(float, optional=True) is None
+            assert get_resources(str) == {"bar": "foo"}
 
     caplog.set_level(logging.DEBUG, "asphalt.core")
     async with Context():
@@ -381,17 +384,17 @@ async def test_wait_for_resource(caplog: LogCaptureFixture) -> None:
             self.add_component("child2", Child2Component)
 
     class Child1Component(Component):
-        async def start(self, ctx: ComponentContext) -> None:
+        async def start(self) -> None:
             child1_ready_event.set()
             await child2_ready_event.wait()
-            ctx.add_resource("from_child1", "special")
+            add_resource("from_child1", "special")
 
     class Child2Component(Component):
-        async def start(self, ctx: ComponentContext) -> None:
+        async def start(self) -> None:
             await child1_ready_event.wait()
             child2_ready_event.set()
             with fail_after(3):
-                assert await ctx.get_resource(str, "special") == "from_child1"
+                assert await get_resource(str, "special") == "from_child1"
 
     caplog.set_level(logging.DEBUG, "asphalt.core")
     child1_ready_event = Event()
@@ -440,10 +443,10 @@ async def test_default_resource_names(caplog: LogCaptureFixture) -> None:
     class ChildComponent(Component):
         name: str
 
-        async def start(self, ctx: ComponentContext) -> None:
-            ctx.add_resource("default_resource")
-            ctx.add_resource(f"special_resource_{self.name}", self.name)
-            ctx.add_resource_factory(lambda: 7, types=[int])
+        async def start(self) -> None:
+            add_resource("default_resource")
+            add_resource(f"special_resource_{self.name}", self.name)
+            add_resource_factory(lambda: 7, types=[int])
 
     caplog.set_level(logging.DEBUG, "asphalt.core")
     async with Context():

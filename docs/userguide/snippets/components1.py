@@ -1,6 +1,5 @@
 from asphalt.core import (
     Component,
-    ComponentContext,
     add_resource,
     get_resource,
     get_resource_nowait,
@@ -13,11 +12,11 @@ class ParentComponent(Component):
         self.add_component("child1", ChildComponent, name="child1")
         self.add_component("child2", ChildComponent, name="child2")
 
-    async def prepare(self, ctx: ComponentContext) -> None:
+    async def prepare(self) -> None:
         print("ParentComponent.prepare()")
         add_resource("Hello")  # adds a `str` type resource by the name `default`
 
-    async def start(self, ctx: ComponentContext) -> None:
+    async def start(self) -> None:
         print("ParentComponent.start()")
         print(get_resource_nowait(str, "child1_resource"))
         print(get_resource_nowait(str, "child2_resource"))
@@ -30,11 +29,11 @@ class ChildComponent(Component):
     def __init__(self, name: str) -> None:
         self.name = name
 
-    async def prepare(self, ctx: ComponentContext) -> None:
+    async def prepare(self) -> None:
         self.parent_resource = get_resource_nowait(str)
         print(f"ChildComponent.prepare() [{self.name}]")
 
-    async def start(self, ctx: ComponentContext) -> None:
+    async def start(self) -> None:
         print(f"ChildComponent.start() [{self.name}]")
 
         # Add a `str` type resource, with a name like `childX_resource`

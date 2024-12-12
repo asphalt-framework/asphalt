@@ -5,7 +5,7 @@ import sys
 from collections.abc import Coroutine
 from dataclasses import dataclass, field
 from inspect import Parameter, signature
-from typing import Any, Callable, TypeVar
+from typing import Any, Callable, Literal, TypeVar, Union
 
 from anyio import (
     TASK_STATUS_IGNORED,
@@ -15,7 +15,6 @@ from anyio import (
 )
 from anyio.abc import TaskGroup, TaskStatus
 
-from ._context import Context
 from ._utils import callable_name
 
 if sys.version_info >= (3, 10):
@@ -25,6 +24,7 @@ else:
 
 T_Retval = TypeVar("T_Retval")
 ExceptionHandler: TypeAlias = Callable[[Exception], bool]
+TeardownAction: TypeAlias = Union[Callable[[], Any], Literal["cancel"], None]
 
 logger = logging.getLogger("asphalt.core")
 
@@ -64,6 +64,8 @@ async def run_background_task(
     *,
     task_status: TaskStatus[Any] = TASK_STATUS_IGNORED,
 ) -> None:
+    from ._context import Context
+
     __tracebackhide__ = True  # trick supported by certain debugger frameworks
 
     # Check if the function has a parameter named "task_status"
@@ -81,11 +83,10 @@ async def run_background_task(
                 else:
                     task_status.started()
                     await func()
-    except BaseException as exc:
-        if isinstance(exc, Exception):
-            logger.exception("Background task (%s) crashed", task_handle.name)
-            if exception_handler is not None and exception_handler(exc):
-                return
+    except Exception as exc:
+        logger.exception("Background task (%s) crashed", task_handle.name)
+        if exception_handler is not None and exception_handler(exc):
+            return
 
         raise
     else:

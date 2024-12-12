@@ -154,7 +154,7 @@ class PluginContainer:
         entry points don't point to classes)
     """
 
-    __slots__ = "namespace", "base_class", "_entrypoints", "_resolved"
+    __slots__ = "_entrypoints", "_resolved", "base_class", "namespace"
 
     def __init__(self, namespace: str, base_class: type | None = None) -> None:
         self.namespace: str = namespace

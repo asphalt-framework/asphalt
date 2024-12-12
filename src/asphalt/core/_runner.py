@@ -3,7 +3,7 @@ from __future__ import annotations
 import platform
 import signal
 import sys
-from contextlib import AsyncExitStack
+from functools import partial
 from logging import INFO, basicConfig, getLogger
 from logging.config import dictConfig
 from typing import Any
@@ -13,19 +13,19 @@ import anyio
 from anyio import (
     CancelScope,
     Event,
-    create_task_group,
     get_cancelled_exc_class,
     to_thread,
 )
 from anyio.abc import TaskStatus
 
+from . import start_service_task
 from ._component import (
     CLIApplicationComponent,
     Component,
     start_component,
 )
 from ._context import Context
-from ._utils import coalesce_exceptions, qualified_name
+from ._utils import qualified_name
 
 logger = getLogger("asphalt.core")
 
@@ -58,30 +58,26 @@ async def _run_application_async(
 
     logger.info("Starting application")
     try:
-        async with AsyncExitStack() as exit_stack:
-            event = Event()
+        event = Event()
+        async with Context():
+            with CancelScope() as startup_scope:
+                if platform.system() != "Windows":
+                    await start_service_task(
+                        partial(handle_signals, startup_scope, event),
+                        "Asphalt signal handler",
+                    )
 
-            await exit_stack.enter_async_context(Context())
-            if platform.system() != "Windows":
-                await exit_stack.enter_async_context(coalesce_exceptions())
-                startup_tg = await exit_stack.enter_async_context(create_task_group())
-                startup_scope = exit_stack.enter_context(CancelScope())
-                exit_stack.callback(startup_tg.cancel_scope.cancel)
-                await startup_tg.start(
-                    handle_signals, startup_scope, event, name="Asphalt signal handler"
-                )
-
-            try:
-                component = await start_component(
-                    component_class, config, timeout=start_timeout
-                )
-            except (get_cancelled_exc_class(), TimeoutError):
-                # This happens when a signal handler cancels the startup or
-                # start_component() times out
-                return 1
-            except BaseException:
-                logger.exception("Error during application startup")
-                return 1
+                try:
+                    component = await start_component(
+                        component_class, config, timeout=start_timeout
+                    )
+                except (get_cancelled_exc_class(), TimeoutError):
+                    # This happens when a signal handler cancels the startup or
+                    # start_component() times out
+                    return 1
+                except BaseException:
+                    logger.exception("Error during application startup")
+                    return 1
 
             logger.info("Application started")
 

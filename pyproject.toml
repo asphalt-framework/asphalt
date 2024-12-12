@@ -72,13 +72,14 @@ extend-select = [
     "I",            # isort
     "ISC",          # flake8-implicit-str-concat
     "PGH",          # pygrep-hooks
-    "RUF100",       # unused noqa (yesqa)
+    "RUF",          # Ruff-specific rules
     "UP",           # pyupgrade
     "W",            # pycodestyle warnings
 ]
 ignore = [
     "ASYNC109",
-    "ASYNC115"
+    "ASYNC115",
+    "RUF001",
 ]
 
 [tool.ruff.lint.isort]

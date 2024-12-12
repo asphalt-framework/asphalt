@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-import sys
 from abc import ABCMeta, abstractmethod
 from collections.abc import (
     Awaitable,
@@ -12,7 +11,7 @@ from collections.abc import (
 )
 from contextlib import AsyncExitStack
 from enum import Enum, auto
-from inspect import isawaitable, isclass
+from inspect import isclass
 from traceback import StackSummary
 from types import FrameType
 from typing import (
@@ -21,19 +20,16 @@ from typing import (
     ClassVar,
     Literal,
     TypeVar,
-    Union,
     get_type_hints,
     overload,
 )
 
-from anyio import (
-    create_task_group,
-    sleep,
-)
+from anyio import create_task_group, sleep
 from anyio.abc import TaskGroup
 
-from ._concurrent import ExceptionHandler, TaskFactory, TaskHandle, run_background_task
+from ._concurrent import ExceptionHandler, TaskFactory, TeardownAction
 from ._context import (
+    Context,
     FactoryCallback,
     T_Resource,
     TeardownCallback,
@@ -42,23 +38,16 @@ from ._context import (
 from ._exceptions import ComponentStartError, NoCurrentContext, ResourceNotFound
 from ._utils import (
     PluginContainer,
-    callable_name,
     coalesce_exceptions,
     format_component_name,
     merge_config,
     qualified_name,
 )
 
-if sys.version_info >= (3, 10):
-    from typing import TypeAlias
-else:
-    from typing_extensions import TypeAlias
-
 logger = logging.getLogger("asphalt.core")
 
 TComponent = TypeVar("TComponent", bound="Component")
 T_Retval = TypeVar("T_Retval")
-TeardownAction: TypeAlias = Union[Callable[[], Any], Literal["cancel"], None]
 
 
 class Component(metaclass=ABCMeta):
@@ -118,7 +107,7 @@ class Component(metaclass=ABCMeta):
 
         self._child_components[alias] = {"type": type or alias, **config}
 
-    async def prepare(self, ctx: ComponentContext) -> None:
+    async def prepare(self) -> None:
         """
         Perform any necessary initialization before starting the component.
 
@@ -127,7 +116,7 @@ class Component(metaclass=ABCMeta):
         by the child components.
         """
 
-    async def start(self, ctx: ComponentContext) -> None:
+    async def start(self) -> None:
         """
         Perform any necessary tasks to start the services provided by this component.
 
@@ -185,24 +174,30 @@ class ComponentState(Enum):
     closed = auto()
 
 
-class ComponentContext:
+class ComponentContext(Context):
     def __init__(
         self,
         component: Component,
         path: str,
         default_resource_name: str,
-        child_contexts: dict[str, ComponentContext],
+        child_component_contexts: dict[str, ComponentContext],
     ):
+        super().__init__()
         self._path = path
         self._component = component
         self._default_resource_name = default_resource_name
-        self._context = current_context()
-        self._child_contexts = child_contexts
-        self._state: ComponentState = ComponentState.initialized
+        self._child_component_contexts = child_component_contexts
+        self._component_state: ComponentState = ComponentState.initialized
         self._coro: Coroutine[Any, Any, None] | None = None
+        context = current_context()
+        if isinstance(context, ComponentContext):
+            context = context._context
 
-    def __format_resource_description(
-        self, types: Any, name: str, description: str | None = None
+        self._context: Context = context
+
+    @staticmethod
+    def _format_resource_description(
+        types: Any, name: str, description: str | None = None
     ) -> str:
         if isclass(types):
             formatted = f"type={qualified_name(types)}"
@@ -216,17 +211,6 @@ class ComponentContext:
 
         return formatted
 
-    def _ensure_state(self, *allowed_states: ComponentState) -> None:
-        if self._state not in allowed_states:
-            raise RuntimeError(
-                f"cannot perform this operation while the component is in the "
-                f"{self._state} state"
-            )
-
-    @property
-    def state(self) -> ComponentState:
-        return self._state
-
     def add_resource(
         self,
         value: T_Resource,
@@ -236,8 +220,7 @@ class ComponentContext:
         description: str | None = None,
         teardown_callback: Callable[[], Any] | None = None,
     ) -> None:
-        self._ensure_state(ComponentState.preparing, ComponentState.starting)
-        if name == "default" and self._state is ComponentState.starting:
+        if name == "default" and self._component_state is ComponentState.starting:
             name = self._default_resource_name
 
         self._context.add_resource(
@@ -250,7 +233,7 @@ class ComponentContext:
         logger.debug(
             "%s added a resource (%s)",
             format_component_name(self._path, capitalize=True),
-            self.__format_resource_description(types or type(value), name, description),
+            self._format_resource_description(types or type(value), name, description),
         )
 
     def add_resource_factory(
@@ -261,8 +244,7 @@ class ComponentContext:
         types: Sequence[type] | None = None,
         description: str | None = None,
     ) -> None:
-        self._ensure_state(ComponentState.preparing, ComponentState.starting)
-        if name == "default" and self._state is ComponentState.starting:
+        if name == "default" and self._component_state is ComponentState.starting:
             name = self._default_resource_name
 
         self._context.add_resource_factory(
@@ -271,7 +253,7 @@ class ComponentContext:
         logger.debug(
             "%s added a resource factory (%s)",
             format_component_name(self._path, capitalize=True),
-            self.__format_resource_description(
+            self._format_resource_description(
                 types or get_type_hints(factory_callback)["return"], name, description
             ),
         )
@@ -306,7 +288,6 @@ class ComponentContext:
         *,
         optional: Literal[False, True] = False,
     ) -> T_Resource | None:
-        self._ensure_state(ComponentState.preparing, ComponentState.starting)
         if optional:
             return await self._context.get_resource(type, name, optional=True)
 
@@ -316,7 +297,7 @@ class ComponentContext:
             logger.debug(
                 "%s is waiting for another component to provide a resource (%s)",
                 format_component_name(self._path, capitalize=True),
-                self.__format_resource_description(type, name),
+                self._format_resource_description(type, name),
             )
 
             # Wait until a matching resource or resource factory is available
@@ -328,7 +309,7 @@ class ComponentContext:
             logger.debug(
                 "%s got the resource it was waiting for (%s)",
                 format_component_name(self._path, capitalize=True),
-                self.__format_resource_description(type, name),
+                self._format_resource_description(type, name),
             )
             return res
 
@@ -354,7 +335,6 @@ class ComponentContext:
         *,
         optional: Literal[False, True] = False,
     ) -> T_Resource | None:
-        self._ensure_state(ComponentState.preparing, ComponentState.starting)
         if optional:
             return self._context.get_resource_nowait(type, name, optional=True)
 
@@ -366,42 +346,14 @@ class ComponentContext:
     def add_teardown_callback(
         self, callback: TeardownCallback, pass_exception: bool = False
     ) -> None:
-        self._ensure_state(ComponentState.preparing, ComponentState.starting)
         self._context.add_teardown_callback(callback, pass_exception)
 
     async def start_background_task_factory(
         self, *, exception_handler: ExceptionHandler | None = None
     ) -> TaskFactory:
-        """
-        Start a service task that hosts ad-hoc background tasks.
-
-        Each of the tasks started by this factory is run in its own, separate Asphalt
-        context, inherited from this context.
-
-        When the service task is torn down, it will wait for all the background tasks to
-        finish before returning.
-
-        It is imperative to ensure that the task factory is set up after any of the
-        resources potentially needed by the ad-hoc tasks are set up first. Failing to do
-        so risks those resources being removed from the context before all the tasks
-        have finished.
-
-        :param exception_handler: a callback called to handle an exception raised from the
-            task. Takes the exception (:exc:`Exception`) as the argument, and should return
-            ``True`` if it successfully handled the exception.
-        :return: the task factory
-
-        .. seealso:: :func:`start_service_task`
-
-        """
-        self._ensure_state(ComponentState.preparing, ComponentState.starting)
-        factory = TaskFactory(exception_handler)
-        await self.start_service_task(
-            factory._run,
-            f"Background task factory ({id(factory):x})",
-            teardown_action=factory._finished_event.set,
+        return await self._context.start_background_task_factory(
+            exception_handler=exception_handler
         )
-        return factory
 
     async def start_service_task(
         self,
@@ -410,75 +362,9 @@ class ComponentContext:
         *,
         teardown_action: TeardownAction = "cancel",
     ) -> Any:
-        """
-        Start a background task that gets shut down when the context shuts down.
-
-        This method is meant to be used by components to run their tasks like network
-        services that should be shut down with the application, because each call to this
-        functions registers a context teardown callback that waits for the service task to
-        finish before allowing the context teardown to continue..
-
-        If you supply a teardown callback, and it raises an exception, then the task
-        will be cancelled instead.
-
-        :param func: the coroutine function to run
-        :param name: descriptive name (e.g. "HTTP server") for the task, to which the
-            prefix "Service task: " will be added when the task is actually created
-            in the backing asynchronous event loop implementation (e.g. asyncio)
-        :param teardown_action: the action to take when the context is being shut down:
-
-            * ``'cancel'``: cancel the task
-            * ``None``: no action (the task must finish by itself)
-            * (function, or any callable, can be asynchronous): run this callable to signal
-                the task to finish
-        :return: any value passed to ``task_status.started()`` by the target callable if
-            it supports that, otherwise ``None``
-        """
-
-        async def finalize_service_task() -> None:
-            if teardown_action == "cancel":
-                logger.debug("Cancelling service task %r", name)
-                task_handle.cancel()
-            elif teardown_action is not None:
-                teardown_action_name = callable_name(teardown_action)
-                logger.debug(
-                    "Calling teardown callback (%s) for service task %r",
-                    teardown_action_name,
-                    name,
-                )
-                try:
-                    retval = teardown_action()
-                    if isawaitable(retval):
-                        await retval
-                except BaseException as exc:
-                    task_handle.cancel()
-                    if isinstance(exc, Exception):
-                        logger.exception(
-                            "Error calling teardown callback (%s) for service task %r",
-                            teardown_action_name,
-                            name,
-                        )
-
-            logger.debug("Waiting for service task %r to finish", name)
-            await task_handle.wait_finished()
-            logger.debug("Service task %r finished", name)
-
-        self._ensure_state(ComponentState.preparing, ComponentState.starting)
-        if (
-            teardown_action != "cancel"
-            and teardown_action is not None
-            and not callable(teardown_action)
-        ):
-            raise ValueError(
-                "teardown_action must be a callable, None, or the string 'cancel'"
-            )
-
-        task_handle = TaskHandle(f"Service task: {name}")
-        task_handle.start_value = await self._context._task_group.start(
-            run_background_task, func, task_handle, name=task_handle.name
+        return await self._context.start_service_task(
+            func, name, teardown_action=teardown_action
         )
-        self._context.add_teardown_callback(finalize_service_task)
-        return task_handle.start_value
 
 
 @overload
@@ -619,55 +505,58 @@ async def _start_component(context: ComponentContext, path: str) -> None:
     # Prevent add_component() from being called beyond this point
     component = context._component
     component._component_started = True
-
     component_class = type(component)
-    # Call prepare() on the component itself, if it's implemented on the component
-    # class
-    if component_class.prepare is not Component.prepare:
-        logger.debug("Calling prepare() of %s", format_component_name(path))
-        context._state = ComponentState.preparing
-        coro = context._coro = component.prepare(context)
-        try:
-            await coro
-        except Exception as exc:
-            raise ComponentStartError("preparing", path, component_class) from exc
 
-        logger.debug("Returned from prepare() of %s", format_component_name(path))
-        context._coro = None
+    async with context:
+        # Call prepare() on the component itself, if it's implemented on the component
+        # class
+        if component_class.prepare is not Component.prepare:
+            logger.debug("Calling prepare() of %s", format_component_name(path))
+            context._component_state = ComponentState.preparing
+            coro = context._coro = component.prepare()
+            try:
+                await coro
+            except Exception as exc:
+                raise ComponentStartError("preparing", path, component_class) from exc
 
-    # Start the child components, if there are any
-    if context._child_contexts:
-        logger.debug("Starting the child components of %s", format_component_name(path))
-        context._state = ComponentState.starting_children
-        async with coalesce_exceptions(), create_task_group() as tg:
-            for alias, child_context in context._child_contexts.items():
-                child_path = f"{path}.{alias}" if path else alias
-                tg.start_soon(
-                    _start_component,
-                    child_context,
-                    child_path,
-                    name=(
-                        f"Starting component {child_path} "
-                        f"({qualified_name(child_context._component)})"
-                    ),
-                )
+            logger.debug("Returned from prepare() of %s", format_component_name(path))
+            context._coro = None
 
-    # Call start() on the component itself, if it's implemented on the component
-    # class
-    if component_class.start is not Component.start:
-        context._state = ComponentState.starting
-        logger.debug("Calling start() of %s", format_component_name(path))
-        coro = context._coro = component.start(context)
-        context._state = ComponentState.starting
-        try:
-            await coro
-        except Exception as exc:
-            raise ComponentStartError("starting", path, component_class) from exc
+        # Start the child components, if there are any
+        if context._child_component_contexts:
+            logger.debug(
+                "Starting the child components of %s", format_component_name(path)
+            )
+            context._component_state = ComponentState.starting_children
+            async with coalesce_exceptions(), create_task_group() as tg:
+                for alias, child_context in context._child_component_contexts.items():
+                    child_path = f"{path}.{alias}" if path else alias
+                    tg.start_soon(
+                        _start_component,
+                        child_context,
+                        child_path,
+                        name=(
+                            f"Starting component {child_path} "
+                            f"({qualified_name(child_context._component)})"
+                        ),
+                    )
 
-        logger.debug("Returned from start() of %s", format_component_name(path))
-        context._coro = None
+        # Call start() on the component itself, if it's implemented on the component
+        # class
+        if component_class.start is not Component.start:
+            context._component_state = ComponentState.starting
+            logger.debug("Calling start() of %s", format_component_name(path))
+            coro = context._coro = component.start()
+            context._component_state = ComponentState.starting
+            try:
+                await coro
+            except Exception as exc:
+                raise ComponentStartError("starting", path, component_class) from exc
 
-    context._state = ComponentState.started
+            logger.debug("Returned from start() of %s", format_component_name(path))
+            context._coro = None
+
+        context._component_state = ComponentState.started
 
 
 async def _watch_component_tree_startup(
@@ -677,10 +566,10 @@ async def _watch_component_tree_startup(
     def create_status_summaries(subcontext: ComponentContext) -> list[str]:
         parts = (subcontext._path or "(root)").split(".")
         indent = "  " * (len(parts) if subcontext._path else 0)
-        state = subcontext._state.name.replace("_", " ")
+        state = subcontext._component_state.name.replace("_", " ")
         summaries = [f"{indent}{parts[-1]}: {state}"]
-        for child_context in subcontext._child_contexts.values():
-            if child_context._state is not ComponentState.started:
+        for child_context in subcontext._child_component_contexts.values():
+            if child_context._component_state is not ComponentState.started:
                 summaries.extend(create_status_summaries(child_context))
 
         return summaries
@@ -693,7 +582,7 @@ async def _watch_component_tree_startup(
             title = f"{subcontext._path} ({qualified_name(subcontext._component)})"
             summaries.append(f"{title}:\n{formatted_summary.rstrip()}")
 
-        for child_context in subcontext._child_contexts.values():
+        for child_context in subcontext._child_component_contexts.values():
             summaries.extend(create_stack_summaries(child_context))
 
         return summaries

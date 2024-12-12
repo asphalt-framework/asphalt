@@ -16,9 +16,10 @@ from anyio import sleep, to_thread, wait_all_tasks_blocked
 from asphalt.core import (
     CLIApplicationComponent,
     Component,
-    ComponentContext,
     add_teardown_callback,
+    get_resource,
     run_application,
+    start_service_task,
 )
 
 pytestmark = pytest.mark.anyio()
@@ -41,15 +42,15 @@ class ShutdownComponent(Component):
         elif self.method == "exception":
             raise RuntimeError("this should crash the application")
 
-    async def start(self, ctx: ComponentContext) -> None:
-        await ctx.start_service_task(self.stop_app, "Application terminator")
+    async def start(self) -> None:
+        await start_service_task(self.stop_app, "Application terminator")
 
 
 class CrashComponent(Component):
     def __init__(self, method: str = "exit"):
         self.method = method
 
-    async def start(self, ctx: ComponentContext) -> None:
+    async def start(self) -> None:
         if self.method == "keyboard":
             signal.raise_signal(signal.SIGINT)
             await sleep(3)
@@ -70,7 +71,7 @@ class DummyCLIApp(CLIApplicationComponent):
         logging.getLogger(__name__).info("Teardown callback called")
         self.exception = exception
 
-    async def start(self, ctx: ComponentContext) -> None:
+    async def start(self) -> None:
         add_teardown_callback(self.teardown_callback, pass_exception=True)
 
     async def run(self) -> int | None:
@@ -247,10 +248,10 @@ def test_start_timeout(caplog: LogCaptureFixture, anyio_backend_name: str) -> No
                 self.add_component("child2", StallingComponent, level=level + 1)
                 self.add_component("child3", Component)
 
-        async def start(self, ctx: ComponentContext) -> None:
+        async def start(self) -> None:
             if self.is_leaf:
                 # Wait forever for a non-existent resource
-                await ctx.get_resource(float)
+                await get_resource(float)
 
     caplog.set_level(logging.INFO)
     with pytest.raises(SystemExit) as exc_info:

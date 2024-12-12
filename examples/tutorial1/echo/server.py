@@ -5,11 +5,7 @@ from __future__ import annotations
 
 import anyio
 from anyio.abc import SocketStream, TaskStatus
-from asphalt.core import (
-    Component,
-    run_application,
-    ComponentContext,
-)
+from asphalt.core import Component, run_application, start_service_task
 
 
 async def handle(stream: SocketStream) -> None:
@@ -27,8 +23,8 @@ async def serve_requests(*, task_status: TaskStatus[None]) -> None:
 
 
 class ServerComponent(Component):
-    async def start(self, ctx: ComponentContext) -> None:
-        await ctx.start_service_task(serve_requests, "Echo server")
+    async def start(self) -> None:
+        await start_service_task(serve_requests, "Echo server")
 
 
 if __name__ == "__main__":

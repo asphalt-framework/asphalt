@@ -11,12 +11,13 @@ from pytest import LogCaptureFixture
 
 from asphalt.core import (
     Component,
-    ComponentContext,
     ComponentStartError,
     Context,
     TaskFactory,
     TaskHandle,
+    start_background_task_factory,
     start_component,
+    start_service_task,
 )
 
 if sys.version_info < (3, 11):
@@ -34,9 +35,9 @@ class TestTaskFactory:
             return "returnvalue"
 
         class TaskComponent(Component):
-            async def start(self, ctx: ComponentContext) -> None:
+            async def start(self) -> None:
                 nonlocal handle
-                factory = await ctx.start_background_task_factory()
+                factory = await start_background_task_factory()
                 handle = await factory.start_task(taskfunc, "taskfunc")
 
         async with Context():
@@ -52,9 +53,9 @@ class TestTaskFactory:
             assert get_current_task().name == expected_name
 
         class TaskComponent(Component):
-            async def start(self, ctx: ComponentContext) -> None:
+            async def start(self) -> None:
                 nonlocal handle
-                factory = await ctx.start_background_task_factory()
+                factory = await start_background_task_factory()
                 handle = await factory.start_task(taskfunc)
 
         expected_name = (
@@ -75,9 +76,9 @@ class TestTaskFactory:
             return "returnvalue"
 
         class TaskComponent(Component):
-            async def start(self, ctx: ComponentContext) -> None:
+            async def start(self) -> None:
                 nonlocal handle
-                factory = await ctx.start_background_task_factory()
+                factory = await start_background_task_factory()
                 handle = await factory.start_task(taskfunc, "taskfunc")
 
         async with Context():
@@ -99,9 +100,9 @@ class TestTaskFactory:
             finished = True
 
         class TaskComponent(Component):
-            async def start(self, ctx: ComponentContext) -> None:
+            async def start(self) -> None:
                 nonlocal handle
-                factory = await ctx.start_background_task_factory()
+                factory = await start_background_task_factory()
                 handle = await factory.start_task(taskfunc, "taskfunc")
 
         async with Context():
@@ -118,8 +119,8 @@ class TestTaskFactory:
             raise Exception("foo")
 
         class TaskComponent(Component):
-            async def start(self, ctx: ComponentContext) -> None:
-                factory = await ctx.start_background_task_factory()
+            async def start(self) -> None:
+                factory = await start_background_task_factory()
                 await factory.start_task(taskfunc, "taskfunc")
 
         with pytest.raises(ExceptionGroup) as excinfo:
@@ -144,8 +145,8 @@ class TestTaskFactory:
             raise Exception("foo")
 
         class TaskComponent(Component):
-            async def start(self, ctx: ComponentContext) -> None:
-                factory = await ctx.start_background_task_factory(
+            async def start(self) -> None:
+                factory = await start_background_task_factory(
                     exception_handler=handle_exception
                 )
                 await factory.start_task(taskfunc, "taskfunc")
@@ -168,9 +169,9 @@ class TestTaskFactory:
             return "returnvalue"
 
         class TaskComponent(Component):
-            async def start(self, ctx: ComponentContext) -> None:
+            async def start(self) -> None:
                 nonlocal handle
-                factory = await ctx.start_background_task_factory()
+                factory = await start_background_task_factory()
                 handle = factory.start_task_soon(taskfunc, name)
 
         async with Context():
@@ -190,9 +191,9 @@ class TestTaskFactory:
             await event.wait()
 
         class TaskComponent(Component):
-            async def start(self, ctx: ComponentContext) -> None:
+            async def start(self) -> None:
                 nonlocal factory, handle1, handle2
-                factory = await ctx.start_background_task_factory()
+                factory = await start_background_task_factory()
                 handle1 = await factory.start_task(taskfunc)
                 handle2 = factory.start_task_soon(taskfunc)
 
@@ -212,8 +213,8 @@ class TestTaskFactory:
 class TestServiceTask:
     async def test_bad_teardown_action(self, caplog: LogCaptureFixture) -> None:
         class TaskComponent(Component):
-            async def start(self, ctx: ComponentContext) -> None:
-                await ctx.start_service_task(
+            async def start(self) -> None:
+                await start_service_task(
                     lambda: sleep(1),
                     "Dummy",
                     teardown_action="fail",  # type: ignore[arg-type]
@@ -233,8 +234,8 @@ class TestServiceTask:
             await event.wait()
 
         class TaskComponent(Component):
-            async def start(self, ctx: ComponentContext) -> None:
-                await ctx.start_service_task(
+            async def start(self) -> None:
+                await start_service_task(
                     service_func, "Dummy", teardown_action=teardown_callback
                 )
 
@@ -251,8 +252,8 @@ class TestServiceTask:
             await event.wait()
 
         class TaskComponent(Component):
-            async def start(self, ctx: ComponentContext) -> None:
-                await ctx.start_service_task(
+            async def start(self) -> None:
+                await start_service_task(
                     service_func, "Dummy", teardown_action=teardown_callback
                 )
 
@@ -278,10 +279,8 @@ class TestServiceTask:
             finished = True
 
         class TaskComponent(Component):
-            async def start(self, ctx: ComponentContext) -> None:
-                await ctx.start_service_task(
-                    taskfunc, "taskfunc", teardown_action="cancel"
-                )
+            async def start(self) -> None:
+                await start_service_task(taskfunc, "taskfunc", teardown_action="cancel")
 
         async with Context():
             await start_component(TaskComponent)
@@ -302,8 +301,8 @@ class TestServiceTask:
             finished = True
 
         class TaskComponent(Component):
-            async def start(self, ctx: ComponentContext) -> None:
-                startval = await ctx.start_service_task(
+            async def start(self) -> None:
+                startval = await start_service_task(
                     taskfunc, "taskfunc", teardown_action="cancel"
                 )
                 assert startval == "startval"
