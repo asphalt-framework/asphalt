@@ -351,9 +351,14 @@ class ComponentContext(Context):
     async def start_background_task_factory(
         self, *, exception_handler: ExceptionHandler | None = None
     ) -> TaskFactory:
-        return await self._context.start_background_task_factory(
+        factory = await self._context.start_background_task_factory(
             exception_handler=exception_handler
         )
+        logger.debug(
+            "%s started a background task factory",
+            format_component_name(self._path, capitalize=True),
+        )
+        return factory
 
     async def start_service_task(
         self,
@@ -362,9 +367,15 @@ class ComponentContext(Context):
         *,
         teardown_action: TeardownAction = "cancel",
     ) -> Any:
-        return await self._context.start_service_task(
+        retval = await self._context.start_service_task(
             func, name, teardown_action=teardown_action
         )
+        logger.debug(
+            "%s started service task (%s)",
+            format_component_name(self._path, capitalize=True),
+            name,
+        )
+        return retval
 
 
 @overload

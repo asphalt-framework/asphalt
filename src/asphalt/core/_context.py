@@ -192,6 +192,7 @@ class Context:
                 if not res.is_generated
             }
             self._resource_factories = self._parent._resource_factories.copy()
+            self._task_group = self._parent._task_group
         else:
             self._resources = {}
             self._resource_factories = {}
@@ -757,15 +758,11 @@ class Context:
                 "teardown_action must be a callable, None, or the string 'cancel'"
             )
 
-        root_context = current_context()
-        while root_context.parent:
-            root_context = root_context.parent
-
         task_handle = TaskHandle(f"Service task: {name}")
-        task_handle.start_value = await root_context._task_group.start(
+        task_handle.start_value = await self._task_group.start(
             run_background_task, func, task_handle, name=task_handle.name
         )
-        root_context.add_teardown_callback(finalize_service_task)
+        self.add_teardown_callback(finalize_service_task)
         return task_handle.start_value
 
 
