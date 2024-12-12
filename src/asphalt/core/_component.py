@@ -371,7 +371,7 @@ class ComponentContext(Context):
             func, name, teardown_action=teardown_action
         )
         logger.debug(
-            "%s started service task (%s)",
+            "%s started a service task (%s)",
             format_component_name(self._path, capitalize=True),
             name,
         )
