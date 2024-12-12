@@ -702,7 +702,7 @@ class Context:
         This function is meant to be used by components to run their tasks like network
         services that should be shut down with the application, because each call to this
         functions registers a context teardown callback that waits for the service task to
-        finish before allowing the context teardown to continue..
+        finish before allowing the context teardown to continue.
 
         If you supply a teardown callback, and it raises an exception, then the task
         will be cancelled instead.
@@ -1011,7 +1011,7 @@ async def start_service_task(
     This function is meant to be used by components to run their tasks like network
     services that should be shut down with the application, because each call to this
     functions registers a context teardown callback that waits for the service task to
-    finish before allowing the context teardown to continue..
+    finish before allowing the context teardown to continue.
 
     If you supply a teardown callback, and it raises an exception, then the task
     will be cancelled instead.
