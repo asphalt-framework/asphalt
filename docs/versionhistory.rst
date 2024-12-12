@@ -35,8 +35,8 @@ This library adheres to `Semantic Versioning 2.0 <https://semver.org/>`_.
     (``Context.call_async()``, ``Context.call_in_executor()``, ``Context.threadpool()``)
 - **BACKWARD INCOMPATIBLE** Changes in the component API:
 
-  * Dropped the ``ctx`` parameter from ``CLIApplicationComponent.run()``
-  * Changed the ``ctx`` parameter in ``Component.start()`` to be a ``ComponentContext``
+  * Dropped the ``ctx`` parameter from ``Component.start()`` and
+    ``CLIApplicationComponent.run()``
   * Changed how ``CLIApplicationComponent`` works: they no longer start a service task
     that call the ``run()`` method, but instead the runner will call it directly
   * Added the ``start_component()`` function which is now the preferred method for
