@@ -45,6 +45,7 @@ This library adheres to `Semantic Versioning 2.0 <https://semver.org/>`_.
 
   * Dropped the ``TeardownError`` exception in favor of PEP 654 exception groups
   * Dropped the ``Context.loop`` attribute
+  * Dropped the ``Context.context_chain`` attribute
   * Dropped the ``Context.close()`` method (``Context`` objects are now required to be
     used as context managers)
   * Dropped the deprecated ability to use a ``Context`` as a synchronous context manager
@@ -59,6 +60,10 @@ This library adheres to `Semantic Versioning 2.0 <https://semver.org/>`_.
       resource factories, and optionally waiting for the resource to become available
     * ``get_resource_nowait()`` the synchronous counterpart to the above, but incapable
       of waiting for resources or triggering asynchronous resource factories
+  * Contexts now make a shallow copy of the non-generated resources, and resource
+    factories, from their parents rather than allowing lookup from parents. This was
+    done to prevent service tasks from using resources added later in the application
+    startup cycle which would be torn down before the tasks.
 - **BACKWARD INCOMPATIBLE** Dropped the deprecated ``Dependency()`` marker
 - **BACKWARD INCOMPATIBLE** Changes in the event system:
 

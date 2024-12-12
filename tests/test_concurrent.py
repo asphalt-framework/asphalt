@@ -9,7 +9,13 @@ from anyio import Event, fail_after, get_current_task, sleep
 from anyio.abc import TaskStatus
 from pytest import LogCaptureFixture
 
-from asphalt.core import Context, start_background_task_factory, start_service_task
+from asphalt.core import (
+    Context,
+    add_resource,
+    get_resource_nowait,
+    start_background_task_factory,
+    start_service_task,
+)
 
 if sys.version_info < (3, 11):
     from exceptiongroup import ExceptionGroup
@@ -135,6 +141,27 @@ class TestTaskFactory:
             await handle.wait_finished()
 
         assert handle.name == expected_name
+
+    async def test_context_isolation(self) -> None:
+        """
+        Test that the background task has no access to resources added after it was
+        started.
+
+        """
+        event = Event()
+
+        async def taskfunc() -> None:
+            assert get_resource_nowait(str) == "test"
+            await event.wait()
+            assert get_resource_nowait(int, optional=True) is None
+
+        async with Context():
+            factory = await start_background_task_factory()
+            add_resource("test")
+            await factory.start_task(taskfunc)
+            add_resource(5)
+            assert get_resource_nowait(int) == 5
+            event.set()
 
     async def test_all_task_handles(self) -> None:
         event = Event()

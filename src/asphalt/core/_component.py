@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import logging
 from abc import ABCMeta, abstractmethod
-from collections import defaultdict
 from collections.abc import (
     Awaitable,
     Coroutine,
@@ -10,7 +9,8 @@ from collections.abc import (
     MutableMapping,
     Sequence,
 )
-from dataclasses import dataclass, field
+from contextlib import AsyncExitStack
+from enum import Enum, auto
 from inspect import isclass
 from traceback import StackSummary
 from types import FrameType
@@ -24,12 +24,10 @@ from typing import (
     overload,
 )
 
-from anyio import (
-    Event,
-    create_task_group,
-    move_on_after,
-)
+from anyio import create_task_group, sleep
+from anyio.abc import TaskGroup
 
+from ._concurrent import ExceptionHandler, TaskFactory, TeardownAction
 from ._context import (
     Context,
     FactoryCallback,
@@ -37,7 +35,6 @@ from ._context import (
     TeardownCallback,
     current_context,
 )
-from ._event import wait_event
 from ._exceptions import ComponentStartError, NoCurrentContext, ResourceNotFound
 from ._utils import (
     PluginContainer,
@@ -50,6 +47,7 @@ from ._utils import (
 logger = logging.getLogger("asphalt.core")
 
 TComponent = TypeVar("TComponent", bound="Component")
+T_Retval = TypeVar("T_Retval")
 
 
 class Component(metaclass=ABCMeta):
@@ -167,6 +165,219 @@ class CLIApplicationComponent(Component):
 component_types = PluginContainer("asphalt.components", Component)
 
 
+class ComponentState(Enum):
+    initialized = auto()
+    preparing = auto()
+    starting_children = auto()
+    starting = auto()
+    started = auto()
+    closed = auto()
+
+
+class ComponentContext(Context):
+    def __init__(
+        self,
+        component: Component,
+        path: str,
+        default_resource_name: str,
+        child_component_contexts: dict[str, ComponentContext],
+    ):
+        super().__init__()
+        self._path = path
+        self._component = component
+        self._default_resource_name = default_resource_name
+        self._child_component_contexts = child_component_contexts
+        self._component_state: ComponentState = ComponentState.initialized
+        self._coro: Coroutine[Any, Any, None] | None = None
+        context = current_context()
+        if isinstance(context, ComponentContext):
+            context = context._context
+
+        self._context: Context = context
+
+    @staticmethod
+    def _format_resource_description(
+        types: Any, name: str, description: str | None = None
+    ) -> str:
+        if isclass(types):
+            formatted = f"type={qualified_name(types)}"
+        else:
+            formatted_types = ", ".join(qualified_name(type_) for type_ in types)
+            formatted = f"types=[{formatted_types}]"
+
+        formatted += f", name={name!r}"
+        if description:
+            formatted += f", description={description!r}"
+
+        return formatted
+
+    def add_resource(
+        self,
+        value: T_Resource,
+        name: str = "default",
+        types: type | Sequence[type] = (),
+        *,
+        description: str | None = None,
+        teardown_callback: Callable[[], Any] | None = None,
+    ) -> None:
+        if name == "default" and self._component_state is ComponentState.starting:
+            name = self._default_resource_name
+
+        self._context.add_resource(
+            value,
+            name,
+            types,
+            description=description,
+            teardown_callback=teardown_callback,
+        )
+        logger.debug(
+            "%s added a resource (%s)",
+            format_component_name(self._path, capitalize=True),
+            self._format_resource_description(types or type(value), name, description),
+        )
+
+    def add_resource_factory(
+        self,
+        factory_callback: FactoryCallback,
+        name: str = "default",
+        *,
+        types: Sequence[type] | None = None,
+        description: str | None = None,
+    ) -> None:
+        if name == "default" and self._component_state is ComponentState.starting:
+            name = self._default_resource_name
+
+        self._context.add_resource_factory(
+            factory_callback, name, types=types, description=description
+        )
+        logger.debug(
+            "%s added a resource factory (%s)",
+            format_component_name(self._path, capitalize=True),
+            self._format_resource_description(
+                types or get_type_hints(factory_callback)["return"], name, description
+            ),
+        )
+
+    @overload
+    async def get_resource(
+        self,
+        type: type[T_Resource],
+        name: str = ...,
+        *,
+        optional: Literal[True],
+    ) -> T_Resource | None: ...
+
+    @overload
+    async def get_resource(
+        self,
+        type: type[T_Resource],
+        name: str = ...,
+        *,
+        optional: Literal[False],
+    ) -> T_Resource: ...
+
+    @overload
+    async def get_resource(
+        self, type: type[T_Resource], name: str = ...
+    ) -> T_Resource: ...
+
+    async def get_resource(
+        self,
+        type: type[T_Resource],
+        name: str = "default",
+        *,
+        optional: Literal[False, True] = False,
+    ) -> T_Resource | None:
+        if optional:
+            return await self._context.get_resource(type, name, optional=True)
+
+        try:
+            return await self._context.get_resource(type, name)
+        except ResourceNotFound:
+            logger.debug(
+                "%s is waiting for another component to provide a resource (%s)",
+                format_component_name(self._path, capitalize=True),
+                self._format_resource_description(type, name),
+            )
+
+            # Wait until a matching resource or resource factory is available
+            await self._context.resource_added.wait_event(
+                lambda event: event.resource_name == name
+                and type in event.resource_types,
+            )
+            res = await self._context.get_resource(type, name)
+            logger.debug(
+                "%s got the resource it was waiting for (%s)",
+                format_component_name(self._path, capitalize=True),
+                self._format_resource_description(type, name),
+            )
+            return res
+
+    @overload
+    def get_resource_nowait(
+        self, type: type[T_Resource], name: str = ..., *, optional: Literal[True]
+    ) -> T_Resource | None: ...
+
+    @overload
+    def get_resource_nowait(
+        self, type: type[T_Resource], name: str = ..., *, optional: Literal[False]
+    ) -> T_Resource: ...
+
+    @overload
+    def get_resource_nowait(
+        self, type: type[T_Resource], name: str = ...
+    ) -> T_Resource: ...
+
+    def get_resource_nowait(
+        self,
+        type: type[T_Resource],
+        name: str = "default",
+        *,
+        optional: Literal[False, True] = False,
+    ) -> T_Resource | None:
+        if optional:
+            return self._context.get_resource_nowait(type, name, optional=True)
+
+        return self._context.get_resource_nowait(type, name)
+
+    def get_resources(self, type: type[T_Resource]) -> Mapping[str, T_Resource]:
+        return self._context.get_resources(type)
+
+    def add_teardown_callback(
+        self, callback: TeardownCallback, pass_exception: bool = False
+    ) -> None:
+        self._context.add_teardown_callback(callback, pass_exception)
+
+    async def start_background_task_factory(
+        self, *, exception_handler: ExceptionHandler | None = None
+    ) -> TaskFactory:
+        factory = await self._context.start_background_task_factory(
+            exception_handler=exception_handler
+        )
+        logger.debug(
+            "%s started a background task factory",
+            format_component_name(self._path, capitalize=True),
+        )
+        return factory
+
+    async def start_service_task(
+        self,
+        func: Callable[..., Coroutine[Any, Any, T_Retval]],
+        name: str,
+        *,
+        teardown_action: TeardownAction = "cancel",
+    ) -> Any:
+        retval = await self._context.start_service_task(
+            func, name, teardown_action=teardown_action
+        )
+        logger.debug(
+            "%s started a service task (%s)",
+            format_component_name(self._path, capitalize=True),
+            name,
+        )
+        return retval
+
+
 @overload
 async def start_component(
     component_class: type[TComponent],
@@ -218,407 +429,207 @@ async def start_component(
     elif not isinstance(config, MutableMapping):
         raise TypeError("config must be a dict (or any other mutable mapping) or None")
 
-    orchestrator = ComponentStartupOrchestrator(component_class, config)
-    return await orchestrator.start_component_tree(timeout)
-
-
-class ComponentContextProxy(Context):
-    _parent: Context
-
-    def __init__(
-        self,
-        path: str,
-        component_class: type[Component],
-        default_resource_name: str,
-        orchestrator: ComponentStartupOrchestrator,
-    ):
-        super().__init__()
-        self.__path = path
-        self.__component_class = component_class
-        self.__default_resource_name = default_resource_name
-        self.__orchestrator = orchestrator
-
-        # Proxy the real context, not another component proxy
-        while isinstance(self._parent, ComponentContextProxy):
-            self._parent = self._parent._parent
-
-    def __format_resource_description(
-        self, types: Any, name: str, description: str | None = None
-    ) -> str:
-        if isclass(types):
-            formatted = f"type={qualified_name(types)}"
-        else:
-            formatted_types = ", ".join(qualified_name(type_) for type_ in types)
-            formatted = f"types=[{formatted_types}]"
-
-        formatted += f", name={name!r}"
-        if description:
-            formatted += f", description={description!r}"
-
-        return formatted
-
-    def add_resource(
-        self,
-        value: T_Resource,
-        name: str = "default",
-        types: type | Sequence[type] = (),
-        *,
-        description: str | None = None,
-        teardown_callback: Callable[[], Any] | None = None,
-    ) -> None:
-        if (
-            name == "default"
-            and self.__orchestrator._component_statuses[self.__path].status
-            == "starting"
-        ):
-            name = self.__default_resource_name
-
-        self._parent.add_resource(
-            value,
-            name,
-            types,
-            description=description,
-            teardown_callback=teardown_callback,
-        )
-        logger.debug(
-            "%s added a resource (%s)",
-            format_component_name(self.__path, capitalize=True),
-            self.__format_resource_description(types or type(value), name, description),
-        )
-
-    def add_resource_factory(
-        self,
-        factory_callback: FactoryCallback,
-        name: str = "default",
-        *,
-        types: Sequence[type] | None = None,
-        description: str | None = None,
-    ) -> None:
-        if (
-            name == "default"
-            and self.__orchestrator._component_statuses[self.__path].status
-            == "starting"
-        ):
-            name = self.__default_resource_name
-
-        self._parent.add_resource_factory(
-            factory_callback, name, types=types, description=description
-        )
-        logger.debug(
-            "%s added a resource factory (%s)",
-            format_component_name(self.__path, capitalize=True),
-            self.__format_resource_description(
-                types or get_type_hints(factory_callback)["return"], name, description
-            ),
-        )
-
-    @overload
-    async def get_resource(
-        self,
-        type: type[T_Resource],
-        name: str = ...,
-        *,
-        optional: Literal[True],
-    ) -> T_Resource | None: ...
-
-    @overload
-    async def get_resource(
-        self,
-        type: type[T_Resource],
-        name: str = ...,
-        *,
-        optional: Literal[False],
-    ) -> T_Resource: ...
-
-    @overload
-    async def get_resource(
-        self, type: type[T_Resource], name: str = ...
-    ) -> T_Resource: ...
-
-    async def get_resource(
-        self,
-        type: type[T_Resource],
-        name: str = "default",
-        *,
-        optional: Literal[False, True] = False,
-    ) -> T_Resource | None:
-        if optional:
-            return await self._parent.get_resource(type, name, optional=True)
-
-        try:
-            return await self._parent.get_resource(type, name)
-        except ResourceNotFound:
-            logger.debug(
-                "%s is waiting for another component to provide a resource (%s)",
-                format_component_name(self.__path, capitalize=True),
-                self.__format_resource_description(type, name),
+    root_component_context = _init_component("", {"type": component_class, **config})
+    async with AsyncExitStack() as exit_stack:
+        tg: TaskGroup | None = None
+        if timeout:
+            await exit_stack.enter_async_context(coalesce_exceptions())
+            tg = await exit_stack.enter_async_context(create_task_group())
+            tg.start_soon(
+                _watch_component_tree_startup,
+                root_component_context,
+                timeout,
             )
 
-            # Wait until a matching resource or resource factory is available
-            signals = [ctx.resource_added for ctx in self._parent.context_chain]
-            await wait_event(
-                signals,
-                lambda event: event.resource_name == name
-                and type in event.resource_types,
-            )
-            res = await self.get_resource(type, name)
-            logger.debug(
-                "%s got the resource it was waiting for (%s)",
-                format_component_name(self.__path, capitalize=True),
-                self.__format_resource_description(type, name),
-            )
-            return res
+        await _start_component(root_component_context, "")
 
-    @overload
-    def get_resource_nowait(
-        self, type: type[T_Resource], name: str = ..., *, optional: Literal[True]
-    ) -> T_Resource | None: ...
+        if tg:
+            tg.cancel_scope.cancel()
 
-    @overload
-    def get_resource_nowait(
-        self, type: type[T_Resource], name: str = ..., *, optional: Literal[False]
-    ) -> T_Resource: ...
-
-    @overload
-    def get_resource_nowait(
-        self, type: type[T_Resource], name: str = ...
-    ) -> T_Resource: ...
-
-    def get_resource_nowait(
-        self,
-        type: type[T_Resource],
-        name: str = "default",
-        *,
-        optional: Literal[False, True] = False,
-    ) -> T_Resource | None:
-        if optional:
-            return self._parent.get_resource_nowait(type, name, optional=True)
-
-        return self._parent.get_resource_nowait(type, name)
-
-    def get_resources(self, type: type[T_Resource]) -> Mapping[str, T_Resource]:
-        return self._parent.get_resources(type)
-
-    def add_teardown_callback(
-        self, callback: TeardownCallback, pass_exception: bool = False
-    ) -> None:
-        self._parent.add_teardown_callback(callback, pass_exception)
+    return root_component_context._component
 
 
-@dataclass
-class ComponentStatus:
-    component_class: type[Component]
-    status: str = "creating"
-    coro: Coroutine[Any, Any, Any] | None = None
+def _init_component(
+    path: str,
+    config: MutableMapping[str, Any],
+    default_resource_name: str = "default",
+) -> ComponentContext:
+    # Separate the child components from the config
+    child_components_config = config.pop("components", {})
 
+    # Resolve the type to a class
+    component_type = config.pop("type")
+    component_class = component_types.resolve(component_type)
+    if not isclass(component_class) or not issubclass(component_class, Component):
+        raise TypeError(
+            f"{path or '(root)'}: the declared component type ({component_type!r}) "
+            f"resolved to {component_class!r} which is not a subclass of Component"
+        )
 
-@dataclass
-class ComponentStartupOrchestrator:
-    root_component_class: type[Component] | str
-    config: Mapping[str, Any]
+    # Instantiate the component
+    logger.debug("Creating %s", format_component_name(path, component_class))
+    try:
+        component = component_class(**config)
+    except Exception as exc:
+        raise ComponentStartError("creating", path, component_class) from exc
 
-    _component_statuses: dict[str, ComponentStatus] = field(
-        init=False, default_factory=dict
-    )
-    _components_by_path: dict[str, Component] = field(init=False, default_factory=dict)
-    _child_component_aliases: dict[str, list[str]] = field(
-        init=False, default_factory=lambda: defaultdict(list)
+    # Merge the overrides to the hard-coded configuration
+    logger.debug("Created %s", format_component_name(path, component_class))
+    child_components_config = merge_config(
+        component._child_components, child_components_config
     )
 
-    def _init_component(self, path: str, config: MutableMapping[str, Any]) -> None:
-        # Separate the child components from the config
-        child_components_config = config.pop("components", {})
+    # Create the child components
+    child_contexts: dict[str, ComponentContext] = {}
+    for alias, child_config in child_components_config.items():
+        child_path = f"{path}.{alias}" if path else alias
 
-        # Resolve the type to a class
-        component_type = config.pop("type")
-        component_class = component_types.resolve(component_type)
-        if not isclass(component_class) or not issubclass(component_class, Component):
+        if child_config is None:
+            child_config = {}
+        elif not isinstance(child_config, MutableMapping):
             raise TypeError(
-                f"{path or '(root)'}: the declared component type ({component_type!r}) "
-                f"resolved to {component_class!r} which is not a subclass of Component"
+                f"{child_path}: component configuration must be either None or a "
+                f"dict (or any other mutable mapping type), not "
+                f"{qualified_name(child_config)}"
             )
 
-        # Instantiate the component
-        logger.debug("Creating %s", format_component_name(path, component_class))
-        self._component_statuses[path] = ComponentStatus(component_class)
-        try:
-            component = self._components_by_path[path] = component_class(**config)
-        except Exception as exc:
-            raise ComponentStartError("creating", path, component_class) from exc
+        # If the type was specified only via an alias, use that as a type
+        child_config.setdefault("type", alias)
 
-        logger.debug("Created %s", format_component_name(path, component_class))
-        self._component_statuses[path].status = "created"
+        # If the type contains a forward slash, split the latter part out of it
+        if isinstance(child_config["type"], str) and "/" in child_config["type"]:
+            child_config["type"] = child_config["type"].split("/")[0]
 
-        # Merge the overrides to the hard-coded configuration
-        child_components_config = merge_config(
-            component._child_components, child_components_config
+        if "/" in alias:
+            child_default_resource_name = alias.split("/", 1)[1]
+        else:
+            child_default_resource_name = "default"
+
+        child_contexts[child_path] = _init_component(
+            child_path, child_config, child_default_resource_name
         )
-        self._child_component_aliases[path] = list(child_components_config)
 
-        # Create the child components
-        for alias, child_config in child_components_config.items():
-            child_path = f"{path}.{alias}" if path else alias
+    return ComponentContext(component, path, default_resource_name, child_contexts)
 
-            if child_config is None:
-                child_config = {}
-            elif not isinstance(child_config, MutableMapping):
-                raise TypeError(
-                    f"{child_path}: component configuration must be either None or a "
-                    f"dict (or any other mutable mapping type), not "
-                    f"{qualified_name(child_config)}"
-                )
 
-            # If the type was specified only via an alias, use that as a type
-            child_config.setdefault("type", alias)
+async def _start_component(context: ComponentContext, path: str) -> None:
+    # Prevent add_component() from being called beyond this point
+    component = context._component
+    component._component_started = True
+    component_class = type(component)
 
-            # If the type contains a forward slash, split the latter part out of it
-            if isinstance(child_config["type"], str) and "/" in child_config["type"]:
-                child_config["type"] = child_config["type"].split("/")[0]
+    async with context:
+        # Call prepare() on the component itself, if it's implemented on the component
+        # class
+        if component_class.prepare is not Component.prepare:
+            logger.debug("Calling prepare() of %s", format_component_name(path))
+            context._component_state = ComponentState.preparing
+            coro = context._coro = component.prepare()
+            try:
+                await coro
+            except Exception as exc:
+                raise ComponentStartError("preparing", path, component_class) from exc
 
-            self._init_component(child_path, child_config)
+            logger.debug("Returned from prepare() of %s", format_component_name(path))
+            context._coro = None
 
-    async def _start_component(
-        self, component: Component, path: str, default_resource_name: str = "default"
-    ) -> Component:
-        # Prevent add_component() from being called beyond this point
-        component._component_started = True
+        # Start the child components, if there are any
+        if context._child_component_contexts:
+            logger.debug(
+                "Starting the child components of %s", format_component_name(path)
+            )
+            context._component_state = ComponentState.starting_children
+            async with coalesce_exceptions(), create_task_group() as tg:
+                for alias, child_context in context._child_component_contexts.items():
+                    child_path = f"{path}.{alias}" if path else alias
+                    tg.start_soon(
+                        _start_component,
+                        child_context,
+                        child_path,
+                        name=(
+                            f"Starting component {child_path} "
+                            f"({qualified_name(child_context._component)})"
+                        ),
+                    )
 
-        component_class = type(component)
-        component_status = self._component_statuses[path]
-        async with ComponentContextProxy(
-            path, component_class, default_resource_name, self
-        ):
-            # Call prepare() on the component itself, if it's implemented on the component
-            # class
-            if component_class.prepare is not Component.prepare:
-                logger.debug("Calling prepare() of %s", format_component_name(path))
-                coro = component_status.coro = component.prepare()
-                component_status.status = "preparing"
-                component_status.coro = coro
-                try:
-                    await coro
-                except Exception as exc:
-                    raise ComponentStartError(
-                        "preparing", path, component_class
-                    ) from exc
+        # Call start() on the component itself, if it's implemented on the component
+        # class
+        if component_class.start is not Component.start:
+            context._component_state = ComponentState.starting
+            logger.debug("Calling start() of %s", format_component_name(path))
+            coro = context._coro = component.start()
+            context._component_state = ComponentState.starting
+            try:
+                await coro
+            except Exception as exc:
+                raise ComponentStartError("starting", path, component_class) from exc
 
-                logger.debug(
-                    "Returned from prepare() of %s", format_component_name(path)
-                )
-                component_status.coro = None
+            logger.debug("Returned from start() of %s", format_component_name(path))
+            context._coro = None
 
-            # Start the child components, if there are any
-            if child_component_aliases := self._child_component_aliases.get(path):
-                logger.debug(
-                    "Starting the child components of %s", format_component_name(path)
-                )
-                component_status.status = "starting children"
-                async with create_task_group() as tg:
-                    for alias in child_component_aliases:
-                        if "/" in alias:
-                            default_resource_name = alias.split("/", 1)[1]
-                        else:
-                            default_resource_name = "default"
+        context._component_state = ComponentState.started
 
-                        child_path = f"{path}.{alias}" if path else alias
-                        child_component = self._components_by_path[child_path]
-                        tg.start_soon(
-                            self._start_component,
-                            child_component,
-                            child_path,
-                            default_resource_name,
-                            name=(
-                                f"Starting component {child_path} "
-                                f"({qualified_name(child_component)})"
-                            ),
-                        )
 
-            # Call start() on the component itself, if it's implemented on the component
-            # class
-            if component_class.start is not Component.start:
-                logger.debug("Calling start() of %s", format_component_name(path))
-                coro = component_status.coro = component.start()
-                component_status.status = "starting"
-                try:
-                    await coro
-                except Exception as exc:
-                    raise ComponentStartError(
-                        "starting", path, component_class
-                    ) from exc
+async def _watch_component_tree_startup(
+    context: ComponentContext,
+    timeout: float,
+) -> None:
+    def create_status_summaries(subcontext: ComponentContext) -> list[str]:
+        parts = (subcontext._path or "(root)").split(".")
+        indent = "  " * (len(parts) if subcontext._path else 0)
+        state = subcontext._component_state.name.replace("_", " ")
+        summaries = [f"{indent}{parts[-1]}: {state}"]
+        for child_context in subcontext._child_component_contexts.values():
+            if child_context._component_state is not ComponentState.started:
+                summaries.extend(create_status_summaries(child_context))
 
-                logger.debug("Returned from start() of %s", format_component_name(path))
-                component_status.coro = None
+        return summaries
 
-        del self._component_statuses[path]
-        return component
+    def create_stack_summaries(subcontext: ComponentContext) -> list[str]:
+        summaries: list[str] = []
+        if subcontext._coro is not None:
+            stack_summary = _get_coro_stack_summary(subcontext._coro)
+            formatted_summary = "".join(stack_summary.format())
+            title = f"{subcontext._path} ({qualified_name(subcontext._component)})"
+            summaries.append(f"{title}:\n{formatted_summary.rstrip()}")
 
-    async def start_component_tree(self, timeout: float | None) -> Component:
-        with coalesce_exceptions():
-            async with create_task_group() as tg:
-                component_started_event = Event()
-                tg.start_soon(
-                    self._watch_component_tree_startup, component_started_event, timeout
-                )
-                self._init_component(
-                    "", {"type": self.root_component_class, **self.config}
-                )
-                try:
-                    return await self._start_component(self._components_by_path[""], "")
-                finally:
-                    component_started_event.set()
+        for child_context in subcontext._child_component_contexts.values():
+            summaries.extend(create_stack_summaries(child_context))
 
-    async def _watch_component_tree_startup(
-        self, component_started_event: Event, timeout: float | None
-    ) -> None:
-        with move_on_after(timeout):
-            await component_started_event.wait()
-            return
+        return summaries
 
-        status_summary_sections: list[str] = [
-            "Timeout waiting for the component tree to start"
-        ]
+    await sleep(timeout)
+    status_summary_sections: list[str] = [
+        "Timeout waiting for the component tree to start"
+    ]
+    status_summaries: list[str] = create_status_summaries(context)
+    title = "Current status of the components still waiting to finish startup"
+    status_summary_sections.append(f"{title}\n{'-' * len(title)}")
+    status_summary_sections.append("\n".join(status_summaries))
 
-        status_summary: list[str] = []
-        for path, status in self._component_statuses.items():
-            parts = (path or "(root)").split(".")
-            indent = "  " * (len(parts) if path else 0)
-            status_summary.append(f"{indent}{parts[-1]}: {status.status}")
-
-        title = "Current status of the components still waiting to finish startup"
+    if stack_summaries := create_stack_summaries(context):
+        title = "Stack summaries of components still waiting to start"
         status_summary_sections.append(f"{title}\n{'-' * len(title)}")
-        status_summary_sections.append("\n".join(status_summary))
+        status_summary_sections.extend(stack_summaries)
 
-        stack_summaries: list[str] = []
-        for path, status in self._component_statuses.items():
-            if status.coro is not None:
-                stack_summary = self._get_coro_stack_summary(status.coro)
-                formatted_summary = "".join(stack_summary.format())
-                title = f"{path} ({qualified_name(status.component_class)})"
-                stack_summaries.append(f"{title}:\n{formatted_summary.rstrip()}")
+    logger.error("%s", "\n\n".join(status_summary_sections))
+    raise TimeoutError("timeout starting component tree")
 
-        if stack_summaries:
-            title = "Stack summaries of components still waiting to start"
-            status_summary_sections.append(f"{title}\n{'-' * len(title)}")
-            status_summary_sections.extend(stack_summaries)
 
-        logger.error("%s", "\n\n".join(status_summary_sections))
-        raise TimeoutError("timeout starting component tree")
+def _get_coro_stack_summary(coro: Coroutine[Any, Any, Any]) -> StackSummary:
+    import gc
 
-    @staticmethod
-    def _get_coro_stack_summary(coro: Coroutine[Any, Any, Any]) -> StackSummary:
-        import gc
+    frames: list[FrameType] = []
+    awaitable: Awaitable[Any] | None = coro
+    while isinstance(awaitable, Coroutine):
+        while awaitable.__class__.__name__ == "async_generator_asend":
+            # Hack to get past asend() objects
+            awaitable = gc.get_referents(awaitable)[0].ag_await
 
-        frames: list[FrameType] = []
-        awaitable: Awaitable[Any] | None = coro
-        while isinstance(awaitable, Coroutine):
-            while awaitable.__class__.__name__ == "async_generator_asend":
-                # Hack to get past asend() objects
-                awaitable = gc.get_referents(awaitable)[0].ag_await
+        if frame := getattr(awaitable, "cr_frame", None):
+            frames.append(frame)
 
-            if frame := getattr(awaitable, "cr_frame", None):
-                frames.append(frame)
+        awaitable = getattr(awaitable, "cr_await", None)
 
-            awaitable = getattr(awaitable, "cr_await", None)
-
-        frame_tuples = [(f, f.f_lineno) for f in frames]
-        return StackSummary.extract(frame_tuples)
+    frame_tuples = [(f, f.f_lineno) for f in frames]
+    return StackSummary.extract(frame_tuples)

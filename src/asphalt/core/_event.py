@@ -37,7 +37,7 @@ class Event:
     :ivar float time: event creation time as seconds from the UNIX epoch
     """
 
-    __slots__ = "source", "topic", "time"
+    __slots__ = "source", "time", "topic"
 
     source: Any
     topic: str

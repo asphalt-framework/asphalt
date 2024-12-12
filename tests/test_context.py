@@ -6,18 +6,14 @@ from contextlib import AsyncExitStack, ExitStack
 from itertools import count
 from typing import Any, NoReturn, Optional, Union
 
-import anyio
 import pytest
 from anyio import (
     create_task_group,
     fail_after,
-    get_current_task,
-    sleep,
     wait_all_tasks_blocked,
 )
 from anyio.abc import TaskStatus
 from anyio.lowlevel import checkpoint
-from common import raises_in_exception_group
 
 from asphalt.core import (
     AsyncResourceError,
@@ -26,13 +22,16 @@ from asphalt.core import (
     ResourceConflict,
     ResourceEvent,
     ResourceNotFound,
+    add_resource,
+    add_resource_factory,
+    add_teardown_callback,
     context_teardown,
     current_context,
     get_resource,
     get_resource_nowait,
+    get_resources,
     inject,
     resource,
-    start_service_task,
 )
 
 if sys.version_info < (3, 11):
@@ -78,7 +77,7 @@ class TestContext:
         ] = []
         async with AsyncExitStack() as exit_stack:
             if exception:
-                exit_stack.enter_context(pytest.raises(ExceptionGroup))
+                exit_stack.enter_context(pytest.raises(Exception, match="foo"))
 
             context = await exit_stack.enter_async_context(Context())
             context.add_teardown_callback(callback, pass_exception=True)
@@ -332,10 +331,9 @@ class TestContext:
 
     async def test_get_resources(self, context: Context) -> None:
         context.add_resource(9, "foo")
-        async with Context() as subctx:
-            subctx.add_resource(1, "bar")
-            subctx.add_resource(4, "foo")
-            assert subctx.get_resources(int) == {"bar": 1, "foo": 4}
+        async with Context():
+            add_resource(1, "bar")
+            assert get_resources(int) == {"bar": 1, "foo": 9}
 
     async def test_get_resource_nowait(self, context: Context) -> None:
         context.add_resource(1)
@@ -350,60 +348,6 @@ class TestContext:
         exc.match("no matching resource was found for type=int name='foo'")
         assert exc.value.type is int
         assert exc.value.name == "foo"
-
-    async def test_start_service_task_cancel_on_exit(self) -> None:
-        started = False
-        finished = False
-
-        async def taskfunc() -> None:
-            nonlocal started, finished
-            assert get_current_task().name == "Service task: taskfunc"
-            started = True
-            await sleep(3)
-            finished = True
-
-        async with Context():
-            await start_service_task(taskfunc, "taskfunc")
-
-        assert started
-        assert not finished
-
-    async def test_start_service_task_custom_teardown_callback(self) -> None:
-        started = False
-        finished = False
-        event = anyio.Event()
-
-        async def taskfunc() -> None:
-            nonlocal started, finished
-            started = True
-            with fail_after(3):
-                await event.wait()
-
-            finished = True
-
-        async with Context():
-            await start_service_task(taskfunc, "taskfunc", teardown_action=event.set)
-
-        assert started
-        assert finished
-
-    async def test_start_service_task_status(self) -> None:
-        started = False
-        finished = False
-
-        async def taskfunc(task_status: TaskStatus[str]) -> None:
-            nonlocal started, finished
-            assert get_current_task().name == "Service task: taskfunc"
-            started = True
-            task_status.started("startval")
-            await sleep(3)
-            finished = True
-
-        async with Context():
-            assert await start_service_task(taskfunc, "taskfunc") == "startval"
-
-        assert started
-        assert not finished
 
 
 class TestContextTeardown:
@@ -426,7 +370,7 @@ class TestContextTeardown:
                 await start(context)
                 assert phase == "started"
                 if expected_exc:
-                    exit_stack.enter_context(pytest.raises(ExceptionGroup))
+                    exit_stack.enter_context(pytest.raises(Exception, match="foo"))
                     raise expected_exc
 
         assert phase == "finished"
@@ -452,7 +396,7 @@ class TestContextTeardown:
                 await SomeComponent().start()
                 assert phase == "started"
                 if expected_exc:
-                    exit_stack.enter_context(pytest.raises(ExceptionGroup))
+                    exit_stack.enter_context(pytest.raises(Exception, match="foo"))
                     raise expected_exc
 
         assert phase == "finished"
@@ -485,9 +429,9 @@ class TestContextTeardown:
             nonlocal resource
             resource = get_resource_nowait(str)
 
-        async with Context() as ctx:
-            ctx.add_resource("blah")
-            ctx.add_teardown_callback(teardown_callback)
+        async with Context():
+            add_resource("blah")
+            add_teardown_callback(teardown_callback)
 
         assert resource == "blah"
 
@@ -498,9 +442,9 @@ class TestContextTeardown:
             nonlocal resource
             resource = get_resource_nowait(str)
 
-        async with Context() as ctx:
-            ctx.add_resource_factory(lambda: "blah", types=[str])
-            ctx.add_teardown_callback(teardown_callback)
+        async with Context():
+            add_resource_factory(lambda: "blah", types=[str])
+            add_teardown_callback(teardown_callback)
 
         assert resource == "blah"
 
@@ -525,7 +469,7 @@ class TestContextFinisher:
                 await start()
                 assert phase == "started"
                 if expected_exc:
-                    exit_stack.enter_context(pytest.raises(ExceptionGroup))
+                    exit_stack.enter_context(pytest.raises(Exception, match="foo"))
                     raise expected_exc
 
         assert phase == "finished"
@@ -546,15 +490,15 @@ async def test_current_context() -> None:
 
 
 async def test_get_resource() -> None:
-    async with Context() as ctx:
-        ctx.add_resource("foo")
+    async with Context():
+        add_resource("foo")
         assert await get_resource(str) == "foo"
         assert await get_resource(int, optional=True) is None
 
 
 async def test_get_resource_nowait() -> None:
-    async with Context() as ctx:
-        ctx.add_resource("foo")
+    async with Context():
+        add_resource("foo")
         assert get_resource_nowait(str) == "foo"
         pytest.raises(ResourceNotFound, get_resource_nowait, int)
 
@@ -567,9 +511,9 @@ class TestDependencyInjection:
         ) -> tuple[int, str, str]:
             return foo, bar, baz
 
-        async with Context() as ctx:
-            ctx.add_resource("bar_test")
-            ctx.add_resource("baz_test", "alt")
+        async with Context():
+            add_resource("bar_test")
+            add_resource("baz_test", "alt")
             foo, bar, baz = await injected(2)
 
         assert foo == 2
@@ -583,9 +527,9 @@ class TestDependencyInjection:
         ) -> tuple[int, str, str]:
             return foo, bar, baz
 
-        async with Context() as ctx:
-            ctx.add_resource("bar_test")
-            ctx.add_resource("baz_test", "alt")
+        async with Context():
+            add_resource("bar_test")
+            add_resource("baz_test", "alt")
             foo, bar, baz = injected(2)
 
         assert foo == 2
@@ -609,7 +553,7 @@ class TestDependencyInjection:
         async def injected(foo: int, bar: str = resource()) -> None:
             pass
 
-        with raises_in_exception_group(ResourceNotFound) as exc:
+        with pytest.raises(ResourceNotFound, match="type=str name='default'") as exc:
             async with Context():
                 await injected(2)
 
@@ -657,10 +601,10 @@ class TestDependencyInjection:
             ) -> annotation:  # type: ignore[valid-type]
                 return res
 
-        async with Context() as ctx:
+        async with Context():
             retval: Any = injected() if sync else (await injected())
             assert retval is None
-            ctx.add_resource("hello")
+            add_resource("hello")
             retval = injected() if sync else (await injected())
             assert retval == "hello"
 

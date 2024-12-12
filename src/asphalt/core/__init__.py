@@ -5,8 +5,6 @@ from ._component import Component as Component
 from ._component import start_component as start_component
 from ._concurrent import TaskFactory as TaskFactory
 from ._concurrent import TaskHandle as TaskHandle
-from ._concurrent import start_background_task_factory as start_background_task_factory
-from ._concurrent import start_service_task as start_service_task
 from ._context import Context as Context
 from ._context import ResourceEvent as ResourceEvent
 from ._context import add_resource as add_resource
@@ -19,6 +17,8 @@ from ._context import get_resource_nowait as get_resource_nowait
 from ._context import get_resources as get_resources
 from ._context import inject as inject
 from ._context import resource as resource
+from ._context import start_background_task_factory as start_background_task_factory
+from ._context import start_service_task as start_service_task
 from ._event import Event as Event
 from ._event import Signal as Signal
 from ._event import SignalQueueFull as SignalQueueFull

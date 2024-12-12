@@ -8,8 +8,8 @@ from unittest.mock import Mock
 
 import anyio
 import pytest
-from anyio import Event, sleep
-from common import raises_in_exception_group
+from anyio import Event, fail_after, get_current_task, sleep
+from anyio.abc import TaskStatus
 from pytest import LogCaptureFixture, MonkeyPatch
 
 from asphalt.core import (
@@ -23,7 +23,9 @@ from asphalt.core import (
     get_resource_nowait,
     get_resources,
     run_application,
+    start_background_task_factory,
     start_component,
+    start_service_task,
 )
 from asphalt.core._component import component_types
 
@@ -205,7 +207,7 @@ class TestCLIApplicationComponent:
             async def run(self) -> NoReturn:
                 raise Exception("blah")
 
-        with raises_in_exception_group(Exception, match="blah"):
+        with pytest.raises(Exception, match="blah"):
             run_application(DummyCLIComponent, backend=anyio_backend_name)
 
 
@@ -394,7 +396,8 @@ async def test_wait_for_resource(caplog: LogCaptureFixture) -> None:
         async def start(self) -> None:
             await child1_ready_event.wait()
             child2_ready_event.set()
-            assert await get_resource(str, "special") == "from_child1"
+            with fail_after(3):
+                assert await get_resource(str, "special") == "from_child1"
 
     caplog.set_level(logging.DEBUG, "asphalt.core")
     child1_ready_event = Event()
@@ -481,3 +484,37 @@ async def test_default_resource_names(caplog: LogCaptureFixture) -> None:
         "Component 'child/2' added a resource factory (types=[int], name='2')",
         "Returned from start() of component 'child/2'",
     ]
+
+
+async def test_start_background_task_factory(caplog: LogCaptureFixture) -> None:
+    def handle_exception(exception: Exception) -> bool:
+        return False
+
+    class DummyComponent(Component):
+        async def start(self) -> None:
+            factory = await start_background_task_factory(
+                exception_handler=handle_exception
+            )
+            assert factory.exception_handler is handle_exception
+
+    caplog.set_level(logging.DEBUG, "asphalt.core")
+    async with Context():
+        await start_component(DummyComponent)
+
+    assert "The root component started a background task factory" in caplog.messages
+
+
+async def test_start_service_task(caplog: LogCaptureFixture) -> None:
+    async def taskfunc(*, task_status: TaskStatus[None]) -> None:
+        assert get_current_task().name == "Service task: servicetask"
+        task_status.started()
+
+    class DummyComponent(Component):
+        async def start(self) -> None:
+            await start_service_task(taskfunc, "servicetask")
+
+    caplog.set_level(logging.DEBUG, "asphalt.core")
+    async with Context():
+        await start_component(DummyComponent)
+
+    assert "The root component started a service task (servicetask)" in caplog.messages
