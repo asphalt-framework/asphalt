@@ -18,13 +18,12 @@ from anyio import (
 )
 from anyio.abc import TaskStatus
 
-from . import start_service_task
 from ._component import (
     CLIApplicationComponent,
     Component,
     start_component,
 )
-from ._context import Context
+from ._context import Context, start_service_task
 from ._utils import qualified_name
 
 logger = getLogger("asphalt.core")
