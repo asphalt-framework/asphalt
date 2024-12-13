@@ -22,7 +22,7 @@ This library adheres to `Semantic Versioning 2.0 <https://semver.org/>`_.
     like ``mycomponenttype/name1``, ``mycomponenttype/name2`` where ``mycomponenttype``
     is used as the type for both components
   * Switched from ruamel.yaml to PyYAML as the backing YAML library
-  * Changed how``CLIApplicationComponent`` is run – their ``run()`` method is now
+  * Changed how ``CLIApplicationComponent`` is run – their ``run()`` method is now
     called directly by the runner after the component has started
 - **BACKWARD INCOMPATIBLE** Changes in concurrency handling:
 
