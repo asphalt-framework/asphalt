@@ -1,5 +1,3 @@
-from typing import Any
-
 from ._component import CLIApplicationComponent as CLIApplicationComponent
 from ._component import Component as Component
 from ._component import start_component as start_component
@@ -37,8 +35,8 @@ from ._utils import qualified_name as qualified_name
 from ._utils import resolve_reference as resolve_reference
 
 # Re-export imports so they look like they live directly in this package
-key: str
-value: Any
-for key, value in list(locals().items()):
-    if getattr(value, "__module__", "").startswith(f"{__name__}."):
-        value.__module__ = __name__
+for __value in list(locals().values()):
+    if getattr(__value, "__module__", "").startswith(f"{__name__}."):
+        __value.__module__ = __name__
+
+del __value
