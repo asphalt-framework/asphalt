@@ -5,6 +5,10 @@ This library adheres to `Semantic Versioning 2.0 <https://semver.org/>`_.
 
 **UNRELEASED**
 
+As this is a major release with several backwards incompatible changes, see the
+:doc:`Migration guide <userguide/migration>` if you're upgrading your existing
+application.
+
 - **BACKWARD INCOMPATIBLE** Changes in the application runner:
 
   * Asphalt now runs via AnyIO, rather than asyncio, although the asyncio backend is
@@ -52,12 +56,13 @@ This library adheres to `Semantic Versioning 2.0 <https://semver.org/>`_.
   * Dropped the deprecated ``parent`` argument to ``Context``
   * Dropped support for context attributes
   * Dropped the ``ctx`` parameter from resource factory callbacks
-  * Refactored the ``Context.require_resource()``, ``Context.require_resource()`` and
+  * Refactored the ``Context.get_resource()``, ``Context.require_resource()`` and
     ``Context.request_resource()`` methods (and their free-function counterparts) to
     just two:
 
     * ``get_resource()``: a coroutine function, capable of triggering asynchronous
-      resource factories, and optionally waiting for the resource to become available
+      resource factories, (and when called during component start-up, optionally waits
+      for the resource to become available)
     * ``get_resource_nowait()`` the synchronous counterpart to the above, but incapable
       of waiting for resources or triggering asynchronous resource factories
   * Contexts now make a shallow copy of the non-generated resources, and resource
