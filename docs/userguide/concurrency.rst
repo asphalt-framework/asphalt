@@ -3,9 +3,10 @@ Working with coroutines and threads
 
 .. py:currentmodule:: asphalt.core
 
-Asphalt was designed as a network oriented framework capable of high concurrency. This means that
-it can efficiently work with hundreds or even thousands of connections at once. This is achieved by
-utilizing `co-operative multitasking`_, using an *event loop* provided by the :mod:`asyncio`
+Asphalt was designed as a network oriented framework capable of high concurrency. This
+means that it can efficiently work with hundreds or even thousands of connections at
+once. This is achieved by utilizing `co-operative multitasking`_, using an *event loop*
+provided by the :mod:`asyncio`
 module.
 
 The event loop can only work on one task at a time, so whenever the currently running task needs to
@@ -32,6 +33,8 @@ otherwise block the event loop for long periods of time.
 
 To help with this, Asphalt contains functionality with which you can easily run code in thread
 pools or call asynchronous code from worker threads.
+
+.. _Trio: https://github.com/python-trio/trio
 
 Examples
 --------

@@ -1,5 +1,3 @@
-"""This is the change detector component for the Asphalt webnotifier tutorial."""
-
 # isort: off
 from __future__ import annotations
 
@@ -9,13 +7,8 @@ from typing import Any
 
 import anyio
 import httpx
-from asphalt.core import (
-    Component,
-    Event,
-    Signal,
-    add_resource,
-    start_service_task,
-)
+
+from asphalt.core import Event, Signal
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +34,7 @@ class Detector:
                 headers: dict[str, Any] = (
                     {"if-modified-since": last_modified} if last_modified else {}
                 )
-                response = await http.get(self.url, headers=headers)
+                response = await http.get("https://imgur.com", headers=headers)
                 logger.debug("Response status: %d", response.status_code)
                 if response.status_code == 200:
                     last_modified = response.headers["date"]
@@ -52,19 +45,3 @@ class Detector:
                     old_lines = new_lines
 
                 await anyio.sleep(self.delay)
-
-
-class ChangeDetectorComponent(Component):
-    def __init__(self, url: str, delay: int = 10):
-        self.url = url
-        self.delay = delay
-
-    async def start(self) -> None:
-        detector = Detector(self.url, self.delay)
-        add_resource(detector)
-        await start_service_task(detector.run, "Web page change detector")
-        logging.info(
-            'Started web page change detector for url "%s" with a delay of %d seconds',
-            self.url,
-            self.delay,
-        )

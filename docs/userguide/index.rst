@@ -14,3 +14,4 @@ take a look at the :doc:`../tutorials/index` first.
    events
    testing
    deployment
+   migration

@@ -1,24 +1,24 @@
 """This is the client code for the Asphalt echo server tutorial."""
 
+# isort: off
 import sys
-from asyncio import open_connection
+from dataclasses import dataclass
 
-from asphalt.core import CLIApplicationComponent, Context, run_application
+import anyio
+from asphalt.core import CLIApplicationComponent, run_application
 
 
+@dataclass
 class ClientComponent(CLIApplicationComponent):
-    def __init__(self, message: str):
-        super().__init__()
-        self.message = message
+    message: str
 
-    async def run(self, ctx: Context) -> None:
-        reader, writer = await open_connection("localhost", 64100)
-        writer.write(self.message.encode() + b"\n")
-        response = await reader.readline()
-        writer.close()
+    async def run(self) -> None:
+        async with await anyio.connect_tcp("localhost", 64100) as stream:
+            await stream.send(self.message.encode() + b"\n")
+            response = await stream.receive()
+
         print("Server responded:", response.decode().rstrip())
 
 
 if __name__ == "__main__":
-    component = ClientComponent(sys.argv[1])
-    run_application(component)
+    run_application(ClientComponent, {"message": sys.argv[1]})
