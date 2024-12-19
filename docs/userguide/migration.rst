@@ -6,7 +6,7 @@ Migrating from Asphalt 4.x to 5.x
 Resources
 ---------
 
-#. Adding resources should now done with the :func:`add_resource` function rather than
+#. Adding resources should now be done with the :func:`add_resource` function rather than
    the :meth:`Context.add_resource` method
 #. ``require_resource()`` is now :func:`get_resource_nowait`
 #. ``get_resource()`` is now :func:`get_resource_nowait` with ``optional=True``
@@ -167,7 +167,7 @@ After::
             factory = await start_background_task_factory()
             add_resource(factory)
 
-    # And then in some another module:
+    # And then in another module:
     from asphalt.core import TaskFactory, get_resource_nowait
 
     async def my_function() -> None:
