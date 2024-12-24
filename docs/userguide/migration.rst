@@ -20,8 +20,10 @@ Component classes
 
 Before::
 
+    from asphalt.core import Component, Context, add_resource, request_resource
+
     class MyComponent(Component):
-        async def start(ctx: Context) -> None:
+        async def start(self, ctx: Context) -> None:
             resource = await ctx.request_resource(int, "integer_resource")
             ctx.add_resource("simple-string")
 
@@ -30,7 +32,7 @@ After::
     from asphalt.core import Component, add_resource, get_resource
 
     class MyComponent(Component):
-        async def start() -> None:
+        async def start(self) -> None:
             resource = await get_resource(int, "integer_resource")
             add_resource("simple-string")
 
@@ -48,22 +50,26 @@ Container components
 
 Before::
 
+    from asphalt.core import ContainerComponent, Context
+
     class MyContainer(ContainerComponent):
         def __init__(self, components):
             super().__init__(components)
 
-        async def start(ctx: Context) -> None:
+        async def start(self, ctx: Context) -> None:
             await super().start(ctx)
             self.add_component("another", AnotherComponent)
             ...
 
 After::
 
+    from asphalt.core import Component
+
     class MyContainer(Component):
         def __init__(self) -> None:
             self.add_component("another", AnotherComponent)
 
-        async def start() -> None:
+        async def start(self) -> None:
            ...
 
 CLI application components
@@ -74,29 +80,31 @@ method.
 
 Before::
 
+    from asphalt.core import CLIApplicationComponent
+
     class MyApp(CLIApplicationComponent):
         def __init__(self, components):
             super().__init__(components)
 
-        async def start(ctx: Context) -> None:
+        async def start(self, ctx: Context) -> None:
             self.add_component("another", AnotherComponent)
             ...
 
-        async def run(ctx: Context) -> None:
+        async def run(self, ctx: Context) -> None:
             ...
 
 After::
 
-    from asphalt.core import Component
+    from asphalt.core import CLIApplicationComponent
 
     class MyApp(CLIApplicationComponent):
         def __init__(self) -> None:
             self.add_component("another", AnotherComponent)
 
-        async def start() -> None:
+        async def start(self) -> None:
            ...
 
-        async def run() -> None:
+        async def run(self) -> None:
             ...
 
 Starting tasks at component startup
@@ -113,29 +121,35 @@ if you're starting tasks in :meth:`Component.start`, you should probably use the
 
 Before::
 
+    from asyncio import CancelledError, create_task
+    from contextlib import suppress
+
+    from asphalt.core import Component, Context
     from asphalt.core.context import context_teardown
 
     class MyComponent(Component):
         @context_teardown
-        async def start(ctx: Context) -> None:
-            task = create_task(self.sometaskfunc(arg=1, kwarg="foo"))
+        async def start(self, ctx: Context) -> None:
+            task = create_task(self.sometaskfunc(1, kwarg="foo"))
             yield
             task.cancel()
             with suppress(CancelledError):
                 await task
 
-        async def sometaskfunc(arg1, *, kwarg) -> None:
+        async def sometaskfunc(self, arg, *, kwarg) -> None:
             ...
 
 After::
 
+    from functools import partial
+
     from asphalt.core import Component, start_service_task
 
     class MyComponent(Component):
-        async def start() -> None:
-            await start_service_task(partial(self.sometaskfunc, arg=1, kwarg="foo"))
+        async def start(self) -> None:
+            await start_service_task(partial(self.sometaskfunc, 1, kwarg="foo"))
 
-        async def sometaskfunc(arg1, *, kwarg) -> None:
+        async def sometaskfunc(self, arg, *, kwarg) -> None:
             ...
 
 .. seealso:: :doc:`concurrency`
@@ -155,15 +169,17 @@ Before::
     async def my_function() -> None:
         task = create_task(sometaskfunc(1, kwarg="foo"))
 
-    async def sometaskfunc(arg1, *, kwarg) -> None:
+    async def sometaskfunc(arg, *, kwarg) -> None:
         ...
 
 After::
 
-    from asphalt.core import start_background_task_factory
+    from functools import partial
+
+    from asphalt.core import Component, add_resource, start_background_task_factory
 
     class MyServiceComponent(Component):
-        async def start() -> None:
+        async def start(self) -> None:
             factory = await start_background_task_factory()
             add_resource(factory)
 
@@ -172,9 +188,9 @@ After::
 
     async def my_function() -> None:
         factory = get_resource_nowait(TaskFactory)
-        task = factory.start_task_soon(sometaskfunc(1, kwarg="foo"))
+        task = factory.start_task_soon(partial(sometaskfunc, 1, kwarg="foo"))
 
-    async def sometaskfunc(arg1, *, kwarg) -> None:
+    async def sometaskfunc(arg, *, kwarg) -> None:
         ...
 
 Threads
