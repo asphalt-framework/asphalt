@@ -147,7 +147,7 @@ After::
 
     class MyComponent(Component):
         async def start(self) -> None:
-            await start_service_task(partial(self.sometaskfunc, 1, kwarg="foo"))
+            await start_service_task(partial(self.sometaskfunc, 1, kwarg="foo"), "sometask")
 
         async def sometaskfunc(self, arg, *, kwarg) -> None:
             ...
