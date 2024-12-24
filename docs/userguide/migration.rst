@@ -20,6 +20,8 @@ Component classes
 
 Before::
 
+    from asphalt.core import Component, Context, add_resource, request_resource
+
     class MyComponent(Component):
         async def start(self, ctx: Context) -> None:
             resource = await ctx.request_resource(int, "integer_resource")
@@ -48,6 +50,8 @@ Container components
 
 Before::
 
+    from asphalt.core import ContainerComponent, Context
+
     class MyContainer(ContainerComponent):
         def __init__(self, components):
             super().__init__(components)
@@ -58,6 +62,8 @@ Before::
             ...
 
 After::
+
+    from asphalt.core import Component
 
     class MyContainer(Component):
         def __init__(self) -> None:
@@ -74,6 +80,8 @@ method.
 
 Before::
 
+    from asphalt.core import CLIApplicationComponent
+
     class MyApp(CLIApplicationComponent):
         def __init__(self, components):
             super().__init__(components)
@@ -87,7 +95,7 @@ Before::
 
 After::
 
-    from asphalt.core import Component
+    from asphalt.core import CLIApplicationComponent
 
     class MyApp(CLIApplicationComponent):
         def __init__(self) -> None:
@@ -113,6 +121,10 @@ if you're starting tasks in :meth:`Component.start`, you should probably use the
 
 Before::
 
+    from asyncio import CancelledError, create_task
+    from contextlib import suppress
+
+    from asphalt.core import Component, Context
     from asphalt.core.context import context_teardown
 
     class MyComponent(Component):
@@ -128,6 +140,8 @@ Before::
             ...
 
 After::
+
+    from functools import partial
 
     from asphalt.core import Component, start_service_task
 
@@ -160,7 +174,9 @@ Before::
 
 After::
 
-    from asphalt.core import start_background_task_factory
+    from functools import partial
+
+    from asphalt.core import Component, add_resource, start_background_task_factory
 
     class MyServiceComponent(Component):
         async def start(self) -> None:
