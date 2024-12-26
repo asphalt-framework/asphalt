@@ -5,7 +5,7 @@ import sys
 from collections.abc import Coroutine
 from dataclasses import dataclass, field
 from inspect import Parameter, signature
-from typing import Any, Callable, Literal, TypeVar, Union
+from typing import TYPE_CHECKING, Any, Callable, Literal, TypeVar, Union
 
 from anyio import (
     TASK_STATUS_IGNORED,
@@ -21,6 +21,9 @@ if sys.version_info >= (3, 10):
     from typing import TypeAlias
 else:
     from typing_extensions import TypeAlias
+
+if TYPE_CHECKING:
+    from ._context import Context
 
 T_Retval = TypeVar("T_Retval")
 ExceptionHandler: TypeAlias = Callable[[Exception], bool]
@@ -57,14 +60,15 @@ class TaskHandle:
 
 async def run_background_task(
     func: Callable[..., Coroutine[Any, Any, Any]],
+    ctx: Context,
     task_handle: TaskHandle,
     exception_handler: ExceptionHandler | None = None,
     *,
     task_status: TaskStatus[Any] = TASK_STATUS_IGNORED,
 ) -> None:
-    from ._context import Context
-
     __tracebackhide__ = True  # trick supported by certain debugger frameworks
+
+    from ._context import Context
 
     # Check if the function has a parameter named "task_status"
     has_task_status = any(
@@ -75,7 +79,7 @@ async def run_background_task(
 
     try:
         with task_handle._cancel_scope:
-            async with Context():
+            async with Context(ctx):
                 if has_task_status:
                     await func(task_status=task_status)
                 else:
@@ -99,6 +103,7 @@ class TaskFactory:
     _finished_event: Event = field(init=False, default_factory=Event)
     _task_group: TaskGroup = field(init=False)
     _tasks: set[TaskHandle] = field(init=False, default_factory=set)
+    _ctx: Context = field(init=False)
 
     def all_task_handles(self) -> set[TaskHandle]:
         """
@@ -185,12 +190,15 @@ class TaskFactory:
         __tracebackhide__ = True  # trick supported by certain debugger frameworks
         try:
             await run_background_task(
-                func, task_handle, exception_handler, task_status=task_status
+                func, self._ctx, task_handle, exception_handler, task_status=task_status
             )
         finally:
             self._tasks.remove(task_handle)
 
     async def _run(self, *, task_status: TaskStatus[None]) -> None:
+        from ._context import current_context
+
+        self._ctx = current_context()
         async with create_task_group() as self._task_group:
             task_status.started()
             await self._finished_event.wait()
