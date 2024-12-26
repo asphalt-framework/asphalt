@@ -173,11 +173,16 @@ class Context:
     _reset_token: Token[Context]
     _exit_stack: AsyncExitStack
 
-    def __init__(self) -> None:
+    def __init__(self, parent: Context | None = None) -> None:
+        """
+        :param parent: the context to inherit resources from, or ``None`` if this is a
+            "root" context
+
+        """
         self._state = ContextState.inactive
         self._teardown_callbacks: list[tuple[TeardownCallback, bool]] = []
         self._child_contexts = set[Context]()
-        self._parent = _current_context.get(None)
+        self._parent = parent or _current_context.get(None)
 
         if self._parent is not None:
             from ._component import ComponentContext
@@ -760,7 +765,7 @@ class Context:
 
         task_handle = TaskHandle(f"Service task: {name}")
         task_handle.start_value = await self._task_group.start(
-            run_background_task, func, task_handle, name=task_handle.name
+            run_background_task, func, self, task_handle, name=task_handle.name
         )
         self.add_teardown_callback(finalize_service_task)
         return task_handle.start_value

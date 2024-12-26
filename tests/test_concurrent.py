@@ -148,20 +148,16 @@ class TestTaskFactory:
         started.
 
         """
-        event = Event()
 
         async def taskfunc() -> None:
             assert get_resource_nowait(str) == "test"
-            await event.wait()
             assert get_resource_nowait(int, optional=True) is None
 
         async with Context():
-            factory = await start_background_task_factory()
             add_resource("test")
-            await factory.start_task(taskfunc)
+            factory = await start_background_task_factory()
             add_resource(5)
-            assert get_resource_nowait(int) == 5
-            event.set()
+            await factory.start_task(taskfunc)
 
     async def test_all_task_handles(self) -> None:
         event = Event()
