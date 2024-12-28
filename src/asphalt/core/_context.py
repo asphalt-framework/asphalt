@@ -312,10 +312,10 @@ class Context:
         exc_type: type[BaseException] | None,
         exc_val: BaseException | None,
         exc_tb: TracebackType | None,
-    ) -> None:
+    ) -> bool:
         self._state = ContextState.closing
         try:
-            await self._exit_stack.__aexit__(exc_type, exc_val, exc_tb)
+            retval = await self._exit_stack.__aexit__(exc_type, exc_val, exc_tb)
         finally:
             self._state = ContextState.closed
 
@@ -324,6 +324,8 @@ class Context:
                 f"Context stack corruption detected: context {id(self):x} still has "
                 f"{len(self._child_contexts)} active child context(s)"
             )
+
+        return retval
 
     def add_resource(
         self,
