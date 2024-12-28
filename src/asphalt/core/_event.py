@@ -76,7 +76,7 @@ class Signal(Generic[T_Event]):
     Declaration of a signal that can be used to dispatch events.
 
     This is a descriptor that returns itself on class level attribute access and a bound
-    version of itself on instance level access. Streaming events and dispatching
+    version of itself on instance level access. Dispatching and streaming
     events only works with these bound instances.
 
     Each signal must be assigned to a class attribute, but only once. The Signal will
