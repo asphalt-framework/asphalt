@@ -1,7 +1,14 @@
 from __future__ import annotations
 
 import weakref
-from collections.abc import AsyncGenerator, AsyncIterator, Callable, Iterator, Sequence
+from collections.abc import (
+    AsyncGenerator,
+    AsyncIterator,
+    Callable,
+    Generator,
+    Hashable,
+    Sequence,
+)
 from contextlib import (
     AbstractAsyncContextManager,
     AsyncExitStack,
@@ -11,14 +18,18 @@ from contextlib import (
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from time import time as stdlib_time
-from typing import Any, Generic, TypeVar, overload
+from typing import Any, Generic, TypeVar
 from warnings import warn
-from weakref import WeakKeyDictionary
+from weakref import ReferenceType, WeakKeyDictionary
 
 from anyio import BrokenResourceError, WouldBlock, create_memory_object_stream
 from anyio.streams.memory import MemoryObjectSendStream
 
+from ._exceptions import UnboundSignal
 from ._utils import qualified_name
+
+T_Event = TypeVar("T_Event", bound="Event")
+bound_signals = WeakKeyDictionary[Hashable, "Signal[Any]"]()
 
 
 class SignalQueueFull(UserWarning):
@@ -59,29 +70,75 @@ class Event:
         )
 
 
-T_Event = TypeVar("T_Event", bound=Event)
-
-
 @dataclass
-class BoundSignal(Generic[T_Event]):
-    event_class: type[T_Event]
-    instance: weakref.ReferenceType[Any]
-    topic: str
+class Signal(Generic[T_Event]):
+    """
+    Declaration of a signal that can be used to dispatch events.
 
-    _send_streams: list[MemoryObjectSendStream[T_Event]] = field(
-        init=False, default_factory=list
-    )
+    This is a descriptor that returns itself on class level attribute access and a bound
+    version of itself on instance level access. Connecting listeners and dispatching
+    events only works with these bound instances.
+
+    Each signal must be assigned to a class attribute, but only once. The Signal will
+    not function correctly if the same Signal instance is assigned to multiple
+    attributes.
+
+    :param event_class: an event class
+    """
+
+    event_class: type[T_Event]
+
+    _instance: ReferenceType[Hashable] = field(init=False)
+    _topic: str = field(init=False)
+    _send_streams: list[MemoryObjectSendStream[T_Event]] = field(init=False)
+
+    def __get__(self, instance: Hashable, owner: Any) -> Signal[T_Event]:
+        if instance is None:
+            return self
+
+        try:
+            return bound_signals[instance]
+        except KeyError:
+            bound_signal = Signal(self.event_class)
+            bound_signal._topic = self._topic
+            bound_signal._instance = weakref.ref(instance)
+            bound_signal._send_streams = []
+            bound_signals[instance] = bound_signal
+            return bound_signal
+
+    def __set_name__(self, owner: Any, name: str) -> None:
+        self._topic = name
+
+    def _check_is_bound_signal(self) -> None:
+        if not hasattr(self, "_instance"):
+            raise UnboundSignal
+
+    @contextmanager
+    def _subscribe(self, send: MemoryObjectSendStream[T_Event]) -> Generator[None]:
+        self._check_is_bound_signal()
+        self._send_streams.append(send)
+        try:
+            yield
+        finally:
+            self._send_streams.remove(send)
 
     def dispatch(self, event: T_Event) -> None:
-        """Dispatch an event."""
+        """
+        Dispatch an event.
+
+        :raises UnboundSignal: if attempting to dispatch an event on a signal not bound
+            to any instance of the containing class
+
+        """
+        self._check_is_bound_signal()
         if not isinstance(event, self.event_class):
             raise TypeError(
                 f"Event type mismatch: event ({qualified_name(event)}) is not a "
                 f"subclass of {qualified_name(self.event_class)}"
             )
 
-        event.source = self.instance()
-        event.topic = self.topic
+        event.source = self._instance()
+        event.topic = self._topic
         event.time = stdlib_time()
 
         for stream in list(self._send_streams):
@@ -96,12 +153,6 @@ class BoundSignal(Generic[T_Event]):
                     SignalQueueFull,
                     stacklevel=2,
                 )
-
-    @contextmanager
-    def _subscribe(self, send: MemoryObjectSendStream[T_Event]) -> Iterator[None]:
-        self._send_streams.append(send)
-        yield None
-        self._send_streams.remove(send)
 
     async def wait_event(
         self,
@@ -127,57 +178,9 @@ class BoundSignal(Generic[T_Event]):
         return stream_events([self], filter, max_queue_size=max_queue_size)
 
 
-@dataclass
-class Signal(Generic[T_Event]):
-    """
-    Declaration of a signal that can be used to dispatch events.
-
-    This is a descriptor that returns itself on class level attribute access and a bound
-    version of itself on instance level access. Connecting listeners and dispatching
-    events only works with these bound instances.
-
-    Each signal must be assigned to a class attribute, but only once. The Signal will
-    not function correctly if the same Signal instance is assigned to multiple
-    attributes.
-
-    :param event_class: an event class
-    """
-
-    event_class: type[T_Event]
-
-    _bound_signals: WeakKeyDictionary[Any, BoundSignal[T_Event]] = field(
-        init=False, default_factory=WeakKeyDictionary
-    )
-    _topic: str = field(init=False)
-
-    @overload
-    def __get__(self, instance: None, owner: Any) -> Signal[T_Event]: ...
-
-    @overload
-    def __get__(self, instance: Any, owner: Any) -> BoundSignal[T_Event]: ...
-
-    def __get__(
-        self, instance: Any, owner: Any
-    ) -> Signal[T_Event] | BoundSignal[T_Event]:
-        if instance is None:
-            return self
-
-        try:
-            return self._bound_signals[instance]
-        except KeyError:
-            bound_signal = BoundSignal(
-                self.event_class, weakref.ref(instance), self._topic
-            )
-            self._bound_signals[instance] = bound_signal
-            return bound_signal
-
-    def __set_name__(self, owner: Any, name: str) -> None:
-        self._topic = name
-
-
 @asynccontextmanager
 async def stream_events(
-    signals: Sequence[BoundSignal[T_Event]],
+    signals: Sequence[Signal[T_Event]],
     filter: Callable[[T_Event], bool] | None = None,
     *,
     max_queue_size: int = 50,
@@ -201,6 +204,8 @@ async def stream_events(
     :param max_queue_size: maximum number of unprocessed events in the queue
     :return: an async generator yielding all events (that pass the filter, if any) from
         all the given signals
+    :raises UnboundSignal: if attempting to listen to events on a signal not bound to
+        any instance of the containing class
 
     """
 
@@ -222,7 +227,7 @@ async def stream_events(
 
 
 async def wait_event(
-    signals: Sequence[BoundSignal[T_Event]],
+    signals: Sequence[Signal[T_Event]],
     filter: Callable[[T_Event], bool] | None = None,
 ) -> T_Event:
     """
@@ -239,6 +244,8 @@ async def wait_event(
         truthy value if the event should pass
     :return: the first event (that passed the filter, if any) that was dispatched from
         any of the signals
+    :raises UnboundSignal: if attempting to listen to events on a signal not bound to
+        any instance of the containing class
 
     """
     async with stream_events(signals, filter) as stream:

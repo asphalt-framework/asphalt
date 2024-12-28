@@ -11,6 +11,7 @@ from anyio.abc import TaskStatus
 from anyio.lowlevel import checkpoint
 
 from asphalt.core import Event, Signal, SignalQueueFull, stream_events, wait_event
+from asphalt.core._exceptions import UnboundSignal
 
 pytestmark = pytest.mark.anyio()
 
@@ -170,6 +171,20 @@ class TestSignal:
             next((x for x in gc.get_objects() if isinstance(x, SignalOwner)), None)
             is None
         )
+
+    def test_dispatch_unbound_signal(self) -> None:
+        with pytest.raises(
+            UnboundSignal,
+            match="attempted to use a signal that is not bound to an instance",
+        ):
+            DummySource.event_a.dispatch(DummyEvent())
+
+    async def test_wait_unbound_signal(self) -> None:
+        with pytest.raises(
+            UnboundSignal,
+            match="attempted to use a signal that is not bound to an instance",
+        ):
+            await DummySource.event_a.wait_event()
 
 
 @pytest.mark.parametrize(
