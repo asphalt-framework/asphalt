@@ -199,7 +199,7 @@ class ComponentContext(Context):
     def _format_resource_description(
         types: Any, name: str, description: str | None = None
     ) -> str:
-        if isclass(types):
+        if isclass(types) or not isinstance(types, Sequence):
             formatted = f"type={qualified_name(types)}"
         else:
             formatted_types = ", ".join(qualified_name(type_) for type_ in types)
