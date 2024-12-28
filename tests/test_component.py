@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import sys
 from dataclasses import dataclass
-from typing import Any, NoReturn
+from typing import Any, Callable, NoReturn
 from unittest.mock import Mock
 
 import anyio
@@ -518,3 +518,29 @@ async def test_start_service_task(caplog: LogCaptureFixture) -> None:
         await start_component(DummyComponent)
 
     assert "The root component started a service task (servicetask)" in caplog.messages
+
+
+async def test_component_generic_resource(caplog: LogCaptureFixture) -> None:
+    def resource0() -> str:
+        return "foo"
+
+    def resource1() -> int:
+        return 3
+
+    class RootComponent(Component):
+        async def start(self) -> None:
+            add_resource(resource0, types=Callable[[], str])  # type: ignore[arg-type]
+            add_resource(resource1, types=Callable[[], int])  # type: ignore[arg-type]
+            _resource0 = get_resource_nowait(Callable[[], str])  # type: ignore[call-overload]
+            _resource1 = get_resource_nowait(Callable[[], int])  # type: ignore[call-overload]
+            assert _resource0 is resource0
+            assert _resource1 is resource1
+
+    async with Context():
+        with caplog.at_level(logging.DEBUG, logger="asphalt.core"):
+            await start_component(RootComponent)
+
+    assert (
+        "The root component added a resource (type=typing._CallableGenericAlias, name='default')"
+        in caplog.text
+    )
