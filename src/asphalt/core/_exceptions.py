@@ -77,3 +77,13 @@ class ResourceNotFound(LookupError):
             f"no matching resource was found for type={qualified_name(self.type)} "
             f"name={self.name!r}"
         )
+
+
+class UnboundSignal(Exception):
+    """
+    Raised when attempting to dispatch or listen to events on a :class:`Signal` on
+    the class level, rather than on an instance of the class.
+    """
+
+    def __init__(self) -> None:
+        super().__init__("attempted to use a signal that is not bound to an instance")
