@@ -520,30 +520,27 @@ async def test_start_service_task(caplog: LogCaptureFixture) -> None:
     assert "The root component started a service task (servicetask)" in caplog.messages
 
 
-async def test_component_generic_resource(caplog) -> None:
-    resource0 = lambda: "foo"
-    resource1 = lambda: 3
+async def test_component_generic_resource(caplog: LogCaptureFixture) -> None:
+    def resource0() -> str:
+        return "foo"
 
-    class ChildComponent(Component):
+    def resource1() -> int:
+        return 3
+
+    class RootComponent(Component):
         async def start(self) -> None:
-            add_resource(resource0, types=Callable[[], str])
-            add_resource(resource1, types=Callable[[], int])
-
-    class ParentComponent(Component):
-        def __init__(self) -> None:
-            self.add_component("child", ChildComponent)
-
-        async def start(self) -> None:
-            _resource0 = await get_resource(Callable[[], str])
-            _resource1 = await get_resource(Callable[[], int])
-            assert _resource0 == resource0
-            assert _resource1 == resource1
+            add_resource(resource0, types=Callable[[], str])  # type: ignore[arg-type]
+            add_resource(resource1, types=Callable[[], int])  # type: ignore[arg-type]
+            _resource0 = get_resource_nowait(Callable[[], str])  # type: ignore[call-overload]
+            _resource1 = get_resource_nowait(Callable[[], int])  # type: ignore[call-overload]
+            assert _resource0 is resource0
+            assert _resource1 is resource1
 
     async with Context():
         with caplog.at_level(logging.DEBUG, logger="asphalt.core"):
-            await start_component(ParentComponent)
+            await start_component(RootComponent)
 
     assert (
-        "Component 'child' added a resource (type=typing._CallableGenericAlias, name='default')"
+        "The root component added a resource (type=typing._CallableGenericAlias, name='default')"
         in caplog.text
     )
