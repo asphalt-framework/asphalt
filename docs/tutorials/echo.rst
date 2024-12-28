@@ -148,8 +148,8 @@ Create the file ``client.py`` file in the ``echo`` package directory as follows:
 You may have noticed that ``ClientComponent`` inherits from
 :class:`CLIApplicationComponent` instead of :class:`Component` and that instead of
 overriding the :meth:`Component.start` method, :meth:`CLIApplicationComponent.run` is
-overridden instead. This is standard practice for Asphalt applications that just do one
-specific thing and then exit.
+overridden. This is standard practice for Asphalt applications that just do one specific
+thing and then exit.
 
 The script instantiates ``ClientComponent`` using the first command line argument as the
 ``message`` argument to the component's constructor. Doing this instead of directly

@@ -100,7 +100,7 @@ values are merged with those provided in the ``start()`` method of ``MyRootCompo
 See the next section for a more elaborate explanation.
 
 With ``max_threads: 20``, the maximum number of threads that functions like
-:func:`anyio.to_thread.run_sync` can have running, to 20.
+:func:`anyio.to_thread.run_sync` can have running is set to 20.
 
 The ``logging`` configuration tree here sets up a root logger that prints all log
 entries of at least ``INFO`` level to the console. You may want to set up more granular
