@@ -304,7 +304,7 @@ refactor them into data classes.
 
 Before::
 
-    from asphalt.core import Signal, Event
+    from asphalt.core import Event
 
     class MyEvent(Event):
         def __init__(self, source, topic, an_attribute: str):
@@ -315,7 +315,7 @@ After::
 
     from dataclasses import dataclass
 
-    from asphalt.core import Signal, Event
+    from asphalt.core import Event
 
     @dataclass
     class MyEvent(Event):
