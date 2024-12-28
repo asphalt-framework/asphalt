@@ -27,6 +27,7 @@ from ._exceptions import ComponentStartError as ComponentStartError
 from ._exceptions import NoCurrentContext as NoCurrentContext
 from ._exceptions import ResourceConflict as ResourceConflict
 from ._exceptions import ResourceNotFound as ResourceNotFound
+from ._exceptions import UnboundSignal as UnboundSignal
 from ._runner import run_application as run_application
 from ._utils import PluginContainer as PluginContainer
 from ._utils import callable_name as callable_name
