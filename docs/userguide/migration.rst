@@ -325,7 +325,7 @@ Iterating over events
 +++++++++++++++++++++
 
 As the ``connect()`` and ``disconnect()`` signal methods have been eliminated, you need
-to use the :meth:`Signal.stream_events` method or
+to use the :meth:`Signal.stream_events` method or the :func:`stream_events` function.
 
 Before::
 
