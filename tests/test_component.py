@@ -543,4 +543,7 @@ async def test_component_generic_resource(caplog) -> None:
         with caplog.at_level(logging.DEBUG, logger="asphalt.core"):
             await start_component(ParentComponent)
 
-    assert "Component 'child' added a resource (type=typing._CallableGenericAlias, name='default')" in caplog.text
+    assert (
+        "Component 'child' added a resource (type=typing._CallableGenericAlias, name='default')"
+        in caplog.text
+    )
