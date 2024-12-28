@@ -287,6 +287,117 @@ After::
 
         await to_thread.run_sync(wrapper)
 
+Signals and events
+------------------
+
+In support of `structured concurrency`_, the signalling system (not to be confused with
+operating system signals like ``SIGTERM`` et al), has been refactored to require the use
+of context managers wherever possible.
+
+Migrating custom event classes
+++++++++++++++++++++++++++++++
+
+As the :class:`Event` class no longer has an initializer, you need to remove the
+``source`` and ``topic`` initializer parameters from your own subclasses, and drop the
+``super().__init__(source, topic)`` call. You may also want to take this opportunity to
+refactor them into data classes.
+
+Before::
+
+    from asphalt.core import Event
+
+    class MyEvent(Event):
+        def __init__(self, source, topic, an_attribute: str):
+            super().__init__(source, topic)
+            self.an_attribute = an_attribute
+
+After::
+
+    from dataclasses import dataclass
+
+    from asphalt.core import Event
+
+    @dataclass
+    class MyEvent(Event):
+        an_attribute: str
+
+Iterating over events
++++++++++++++++++++++
+
+As the ``connect()`` and ``disconnect()`` signal methods have been eliminated, you need
+to use the :meth:`Signal.stream_events` method or the :func:`stream_events` function.
+
+Before::
+
+    from asphalt.core import Signal, Event
+
+    class MyEvent(Event):
+        ...
+
+    class MyService:
+        something = Signal(MyEvent)
+
+    def event_listener(event: MyEvent) -> None:
+        print("got an event")
+
+    async def myfunc(service: MyService) -> None:
+        service.something.connect(event_listener)
+        ...
+        service.something.disconnect(event_listener)
+
+After::
+
+    from asphalt.core import Signal, Event
+
+    class MyEvent(Event):
+        ...
+
+    class MyService:
+        something = Signal(MyEvent)
+
+    async def myfunc(service: MyService) -> None:
+        async with service.something.stream_events() as event_stream:
+            async for event in event_stream:
+                print("got an event")
+
+Dispatching events
+++++++++++++++++++
+
+The :meth:`~Signal.dispatch` method has been changed to work like
+``Signal.dispatch_raw()``. That is, you will need to pass it an appropriate
+:class:`Event` object.
+
+Before::
+
+    from asphalt.core import Signal, Event
+
+    class MyEvent(Event):
+        def __init__(self, source, topic, an_attribute: str):
+            super().__init__(source, topic)
+            self.an_attribute = an_attribute
+
+    class MyService:
+        something = Signal(MyEvent)
+
+    async def myfunc(service: MyService) -> None:
+        service.something.dispatch("value")
+
+After::
+
+    from dataclasses import dataclass
+
+    from asphalt.core import Signal, Event
+
+    @dataclass
+    class MyEvent(Event):
+        an_attribute: str
+
+    class MyService:
+        something = Signal(MyEvent)
+
+    async def myfunc(service: MyService) -> None:
+        service.something.dispatch(MyEvent("value"))
+
 Configuration
 -------------
 
