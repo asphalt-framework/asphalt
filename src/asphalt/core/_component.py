@@ -183,7 +183,7 @@ class ComponentContext(Context):
         child_component_contexts: dict[str, ComponentContext],
     ):
         super().__init__()
-        self._path = path
+        self.path = path
         self._component = component
         self._default_resource_name = default_resource_name
         self._child_component_contexts = child_component_contexts
@@ -232,7 +232,7 @@ class ComponentContext(Context):
         )
         logger.debug(
             "%s added a resource (%s)",
-            format_component_name(self._path, capitalize=True),
+            format_component_name(self.path, capitalize=True),
             self._format_resource_description(types or type(value), name, description),
         )
 
@@ -252,7 +252,7 @@ class ComponentContext(Context):
         )
         logger.debug(
             "%s added a resource factory (%s)",
-            format_component_name(self._path, capitalize=True),
+            format_component_name(self.path, capitalize=True),
             self._format_resource_description(
                 types or get_type_hints(factory_callback)["return"], name, description
             ),
@@ -296,7 +296,7 @@ class ComponentContext(Context):
         except ResourceNotFound:
             logger.debug(
                 "%s is waiting for another component to provide a resource (%s)",
-                format_component_name(self._path, capitalize=True),
+                format_component_name(self.path, capitalize=True),
                 self._format_resource_description(type, name),
             )
 
@@ -308,7 +308,7 @@ class ComponentContext(Context):
             res = await self._context.get_resource(type, name)
             logger.debug(
                 "%s got the resource it was waiting for (%s)",
-                format_component_name(self._path, capitalize=True),
+                format_component_name(self.path, capitalize=True),
                 self._format_resource_description(type, name),
             )
             return res
@@ -356,7 +356,7 @@ class ComponentContext(Context):
         )
         logger.debug(
             "%s started a background task factory",
-            format_component_name(self._path, capitalize=True),
+            format_component_name(self.path, capitalize=True),
         )
         return factory
 
@@ -372,7 +372,7 @@ class ComponentContext(Context):
         )
         logger.debug(
             "%s started a service task (%s)",
-            format_component_name(self._path, capitalize=True),
+            format_component_name(self.path, capitalize=True),
             name,
         )
         return retval
@@ -441,7 +441,7 @@ async def start_component(
                 timeout,
             )
 
-        await _start_component(root_component_context, "")
+        await _start_component(root_component_context)
 
         if tg:
             tg.cancel_scope.cancel()
@@ -512,7 +512,7 @@ def _init_component(
     return ComponentContext(component, path, default_resource_name, child_contexts)
 
 
-async def _start_component(context: ComponentContext, path: str) -> None:
+async def _start_component(context: ComponentContext) -> None:
     # Prevent add_component() from being called beyond this point
     component = context._component
     component._component_started = True
@@ -522,32 +522,35 @@ async def _start_component(context: ComponentContext, path: str) -> None:
         # Call prepare() on the component itself, if it's implemented on the component
         # class
         if component_class.prepare is not Component.prepare:
-            logger.debug("Calling prepare() of %s", format_component_name(path))
+            logger.debug("Calling prepare() of %s", format_component_name(context.path))
             context._component_state = ComponentState.preparing
             coro = context._coro = component.prepare()
             try:
                 await coro
             except Exception as exc:
-                raise ComponentStartError("preparing", path, component_class) from exc
+                raise ComponentStartError(
+                    "preparing", context.path, component_class
+                ) from exc
 
-            logger.debug("Returned from prepare() of %s", format_component_name(path))
+            logger.debug(
+                "Returned from prepare() of %s", format_component_name(context.path)
+            )
             context._coro = None
 
         # Start the child components, if there are any
         if context._child_component_contexts:
             logger.debug(
-                "Starting the child components of %s", format_component_name(path)
+                "Starting the child components of %s",
+                format_component_name(context.path),
             )
             context._component_state = ComponentState.starting_children
             async with coalesce_exceptions(), create_task_group() as tg:
                 for alias, child_context in context._child_component_contexts.items():
-                    child_path = f"{path}.{alias}" if path else alias
                     tg.start_soon(
                         _start_component,
                         child_context,
-                        child_path,
                         name=(
-                            f"Starting component {child_path} "
+                            f"Starting component {child_context.path} "
                             f"({qualified_name(child_context._component)})"
                         ),
                     )
@@ -556,15 +559,19 @@ async def _start_component(context: ComponentContext, path: str) -> None:
         # class
         if component_class.start is not Component.start:
             context._component_state = ComponentState.starting
-            logger.debug("Calling start() of %s", format_component_name(path))
+            logger.debug("Calling start() of %s", format_component_name(context.path))
             coro = context._coro = component.start()
             context._component_state = ComponentState.starting
             try:
                 await coro
             except Exception as exc:
-                raise ComponentStartError("starting", path, component_class) from exc
+                raise ComponentStartError(
+                    "starting", context.path, component_class
+                ) from exc
 
-            logger.debug("Returned from start() of %s", format_component_name(path))
+            logger.debug(
+                "Returned from start() of %s", format_component_name(context.path)
+            )
             context._coro = None
 
         context._component_state = ComponentState.started
@@ -575,8 +582,8 @@ async def _watch_component_tree_startup(
     timeout: float,
 ) -> None:
     def create_status_summaries(subcontext: ComponentContext) -> list[str]:
-        parts = (subcontext._path or "(root)").split(".")
-        indent = "  " * (len(parts) if subcontext._path else 0)
+        parts = (subcontext.path or "(root)").split(".")
+        indent = "  " * (len(parts) if subcontext.path else 0)
         state = subcontext._component_state.name.replace("_", " ")
         summaries = [f"{indent}{parts[-1]}: {state}"]
         for child_context in subcontext._child_component_contexts.values():
@@ -590,7 +597,7 @@ async def _watch_component_tree_startup(
         if subcontext._coro is not None:
             stack_summary = _get_coro_stack_summary(subcontext._coro)
             formatted_summary = "".join(stack_summary.format())
-            title = f"{subcontext._path} ({qualified_name(subcontext._component)})"
+            title = f"{subcontext.path} ({qualified_name(subcontext._component)})"
             summaries.append(f"{title}:\n{formatted_summary.rstrip()}")
 
         for child_context in subcontext._child_component_contexts.values():
