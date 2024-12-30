@@ -9,6 +9,7 @@ Components
 .. autoclass:: Component
 .. autoclass:: CLIApplicationComponent
 .. autofunction:: start_component
+.. autoexception:: ComponentStartError
 
 Concurrency
 -----------
@@ -17,7 +18,6 @@ Concurrency
 .. autofunction:: start_service_task
 .. autoclass:: TaskFactory
 .. autoclass:: TaskHandle
-.. autoexception:: ComponentStartError
 
 Contexts and resources
 ----------------------
