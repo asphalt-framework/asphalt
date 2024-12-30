@@ -49,6 +49,8 @@ don't do that now!).
 You can now proceed with installing Asphalt itself::
 
     pip install asphalt
+    # or if you use conda:
+    # conda install -c conda-forge asphalt
 
 Creating the project structure
 ------------------------------
