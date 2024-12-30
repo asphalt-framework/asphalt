@@ -5,9 +5,9 @@ Testing Asphalt components
 
 Testing Asphalt components and component hierarchies is a relatively simple procedure:
 
-#. Create an instance of your :class:`~Component`
 #. Create a :class:`~Context` and enter it with ``async with ...``
-#. Run :func:`start_component` with the component instance as the argument
+#. Run :func:`start_component` with your component class as the first argument (and the
+   configuration dictionary, if you have one, as the second argument)
 #. Run the test code itself
 
 With Asphalt projects, it is recommended to use the pytest_ testing framework because it

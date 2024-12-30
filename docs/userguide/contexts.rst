@@ -79,35 +79,28 @@ instead of static resources:
 Getting resources from a context
 --------------------------------
 
-The :class:`Context` class offers a few ways to look up resources.
+The primary ways to retrieve a resource from the current context are the
+:func:`get_resource` and :func:`get_resource_nowait` functions. They look for a resource
+or resource factory matching the given type and name. If a matching resource is found,
+it is returned from the call. If a resource is not found, but a matching resource
+factory is found, it is used to generate a matching resource which is then returned and
+also stored in the context for future requests.
 
-The primary way to retrieve a resource from the current context is :func:`get_resource`.
-It looks for a resource or resource factory matching the given type and name. If a
-matching resource is found, it is returned from the call.
+The :func:`get_resource` and :func:`get_resource_nowait` functions each have their own
+pros and cons:
 
-This function has a keyword argument ``wait``, which, if set to ``True``, will wait
-until the requested resource becomes available, typically when another component adds it
-to the context. This is primarily intended to be used in components that expect a
-sibling component to add the resource.
+#. :func:`get_resource` works with asynchronous resource factories as well as static
+   resources, but needs to be used with an ``await``
+#. :func:`get_resource_nowait` doesn't work with asynchronous resource factories, but
+   can be called from synchronous callbacks – that is, it doesn't need the ``await``
 
-Sometimes you need to retrieve resources in a synchronous context. To that end, Asphalt
-offers the :func:`get_resource_nowait` function. This function is similar to its
-asynchronous version, but with two downsides:
-
-#. It cannot trigger asynchronous factories
-#. It doesn't have a ``wait`` parameter, so it cannot wait for the resource to appear
+Additionally, the :func:`get_resource` function has special behavior during component
+startup. If the designated resource is not found and the ``optional=False`` option was
+not given, it will wait until another component makes the resource available. Normally,
+if the resource is not found, the call raises :exc:`ResourceNotFound`.
 
 Both variants can be made to return ``None`` if no matching resource is found, by
-passing ``optional=True``. If neither ``wait=True`` or ``optional=True`` were specified
-and the requested resource is not found in the context chain, :exc:`ResourceNotFound`
-is raised.
-
-The order of resource lookup is as follows:
-
-#. search for a resource in the local context
-#. search for a resource factory in the local context and its parents and, if found,
-   generate the local resource
-#. search for a resource in the parent contexts
+passing ``optional=True``.
 
 Injecting resources to functions
 --------------------------------
@@ -134,11 +127,12 @@ to :func:`resource`::
         ...
 
 Resources can be declared to be optional too, by using either :data:`~typing.Optional`
-or ``| None`` (Python 3.10+ only)::
+or ``| None`` (Python 3.10 or later only)::
 
     @inject
     async def some_function(
         some_arg,
+        *,
         some_resource: Optional[MyResourceType] = resource('alternate')
     ):
         ...  # some_resource will be None if it's not found
@@ -237,5 +231,5 @@ The same can be achieved with :func:`context_teardown` by storing the yielded va
                 db.commit()
 
 If any of the teardown callbacks raises an exception, the cleanup process will still
-continue, but all those raised exceptions will be reraised the end inside an
+continue, but all those raised exceptions will be reraised at the end inside an
 :exc:`ExceptionGroup` (or :exc:`BaseExceptionGroup`).
