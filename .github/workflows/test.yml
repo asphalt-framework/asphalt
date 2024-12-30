@@ -6,21 +6,38 @@ on:
   pull_request:
 
 jobs:
+  pyright:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: 3.x
+    - uses: actions/cache@v4
+      with:
+        path: ~/.cache/pip
+        key: pip-pyright
+    - name: Install dependencies
+      run: pip install -e . pyright
+    - name: Run pyright
+      run: pyright --verifytypes asphalt.core
+
   test:
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest]
-        python-version: ["3.8", "3.9", "3.10", "3.11", "3.12", "pypy-3.10"]
+        python-version: ["3.9", "3.10", "3.11", "3.12", "3.13", "pypy-3.10"]
         include:
         - os: macos-latest
-          python-version: "3.10"
+          python-version: "3.9"
         - os: macos-latest
-          python-version: "3.12"
+          python-version: "3.13"
         - os: windows-latest
-          python-version: "3.8"
+          python-version: "3.9"
         - os: windows-latest
-          python-version: "3.12"
+          python-version: "3.13"
     runs-on: ${{ matrix.os }}
     steps:
     - uses: actions/checkout@v4
@@ -32,7 +49,7 @@ jobs:
         cache: pip
         cache-dependency-path: pyproject.toml
     - name: Install dependencies
-      run: pip install .[test]
+      run: pip install -e .[test]
     - name: Test with pytest
       run: coverage run -m pytest -v
     - name: Generate coverage report

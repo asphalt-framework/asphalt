@@ -1,22 +1,23 @@
 from __future__ import annotations
 
-__all__ = (
-    "resolve_reference",
-    "qualified_name",
-    "callable_name",
-    "merge_config",
-    "PluginContainer",
-)
-
 import sys
+from collections.abc import AsyncIterator, Callable, Mapping
+from contextlib import asynccontextmanager
+from functools import partial
 from importlib import import_module
 from inspect import isclass
-from typing import Any, Callable, TypeVar, overload
+from typing import TYPE_CHECKING, Any, TypeVar, overload
 
 if sys.version_info >= (3, 10):
     from importlib.metadata import entry_points
 else:
     from importlib_metadata import entry_points
+
+if sys.version_info < (3, 11):
+    from exceptiongroup import ExceptionGroup
+
+if TYPE_CHECKING:
+    from ._component import Component
 
 T_Object = TypeVar("T_Object")
 
@@ -24,13 +25,10 @@ T_Object = TypeVar("T_Object")
 def resolve_reference(ref: object) -> Any:
     """
     Return the object pointed to by ``ref``.
-
     If ``ref`` is not a string or does not contain ``:``, it is returned as is.
-
-    References must be in the form  <modulename>:<varname> where <modulename> is the fully
-    qualified module name and varname is the path to the variable inside that module.
-
-    For example, "concurrent.futures:Future" would give you the
+    References must be in the form  <modulename>:<varname> where <modulename> is the
+    fully qualified module name and varname is the path to the variable inside that
+    module. For example, "concurrent.futures:Future" would give you the
     :class:`~concurrent.futures.Future` class.
 
     :raises LookupError: if the reference could not be resolved
@@ -43,7 +41,9 @@ def resolve_reference(ref: object) -> Any:
     try:
         obj = import_module(modulename)
     except ImportError as e:
-        raise LookupError(f"error resolving reference {ref}: could not import module") from e
+        raise LookupError(
+            f"error resolving reference {ref}: could not import module"
+        ) from e
 
     try:
         for name in rest.split("."):
@@ -70,6 +70,9 @@ def qualified_name(obj: object) -> str:
 
 def callable_name(func: Callable[..., Any]) -> str:
     """Return the qualified name (e.g. package.module.func) for the given callable."""
+    if isinstance(func, partial):
+        func = func.func
+
     if func.__module__ == "builtins":
         return func.__name__
     else:
@@ -77,30 +80,32 @@ def callable_name(func: Callable[..., Any]) -> str:
 
 
 def merge_config(
-    original: dict[str, Any] | None, overrides: dict[str, Any] | None
+    original: Mapping[str, Any] | None, overrides: Mapping[str, Any] | None
 ) -> dict[str, Any]:
     """
-    Return a copy of the ``original`` configuration dictionary, with overrides from ``overrides``
-    applied.
+    Return a copy of the ``original`` configuration dictionary, with overrides from
+    ``overrides`` applied.
 
     This similar to what :meth:`dict.update` does, but when a dictionary is about to be
     replaced with another dictionary, it instead merges the contents.
 
-    If a key in ``overrides`` is a dotted path (ie. ``foo.bar.baz: value``), it is assumed to be a
-    shorthand for ``foo: {bar: {baz: value}}``.
-
     :param original: a configuration dictionary (or ``None``)
-    :param overrides: a dictionary containing overriding values to the configuration (or ``None``)
+    :param overrides: a dictionary containing overriding values to the configuration
+        (or ``None``)
     :return: the merge result
 
+    .. versionchanged:: 5.0
+        Previously, if a key in ``overrides`` was a dotted path (ie.
+        ``foo.bar.baz: value``), it was assumed to be a shorthand for
+        ``foo: {bar: {baz: value}}``. In v5.0, this feature was removed, as it turned
+        out to be a problem with logging configuration, as it was not possible to
+        configure any logging that had a dot in its name (as is the case with most
+        loggers).
+
     """
-    copied = original.copy() if original else {}
+    copied = dict(original) if original else {}
     if overrides:
         for key, value in overrides.items():
-            if "." in key:
-                key, rest = key.split(".", 1)
-                value = {rest: value}
-
             orig_value = copied.get(key)
             if isinstance(orig_value, dict) and isinstance(value, dict):
                 copied[key] = merge_config(orig_value, value)
@@ -110,21 +115,51 @@ def merge_config(
     return copied
 
 
+@asynccontextmanager
+async def coalesce_exceptions() -> AsyncIterator[None]:
+    try:
+        yield
+    except ExceptionGroup as excgrp:
+        if len(excgrp.exceptions) == 1 and not isinstance(
+            excgrp.exceptions[0], ExceptionGroup
+        ):
+            raise excgrp.exceptions[0] from excgrp.exceptions[0].__cause__
+
+        raise
+
+
+def format_component_name(
+    path: str,
+    component_class: type[Component] | None = None,
+    *,
+    capitalize: bool = False,
+) -> str:
+    formatted = f"component {path!r}" if path else "the root component"
+    if component_class is not None:
+        formatted += f" ({qualified_name(component_class)})"
+
+    if capitalize:
+        formatted = formatted[0].upper() + formatted[1:]
+
+    return formatted
+
+
 class PluginContainer:
     """
-    A convenience class for loading and instantiating plugins through the use of entry points.
+    A convenience class for loading and instantiating plugins through the use of entry
+    points.
 
     :param namespace: a setuptools entry points namespace
-    :param base_class: the base class for plugins of this type (or ``None`` if the entry points
-        don't point to classes)
+    :param base_class: the base class for plugins of this type (or ``None`` if the
+        entry points don't point to classes)
     """
 
-    __slots__ = "namespace", "base_class", "_entrypoints", "_resolved"
+    __slots__ = "_entrypoints", "_resolved", "base_class", "namespace"
 
     def __init__(self, namespace: str, base_class: type | None = None) -> None:
-        self.namespace = namespace
-        self.base_class = base_class
-        group = entry_points().select(group=namespace)  # type: ignore[attr-defined]
+        self.namespace: str = namespace
+        self.base_class: type | None = base_class
+        group = entry_points(group=namespace)
         self._entrypoints = {ep.name: ep for ep in group}
         self._resolved: dict[str, Any] = {}
 
@@ -138,22 +173,23 @@ class PluginContainer:
 
     def resolve(self, obj: Any) -> Any:
         """
-        Resolve a reference to an entry point or a variable in a module.
+        Resolve a reference to an entry point.
 
-        If ``obj`` is a ``module:varname`` reference to an object, :func:`resolve_reference` is
-        used to resolve it. If it is a string of any other kind, the named entry point is loaded
-        from this container's namespace. Otherwise, ``obj`` is returned as is.
+        If ``obj`` is a string, the named entry point is loaded from this container's
+        namespace. Otherwise, ``obj`` is returned as is.
 
-        :param obj: an entry point identifier, an object reference or an arbitrary object
+        :param obj: an entry point identifier, an object reference or an arbitrary
+            object
         :return: the loaded entry point, resolved object or the unchanged input value
-        :raises LookupError: if ``obj`` was a string but the named entry point was not found
+        :raises LookupError: if ``obj`` was a string but the named entry point was not
+            found
 
         """
         if not isinstance(obj, str):
             return obj
-        if ":" in obj:
+        elif ":" in obj:
             return resolve_reference(obj)
-        if obj in self._resolved:
+        elif obj in self._resolved:
             return self._resolved[obj]
 
         value = self._entrypoints.get(obj)
@@ -163,16 +199,16 @@ class PluginContainer:
         value = self._resolved[obj] = value.load()
         return value
 
-    def create_object(self, type: type | str, **constructor_kwargs) -> Any:
+    def create_object(self, type: type | str, **constructor_kwargs: Any) -> Any:
         """
         Instantiate a plugin.
 
-        The entry points in this namespace must point to subclasses of the ``base_class`` parameter
-        passed to this container.
+        The entry points in this namespace must point to subclasses of the
+        ``base_class`` parameter passed to this container.
 
-        :param type: an entry point identifier, a ``module:varname`` reference to a class, or an
-            actual class object
-        :param constructor_kwargs: keyword arguments passed to the constructor of the plugin class
+        :param type: an entry point identifier or an actual class object
+        :param constructor_kwargs: keyword arguments passed to the constructor of the
+            plugin class
         :return: the plugin instance
 
         """
@@ -193,8 +229,8 @@ class PluginContainer:
 
     def all(self) -> list[Any]:
         """
-        Load all entry points (if not already loaded) in this namespace and return the resulting
-        objects as a list.
+        Load all entry points (if not already loaded) in this namespace and return the
+        resulting objects as a list.
 
         """
         values = []
@@ -208,7 +244,7 @@ class PluginContainer:
 
         return values
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return (
             f"{self.__class__.__name__}(namespace={self.namespace!r}, "
             f"base_class={qualified_name(self.base_class)})"

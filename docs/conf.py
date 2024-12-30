@@ -7,6 +7,7 @@ extensions = [
     "sphinx.ext.autodoc",
     "sphinx.ext.intersphinx",
     "sphinx_autodoc_typehints",
+    "sphinx_rtd_theme",
 ]
 
 templates_path = ["_templates"]
@@ -24,6 +25,7 @@ language = "en"
 
 exclude_patterns = ["_build"]
 pygments_style = "sphinx"
+autodoc_default_options = {"members": True, "show-inheritance": True}
 highlight_language = "python3"
 todo_include_todos = False
 
@@ -31,9 +33,7 @@ html_theme = "sphinx_rtd_theme"
 htmlhelp_basename = "asphaltdoc"
 
 intersphinx_mapping = {
+    "anyio": ("https://anyio.readthedocs.io/en/stable/", None),
+    "asphalt-mailer": ("https://asphalt-mailer.readthedocs.io/en/stable/", None),
     "python": ("https://docs.python.org/3/", None),
-    "asphalt-mailer": (
-        "https://asphalt.readthedocs.io/projects/mailer/en/latest/",
-        None,
-    ),
 }

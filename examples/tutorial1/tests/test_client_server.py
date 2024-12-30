@@ -1,30 +1,33 @@
 # isort: off
-from asyncio import AbstractEventLoop
+from __future__ import annotations
+
+from collections.abc import AsyncGenerator
 
 import pytest
-from _pytest.capture import CaptureFixture
-
-from asphalt.core import Context
+from anyio import wait_all_tasks_blocked
+from pytest import CaptureFixture
+from asphalt.core import Context, start_component
 
 from echo.client import ClientComponent
 from echo.server import ServerComponent
 
+pytestmark = pytest.mark.anyio
 
-def test_client_and_server(event_loop: AbstractEventLoop, capsys: CaptureFixture[str]) -> None:
-    async def run() -> None:
-        async with Context() as ctx:
-            server = ServerComponent()
-            await server.start(ctx)
 
-            client = ClientComponent("Hello!")
-            await client.start(ctx)
+@pytest.fixture
+async def server(capsys: CaptureFixture[str]) -> AsyncGenerator[None, None]:
+    async with Context():
+        await start_component(ServerComponent)
+        yield
 
-    event_loop.create_task(run())
-    with pytest.raises(SystemExit) as exc:
-        event_loop.run_forever()
 
-    assert exc.value.code == 0
+async def test_client_and_server(server: None, capsys: CaptureFixture[str]) -> None:
+    async with Context():
+        component = await start_component(ClientComponent, {"message": "Hello!"})
+        await component.run()
 
     # Grab the captured output of sys.stdout and sys.stderr from the capsys fixture
+    await wait_all_tasks_blocked()
     out, err = capsys.readouterr()
-    assert out == "Message from client: Hello!\nServer responded: Hello!\n"
+    assert "Message from client: Hello!" in out
+    assert "Server responded: Hello!" in out

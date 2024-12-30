@@ -1,226 +1,345 @@
 from __future__ import annotations
 
-import asyncio
 import logging
-import sys
-from asyncio import AbstractEventLoop
-from concurrent.futures import ThreadPoolExecutor
-from typing import NoReturn
+import platform
+import re
+import signal
+from textwrap import dedent
+from typing import Any, Literal
 from unittest.mock import patch
 
+import anyio
 import pytest
 from _pytest.logging import LogCaptureFixture
-from _pytest.monkeypatch import MonkeyPatch
+from anyio import sleep, to_thread, wait_all_tasks_blocked
 
-from asphalt.core.component import CLIApplicationComponent, Component
-from asphalt.core.context import Context
-from asphalt.core.runner import run_application, sigterm_handler
+from asphalt.core import (
+    CLIApplicationComponent,
+    Component,
+    add_teardown_callback,
+    get_resource,
+    run_application,
+    start_service_task,
+)
+
+pytestmark = pytest.mark.anyio()
+windows_signal_mark = pytest.mark.skipif(
+    platform.system() == "Windows", reason="Signals don't work on Windows"
+)
 
 
 class ShutdownComponent(Component):
-    def __init__(self, method: str = "stop"):
+    def __init__(self, method: Literal["keyboard", "sigterm", "exception"]):
         self.method = method
         self.teardown_callback_called = False
-        self.exception = None
 
-    def teardown_callback(self, exception) -> None:
-        self.teardown_callback_called = True
-        self.exception = exception
-
-    def press_ctrl_c(self) -> NoReturn:
-        raise KeyboardInterrupt
-
-    async def start(self, ctx: Context) -> None:
-        ctx.add_teardown_callback(self.teardown_callback, pass_exception=True)
-
-        if self.method == "stop":
-            ctx.loop.call_later(0.1, ctx.loop.stop)
-        elif self.method == "exit":
-            ctx.loop.call_later(0.1, sys.exit)
-        elif self.method == "keyboard":
-            ctx.loop.call_later(0.1, self.press_ctrl_c)
+    async def stop_app(self) -> None:
+        await wait_all_tasks_blocked()
+        if self.method == "keyboard":
+            signal.raise_signal(signal.SIGINT)
         elif self.method == "sigterm":
-            ctx.loop.call_later(0.1, sigterm_handler, logging.getLogger(__name__), ctx.loop)
+            signal.raise_signal(signal.SIGTERM)
         elif self.method == "exception":
             raise RuntimeError("this should crash the application")
-        elif self.method == "timeout":
-            await asyncio.sleep(1)
+
+    async def start(self) -> None:
+        await start_service_task(self.stop_app, "Application terminator")
+
+
+class CrashComponent(Component):
+    def __init__(self, method: str = "exit"):
+        self.method = method
+
+    async def start(self) -> None:
+        if self.method == "keyboard":
+            signal.raise_signal(signal.SIGINT)
+            await sleep(3)
+        elif self.method == "sigterm":
+            signal.raise_signal(signal.SIGTERM)
+            await sleep(3)
+        elif self.method == "exception":
+            raise RuntimeError("this should crash the application")
 
 
 class DummyCLIApp(CLIApplicationComponent):
-    async def run(self, ctx: Context) -> int:
-        return 20
+    def __init__(self, exit_code: int | None = None):
+        super().__init__()
+        self.exit_code = exit_code
+        self.exception: BaseException | None = None
 
+    def teardown_callback(self, exception: BaseException | None) -> None:
+        logging.getLogger(__name__).info("Teardown callback called")
+        self.exception = exception
 
-@pytest.fixture(autouse=True)
-def prevent_logging_shutdown(monkeypatch: MonkeyPatch) -> None:
-    monkeypatch.setattr("asphalt.core.runner.shutdown", lambda: None)
+    async def start(self) -> None:
+        add_teardown_callback(self.teardown_callback, pass_exception=True)
 
-
-def test_sigterm_handler_loop_not_running(event_loop: AbstractEventLoop) -> None:
-    """Test that the SIGTERM handler does nothing if the event loop is not running."""
-    sigterm_handler(logging.getLogger(__name__), event_loop)
+    async def run(self) -> int | None:
+        return self.exit_code
 
 
 @pytest.mark.parametrize(
     "logging_config",
-    [None, logging.INFO, {"version": 1, "loggers": {"asphalt": {"level": "INFO"}}}],
-    ids=["disabled", "loglevel", "dictconfig"],
+    [
+        pytest.param(None, id="disabled"),
+        pytest.param(logging.INFO, id="loglevel"),
+        pytest.param(
+            {"version": 1, "loggers": {"asphalt": {"level": "INFO"}}}, id="dictconfig"
+        ),
+    ],
 )
-def test_run_logging_config(event_loop: AbstractEventLoop, logging_config) -> None:
+def test_run_logging_config(
+    logging_config: dict[str, Any] | int | None, anyio_backend_name: str
+) -> None:
     """Test that logging initialization happens as expected."""
-    with patch("asphalt.core.runner.basicConfig") as basicConfig, patch(
-        "asphalt.core.runner.dictConfig"
-    ) as dictConfig:
-        run_application(ShutdownComponent(), logging=logging_config)
+    with (
+        patch("asphalt.core._runner.basicConfig") as basicConfig,
+        patch("asphalt.core._runner.dictConfig") as dictConfig,
+    ):
+        run_application(DummyCLIApp, logging=logging_config, backend=anyio_backend_name)
 
     assert basicConfig.call_count == (1 if logging_config == logging.INFO else 0)
     assert dictConfig.call_count == (1 if isinstance(logging_config, dict) else 0)
 
 
 @pytest.mark.parametrize("max_threads", [None, 3])
-def test_run_max_threads(event_loop: AbstractEventLoop, max_threads: int | None) -> None:
+def test_run_max_threads(max_threads: int | None, anyio_backend_name: str) -> None:
     """
-    Test that a new default executor is installed if and only if the max_threads argument is given.
+    Test that a new default executor is installed if and only if the max_threads
+    argument is given.
 
     """
-    component = ShutdownComponent()
-    with patch("asphalt.core.runner.ThreadPoolExecutor") as mock_executor:
-        mock_executor.configure_mock(
-            side_effect=lambda *args, **kwargs: ThreadPoolExecutor(*args, **kwargs)
-        )
-        run_application(component, max_threads=max_threads)
+    observed_total_tokens: float | None = None
 
-    if max_threads:
-        mock_executor.assert_called_once_with(max_threads)
-    else:
-        assert not mock_executor.called
+    class MaxThreadsComponent(CLIApplicationComponent):
+        async def run(self) -> int | None:
+            nonlocal observed_total_tokens
+            limiter = to_thread.current_default_thread_limiter()
+            observed_total_tokens = limiter.total_tokens
+            return None
 
+    async def get_default_total_tokens() -> float:
+        limiter = to_thread.current_default_thread_limiter()
+        return limiter.total_tokens
 
-def test_uvloop_policy(caplog: LogCaptureFixture) -> None:
-    """Test that the runner switches to a different event loop policy when instructed to."""
-    pytest.importorskip("uvloop", reason="uvloop not installed")
-    caplog.set_level(logging.INFO)
-    component = ShutdownComponent()
-    old_policy = asyncio.get_event_loop_policy()
-    run_application(component, event_loop_policy="uvloop")
-    asyncio.set_event_loop_policy(old_policy)
-
-    records = [record for record in caplog.records if record.name == "asphalt.core.runner"]
-    assert len(records) == 6
-    assert records[0].message == "Running in development mode"
-    assert records[1].message == "Switched event loop policy to uvloop.EventLoopPolicy"
-    assert records[2].message == "Starting application"
-    assert records[3].message == "Application started"
-    assert records[4].message == "Stopping application"
-    assert records[5].message == "Application stopped"
+    expected_total_tokens = max_threads or anyio.run(
+        get_default_total_tokens, backend=anyio_backend_name
+    )
+    run_application(
+        MaxThreadsComponent, max_threads=max_threads, backend=anyio_backend_name
+    )
+    assert observed_total_tokens == expected_total_tokens
 
 
-def test_run_callbacks(event_loop: AbstractEventLoop, caplog: LogCaptureFixture) -> None:
+def test_run_callbacks(caplog: LogCaptureFixture, anyio_backend_name: str) -> None:
     """
-    Test that the teardown callbacks are run when the application is started and shut down properly
-    and that the proper logging messages are emitted.
+    Test that the teardown callbacks are run when the application is started and shut
+    down properly and that the proper logging messages are emitted.
 
     """
     caplog.set_level(logging.INFO)
-    component = ShutdownComponent()
-    run_application(component)
+    run_application(DummyCLIApp, backend=anyio_backend_name)
 
-    assert component.teardown_callback_called
-    records = [record for record in caplog.records if record.name == "asphalt.core.runner"]
-    assert len(records) == 5
-    assert records[0].message == "Running in development mode"
-    assert records[1].message == "Starting application"
-    assert records[2].message == "Application started"
-    assert records[3].message == "Stopping application"
-    assert records[4].message == "Application stopped"
+    assert caplog.messages == [
+        "Running in development mode",
+        "Starting application",
+        "Application started",
+        "Teardown callback called",
+        "Application stopped",
+    ]
 
 
-@pytest.mark.parametrize("method", ["exit", "keyboard", "sigterm"])
-def test_clean_exit(event_loop: AbstractEventLoop, caplog: LogCaptureFixture, method: str) -> None:
+@pytest.mark.parametrize(
+    "method, expected_stop_message",
+    [
+        pytest.param(
+            "keyboard",
+            "Received signal (Interrupt) – terminating application",
+            id="keyboard",
+            marks=[windows_signal_mark],
+        ),
+        pytest.param(
+            "sigterm",
+            "Received signal (Terminated) – terminating application",
+            id="sigterm",
+            marks=[windows_signal_mark],
+        ),
+    ],
+)
+def test_clean_exit(
+    caplog: LogCaptureFixture,
+    method: Literal["keyboard", "sigterm"],
+    expected_stop_message: str | None,
+    anyio_backend_name: str,
+) -> None:
     """
-    Test that when Ctrl+C is pressed during event_loop.run_forever(), run_application() exits
-    cleanly.
+    Test that when application termination is explicitly requested either externally or
+    directly from a service task, it exits cleanly.
 
     """
-    caplog.set_level(logging.INFO)
-    component = ShutdownComponent(method=method)
-    run_application(component)
+    caplog.set_level(logging.INFO, "asphalt.core")
+    run_application(ShutdownComponent, {"method": method}, backend=anyio_backend_name)
 
-    records = [record for record in caplog.records if record.name == "asphalt.core.runner"]
-    assert len(records) == 5
-    assert records[0].message == "Running in development mode"
-    assert records[1].message == "Starting application"
-    assert records[2].message == "Application started"
-    assert records[3].message == "Stopping application"
-    assert records[4].message == "Application stopped"
+    expected_messages = [
+        "Running in development mode",
+        "Starting application",
+        "Application started",
+        "Application stopped",
+    ]
+    if expected_stop_message:
+        expected_messages.insert(3, expected_stop_message)
+
+    assert caplog.messages == expected_messages
 
 
-def test_run_start_exception(event_loop: AbstractEventLoop, caplog: LogCaptureFixture) -> None:
+@pytest.mark.parametrize(
+    "method, expected_stop_message",
+    [
+        pytest.param(
+            "exception",
+            "Error during application startup",
+            id="exception",
+        ),
+        pytest.param(
+            "keyboard",
+            "Received signal (Interrupt) – terminating application",
+            id="keyboard",
+            marks=[windows_signal_mark],
+        ),
+        pytest.param(
+            "sigterm",
+            "Received signal (Terminated) – terminating application",
+            id="sigterm",
+            marks=[windows_signal_mark],
+        ),
+    ],
+)
+def test_start_exception(
+    caplog: LogCaptureFixture,
+    anyio_backend_name: str,
+    method: str,
+    expected_stop_message: str,
+) -> None:
     """
     Test that an exception caught during the application initialization is put into the
     application context and made available to teardown callbacks.
 
     """
+    caplog.set_level(logging.INFO, "asphalt.core")
+    with pytest.raises(SystemExit) as exc_info:
+        run_application(CrashComponent, {"method": method}, backend=anyio_backend_name)
+
+    assert exc_info.value.code == 1
+    assert caplog.messages == [
+        "Running in development mode",
+        "Starting application",
+        expected_stop_message,
+        "Application stopped",
+    ]
+
+
+def test_start_timeout(caplog: LogCaptureFixture, anyio_backend_name: str) -> None:
+    class StallingComponent(Component):
+        def __init__(self, level: int = 1):
+            super().__init__()
+            self.is_leaf = level == 4
+            if not self.is_leaf:
+                self.add_component("child1", StallingComponent, level=level + 1)
+                self.add_component("child2", StallingComponent, level=level + 1)
+                self.add_component("child3", Component)
+
+        async def start(self) -> None:
+            if self.is_leaf:
+                # Wait forever for a non-existent resource
+                await get_resource(float)
+
     caplog.set_level(logging.INFO)
-    component = ShutdownComponent(method="exception")
-    pytest.raises(SystemExit, run_application, component)
+    with pytest.raises(SystemExit) as exc_info:
+        run_application(
+            StallingComponent,
+            {},
+            start_timeout=0.1,
+            backend=anyio_backend_name,
+        )
 
-    assert str(component.exception) == "this should crash the application"
-    records = [record for record in caplog.records if record.name == "asphalt.core.runner"]
-    assert len(records) == 5
-    assert records[0].message == "Running in development mode"
-    assert records[1].message == "Starting application"
-    assert records[2].message == "Error during application startup"
-    assert records[3].message == "Stopping application"
-    assert records[4].message == "Application stopped"
+    assert exc_info.value.code == 1
+    assert caplog.messages == [
+        "Running in development mode",
+        "Starting application",
+        caplog.messages[2],
+        "Application stopped",
+    ]
+    assert caplog.messages[2].startswith(
+        dedent(
+            """\
+            Timeout waiting for the component tree to start
+
+            Current status of the components still waiting to finish startup
+            ----------------------------------------------------------------
+
+            (root): starting children
+              child1: starting children
+                child1: starting children
+                  child1: starting
+                  child2: starting
+                child2: starting children
+                  child1: starting
+                  child2: starting
+              child2: starting children
+                child1: starting children
+                  child1: starting
+                  child2: starting
+                child2: starting children
+                  child1: starting
+                  child2: starting
+
+            Stack summaries of components still waiting to start
+            ----------------------------------------------------
+
+            """
+        )
+    )
+
+    expected_component_name = (
+        f"{__name__}.test_start_timeout.<locals>.StallingComponent"
+    )
+    paths = set()
+    for line in caplog.messages[2].splitlines()[24:]:
+        if line.startswith("    "):
+            pass
+        elif line.startswith("  "):
+            assert line.startswith('  File "')
+        elif line:
+            match = re.match(r"(child\d\.child\d\.child\d) \((.+)\):$", line)
+            assert match
+            paths.add(match.group(1))
+            assert match.group(2) == expected_component_name
+
+    assert paths == {
+        "child1.child1.child1",
+        "child1.child1.child2",
+        "child1.child2.child1",
+        "child1.child2.child2",
+        "child2.child1.child1",
+        "child2.child1.child2",
+        "child2.child2.child1",
+        "child2.child2.child2",
+    }
 
 
-def test_run_start_timeout(event_loop: AbstractEventLoop, caplog: LogCaptureFixture) -> None:
-    """
-    Test that when the root component takes too long to start up, the runner exits and logs the
-    appropriate error message.
-
-    """
-    caplog.set_level(logging.INFO)
-    component = ShutdownComponent(method="timeout")
-    pytest.raises(SystemExit, run_application, component, start_timeout=1)
-
-    records = [record for record in caplog.records if record.name == "asphalt.core.runner"]
-    assert len(records) == 5
-    assert records[0].message == "Running in development mode"
-    assert records[1].message == "Starting application"
-    assert records[2].message == "Timeout waiting for the root component to start"
-    assert records[3].message == "Stopping application"
-    assert records[4].message == "Application stopped"
-
-
-def test_dict_config(event_loop: AbstractEventLoop, caplog: LogCaptureFixture) -> None:
-    """Test that component configuration passed as a dictionary works."""
-    caplog.set_level(logging.INFO)
-    component_class = f"{ShutdownComponent.__module__}:{ShutdownComponent.__name__}"
-    run_application(component={"type": component_class})
-
-    records = [record for record in caplog.records if record.name == "asphalt.core.runner"]
-    assert len(records) == 5
-    assert records[0].message == "Running in development mode"
-    assert records[1].message == "Starting application"
-    assert records[2].message == "Application started"
-    assert records[3].message == "Stopping application"
-    assert records[4].message == "Application stopped"
-
-
-def test_run_cli_application(event_loop: AbstractEventLoop, caplog: LogCaptureFixture) -> None:
+def test_run_cli_application(
+    caplog: LogCaptureFixture, anyio_backend_name: str
+) -> None:
     caplog.set_level(logging.INFO)
     with pytest.raises(SystemExit) as exc:
-        run_application(DummyCLIApp())
+        run_application(DummyCLIApp, {"exit_code": 20}, backend=anyio_backend_name)
 
     assert exc.value.code == 20
 
-    records = [record for record in caplog.records if record.name == "asphalt.core.runner"]
-    assert len(records) == 5
-    assert records[0].message == "Running in development mode"
-    assert records[1].message == "Starting application"
-    assert records[2].message == "Application started"
-    assert records[3].message == "Stopping application"
-    assert records[4].message == "Application stopped"
+    assert caplog.messages == [
+        "Running in development mode",
+        "Starting application",
+        "Application started",
+        "Teardown callback called",
+        "Application stopped",
+    ]

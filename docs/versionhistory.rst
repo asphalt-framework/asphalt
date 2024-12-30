@@ -1,12 +1,86 @@
 Version history
 ===============
 
-This library adheres to `Semantic Versioning 2.0 <http://semver.org/>`_.
+This library adheres to `Semantic Versioning 2.0 <https://semver.org/>`_.
 
 **UNRELEASED**
 
-- Added Python 3.12 support
-- Dropped Python 3.7 support
+As this is a major release with several backwards incompatible changes, see the
+:doc:`Migration guide <userguide/migration>` if you're upgrading your existing
+application.
+
+- **BACKWARD INCOMPATIBLE** Changes in the application runner:
+
+  * Asphalt now runs via AnyIO, rather than asyncio, although the asyncio backend is
+    used by default
+  * The runner now outputs an elaborate tree of component startup tasks if the
+    application fails to start within the allotted time
+  * Dropped the ``--unsafe`` switch for ``asphalt run`` – configuration files are now
+    always parsed in unsafe mode
+  * Changed configuration parsing to no longer treat dotted keys in configuration
+    overrides to be interpreted as structural shortcuts (i.e. ``foo.bar.baz``
+    interpreted as a shortcut for a structure 3 levels deep:
+    ``foo: {bar: {baz: ...}}``), as this prevented proper configuration for loggers that
+    have dots in their names
+  * Added a shortcut for specify multiple components of the same type using a scheme
+    like ``mycomponenttype/name1``, ``mycomponenttype/name2`` where ``mycomponenttype``
+    is used as the type for both components
+  * Switched from ruamel.yaml to PyYAML as the backing YAML library
+  * Changed how ``CLIApplicationComponent`` is run – their ``run()`` method is now
+    called directly by the runner after the component has started
+- **BACKWARD INCOMPATIBLE** Changes in concurrency handling:
+
+  * Added the ``start_service_task()`` function for starting background service tasks,
+    bound to the root context, from ``Component.start()``
+  * Added the ``start_background_task_factory()`` function for launching ad-hoc
+    background tasks in a manner compatible with Structured Concurrency
+  * Dropped the ``@executor`` decorator
+  * Dropped all context-bound methods of jumping to and from worker threads
+    (``Context.call_async()``, ``Context.call_in_executor()``, ``Context.threadpool()``)
+- **BACKWARD INCOMPATIBLE** Changes in the component API:
+
+  * Dropped the ``ctx`` parameter from ``Component.start()`` and
+    ``CLIApplicationComponent.run()``
+  * Changed how ``CLIApplicationComponent`` works: they no longer start a service task
+    that call the ``run()`` method, but instead the runner will call it directly
+  * Added the ``start_component()`` function which is now the preferred method for
+    starting components directly (e.g. in test suites)
+- **BACKWARD INCOMPATIBLE** Changes in (Asphalt) context handling:
+
+  * Dropped the ``TeardownError`` exception in favor of PEP 654 exception groups
+  * Dropped the ``Context.loop`` attribute
+  * Dropped the ``Context.context_chain`` attribute
+  * Dropped the ``Context.close()`` method (``Context`` objects are now required to be
+    used as context managers)
+  * Dropped the deprecated ability to use a ``Context`` as a synchronous context manager
+  * Dropped the deprecated ``parent`` argument to ``Context``
+  * Dropped support for context attributes
+  * Dropped the ``ctx`` parameter from resource factory callbacks
+  * Refactored the ``Context.get_resource()``, ``Context.require_resource()`` and
+    ``Context.request_resource()`` methods (and their free-function counterparts) to
+    just two:
+
+    * ``get_resource()``: a coroutine function, capable of triggering asynchronous
+      resource factories, (and when called during component start-up, optionally waits
+      for the resource to become available)
+    * ``get_resource_nowait()`` the synchronous counterpart to the above, but incapable
+      of waiting for resources or triggering asynchronous resource factories
+  * Contexts now make a shallow copy of the non-generated resources, and resource
+    factories, from their parents rather than allowing lookup from parents. This was
+    done to prevent service tasks from using resources added later in the application
+    startup cycle which would be torn down before the tasks.
+- **BACKWARD INCOMPATIBLE** Dropped the deprecated ``Dependency()`` marker
+- **BACKWARD INCOMPATIBLE** Changes in the event system:
+
+  * The ``connect()``, ``disconnect()`` and ``dispatch_raw()`` methods were removed
+  * The ``dispatch()`` method now accepts only an ``Event`` object and fills in the
+    source, topic and time attributes
+  * The ``Event`` class no longer has an initializer, so subclasses don't have to call
+    ``super().__init__()`` anymore
+- **BACKWARD INCOMPATIBLE** Moved all exported functions and classes directly to
+  ``asphalt.core`` and made submodules private
+- Added support for Python 3.13
+- Dropped support for Python 3.7 and 3.8
 
 **4.12.0**
 

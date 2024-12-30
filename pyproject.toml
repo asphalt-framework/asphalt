@@ -16,25 +16,26 @@ classifiers = [
     "Intended Audience :: Developers",
     "License :: OSI Approved :: Apache Software License",
     "Topic :: Software Development :: Libraries :: Application Frameworks",
+    "Framework :: AnyIO",
     "Framework :: AsyncIO",
+    "Framework :: Trio",
     "Typing :: Typed",
     "Programming Language :: Python",
     "Programming Language :: Python :: 3 :: Only",
-    "Programming Language :: Python :: 3.8",
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
 ]
-requires-python = ">=3.8"
+requires-python = ">=3.9"
 dependencies = [
+    "anyio ~= 4.1",
     "importlib_metadata >= 4.4; python_version < '3.10'",
     "typing_extensions; python_version < '3.10'",
-    "ruamel.yaml >= 0.15",
-    "async-generator ~= 1.4",
-    "asyncio_extras ~= 1.3",
-    "async_timeout >= 2.0",
-    "click >= 6.6",
+    "exceptiongroup >= 1.2.0; python_version < '3.11'",
+    "pyyaml ~= 6.0",
+    "click >= 6.6"
 ]
 dynamic = ["version"]
 
@@ -46,79 +47,80 @@ Documentation = "https://asphalt.readthedocs.org/en/latest/"
 "Issue tracker" = "https://github.com/asphalt-framework/asphalt/issues"
 
 [project.optional-dependencies]
-uvloop = ["uvloop >= 0.4.10"]
-tokio = ["tokio"]
 test = [
+    "anyio[trio] ~= 4.1",
     "coverage >= 7",
-    "pytest >= 3.9",
-    "pytest-asyncio",
-    "uvloop; python_version < '3.12' and python_implementation == 'CPython' and platform_system != 'Windows'",
+    "pytest >= 7",
 ]
 doc = [
+    "packaging",
     "Sphinx >= 7.0",
     "sphinx-rtd-theme >= 1.3.0",
     "sphinx-autodoc-typehints >= 1.22",
 ]
 
-[project.entry-points."asphalt.core.event_loop_policies"]
-uvloop = "uvloop:EventLoopPolicy"
-tokio = "tokio:TokioLoopPolicy"
-
 [project.scripts]
-asphalt = "asphalt.core.cli:main"
+asphalt = "asphalt.core._cli:main"
 
 [tool.setuptools_scm]
 version_scheme = "post-release"
 local_scheme = "dirty-tag"
 
-[tool.ruff]
-line-length = 99
-
 [tool.ruff.lint]
-select = [
+extend-select = [
     "ASYNC",        # flake8-async
-    "E", "F", "W",  # default Flake8
     "G",            # flake8-logging-format
     "I",            # isort
     "ISC",          # flake8-implicit-str-concat
     "PGH",          # pygrep-hooks
-    "RUF100",       # unused noqa (yesqa)
+    "RUF",          # Ruff-specific rules
     "UP",           # pyupgrade
+    "W",            # pycodestyle warnings
+]
+ignore = [
+    "ASYNC109",
+    "ASYNC115",
+    "RUF001",
 ]
 
 [tool.ruff.lint.isort]
 known-first-party = ["asphalt.core"]
 
 [tool.pytest.ini_options]
-addopts = "-rsx --tb=short"
-asyncio_mode = "strict"
+addopts = ["-rsfE", "--tb=short"]
 testpaths = ["tests"]
 
 [tool.mypy]
-show_error_codes = true
+python_version = "3.9"
+strict = true
+explicit_package_bases = true
+mypy_path = ["src", "tests", "examples/tutorial1", "examples/tutorial2"]
 
 [tool.coverage.run]
-source = ["asphalt"]
+source = ["asphalt.core"]
 relative_files = true
 branch = true
 
 [tool.coverage.report]
 show_missing = true
+exclude_also = [
+    "@overload",
+    "if TYPE_CHECKING:"
+]
 
 [tool.tox]
-legacy_tox_ini = """
-[tox]
-envlist = py38, py39, py310, py311, py312, pypy3
+env_list = ["py39", "py310", "py311", "py312", "py313", "pypy3"]
 skip_missing_interpreters = true
-minversion = 4.0
 
-[testenv]
-extras = test
-commands = python -m pytest {posargs}
-package = editable
+[tool.tox.env_run_base]
+commands = [["python", "-m", "pytest", { replace = "posargs", extend = true }]]
+package = "editable"
+extras = ["test"]
 
-[testenv:docs]
-extras = doc
-commands = sphinx-build -n docs build/sphinx {posargs}
-package = editable
-"""
+[tool.tox.env.pyright]
+deps = ["pyright"]
+commands = [["pyright", "--verifytypes", "asphalt.core"]]
+
+[tool.tox.env.docs]
+commands = [["sphinx-build", "-n", "docs", "build/sphinx", { replace = "posargs", extend = true }]]
+extras = ["doc"]

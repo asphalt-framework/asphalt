@@ -8,7 +8,7 @@
   :target: https://asphalt.readthedocs.io/en/latest/?badge=latest
   :alt: Documentation Status
 
-Asphalt is an asyncio_ based microframework for network oriented applications.
+Asphalt is an asynchronous application microframework.
 
 Its highlight features are:
 
@@ -18,8 +18,8 @@ Its highlight features are:
   configuration
 * A sophisticated signal system that lets you connect different services to create complex
   event-driven interactions
-* Supports uvloop_ and tokio_ as event loop policy providers (though YMMV with the last one)
-* Elegant handling of blocking APIs through the use of thread pooling
+* Built on top of AnyIO_ to work with both Trio_ and asyncio_
+* Designed for `Structured Concurrency`_ from the ground up
 * `Type hints`_ and `semantic versioning`_ used throughout the core and all component libraries
 
 Asphalt can be used to make any imaginable kind of networked application, ranging from trivial
@@ -34,8 +34,8 @@ with relatively little effort.
 
 Full documentation: https://asphalt.readthedocs.io/
 
+.. _Structured Concurrency: https://en.wikipedia.org/wiki/Structured_concurrency
 .. _asyncio: https://docs.python.org/3/library/asyncio.html
-.. _uvloop: https://github.com/MagicStack/uvloop
-.. _tokio: https://github.com/PyO3/tokio
+.. _Trio: https://github.com/python-trio/trio
 .. _Type hints: https://www.python.org/dev/peps/pep-0484/
 .. _semantic versioning: http://semver.org/
