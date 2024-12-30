@@ -38,7 +38,7 @@ will be cancelled, but you can control this behavior by passing a different valu
 * ``cancel`` (the default): cancel the task and wait for it to finish
 * a callable: run the given callable at teardown to trigger the task to shut itself down
   (and wait for the task to finish on its own)
-* ``None``: to do nothing and just wait for the task to finish on its own
+* ``None``: do nothing and just wait for the task to finish on its own
 
 If a service task crashes, it will take down the whole application with it. This is part
 of the `structured concurrency`_ design that is intended to ensure that failures don't
@@ -53,7 +53,7 @@ on demand. A typical example would be a web app request handler that needs to se
 email, but wants to return a response to the end user straight away. The background
 task will thus outlive the task that was spawned to handle the request.
 
-In contrast to service tasks, any running background tasks will block the teardown of
+In contrast to service tasks, any running background task will block the teardown of
 the task factory from which they were spawned.
 
 By default, an unhandled exception raised in a task spawned from a background task
@@ -91,7 +91,7 @@ Configuring the maximum amount of worker threads
 ++++++++++++++++++++++++++++++++++++++++++++++++
 
 The configuration option ``max_threads`` sets the limit on how many worker threads will
-at most be used with :func:`anyio.to_thread.run_sync` if not explicit capacity limiter
+at most be used with :func:`anyio.to_thread.run_sync` if no explicit capacity limiter
 is passed.
 
 For example, this YAML configuration will set the thread limit to 60 in the default
