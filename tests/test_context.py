@@ -304,10 +304,19 @@ class TestContext:
         )
 
     async def test_add_resource_factory_empty_types(self, context: Context) -> None:
-        with pytest.raises(ValueError) as exc:
+        with pytest.raises(
+            ValueError,
+            match="no resource types specified, and the factory callback does not have "
+            "a return type hint",
+        ):
             context.add_resource_factory(lambda: 1, types=())
 
-        exc.match("no resource types were specified")
+    async def test_add_resource_factory_none_in_types(self, context: Context) -> None:
+        with pytest.raises(TypeError, match="None is not a valid resource type"):
+            context.add_resource_factory(
+                lambda: 1,
+                types=(int, float, None),  # type: ignore[arg-type]
+            )
 
     async def test_add_resource_factory_type_conflict(self, context: Context) -> None:
         context.add_resource_factory(lambda: None, types=(str, int))

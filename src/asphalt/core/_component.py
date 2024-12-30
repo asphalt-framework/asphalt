@@ -241,7 +241,7 @@ class ComponentContext(Context):
         factory_callback: FactoryCallback,
         name: str = "default",
         *,
-        types: Sequence[type] | None = None,
+        types: type | Sequence[type] = (),
         description: str | None = None,
     ) -> None:
         if name == "default" and self._component_state is ComponentState.starting:

@@ -403,7 +403,7 @@ class Context:
         factory_callback: FactoryCallback,
         name: str = "default",
         *,
-        types: Sequence[type] | None = None,
+        types: type | Sequence[type] = (),
         description: str | None = None,
     ) -> None:
         """
@@ -446,11 +446,11 @@ class Context:
                 "characters and underscores"
             )
 
-        if types is not None:
-            if isinstance(types, type):
-                resource_types: tuple[type, ...] = (types,)
-            else:
+        if types:
+            if isinstance(types, Sequence):
                 resource_types = tuple(types)
+            else:
+                resource_types = (types,)
         else:
             # Extract the resources types from the return type annotation of the factory
             type_hints = get_type_hints(factory_callback)
@@ -460,7 +460,7 @@ class Context:
                 raise ValueError(
                     "no resource types specified, and the factory callback does not "
                     "have a return type hint"
-                )
+                ) from None
 
             origin = get_origin(return_type_hint)
             if origin is Union or (
@@ -469,9 +469,6 @@ class Context:
                 resource_types = get_args(return_type_hint)
             else:
                 resource_types = (return_type_hint,)
-
-        if not resource_types:
-            raise ValueError("no resource types were specified")
 
         if None in resource_types:
             raise TypeError("None is not a valid resource type")
@@ -797,7 +794,6 @@ def context_teardown(
 
     :param func: an async generator function
     :return: an async function
-
     """
 
     @wraps(func)
@@ -810,14 +806,7 @@ def context_teardown(
             finally:
                 await generator.aclose()
 
-        try:
-            ctx = current_context()
-        except StopIteration:
-            raise RuntimeError(
-                f"the first positional argument to {callable_name(func)}() has to be "
-                f"a Context instance"
-            ) from None
-
+        ctx = current_context()
         generator = func(*args, **kwargs)
         try:
             await generator.asend(None)
@@ -871,7 +860,7 @@ def add_resource_factory(
     factory_callback: FactoryCallback,
     name: str = "default",
     *,
-    types: Sequence[type] | None = None,
+    types: type | Sequence[type] = (),
     description: str | None = None,
 ) -> None:
     """
