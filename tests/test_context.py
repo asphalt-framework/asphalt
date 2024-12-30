@@ -47,6 +47,43 @@ async def context() -> AsyncGenerator[Context, None]:
 
 
 class TestContext:
+    async def test_use_without_entering(self) -> None:
+        with pytest.raises(RuntimeError, match="this context has not been entered yet"):
+            Context().add_resource(1)
+
+    async def test_enter_twice(self, context: Context) -> None:
+        with pytest.raises(RuntimeError, match="this context has already been entered"):
+            async with context:
+                pass
+
+    async def test_use_after_close(self) -> None:
+        async with Context() as ctx:
+            pass
+
+        with pytest.raises(RuntimeError, match="this context has already been closed"):
+            ctx.add_resource(1)
+
+    async def test_use_during_teardown(self) -> None:
+        def teardown_callback() -> None:
+            ctx.add_resource_factory(lambda: 1)
+
+        with pytest.raises(ExceptionGroup) as exc:
+            async with Context() as ctx:
+                ctx.add_teardown_callback(teardown_callback)
+
+        assert len(exc.value.exceptions) == 1
+        assert isinstance(exc.value.exceptions[0], ExceptionGroup)
+        assert len(exc.value.exceptions[0].exceptions) == 1
+        assert isinstance(exc.value.exceptions[0].exceptions[0], RuntimeError)
+        assert str(exc.value.exceptions[0].exceptions[0]) == (
+            "this context is being torn down"
+        )
+
+    async def test_context_stack_corruption(self, context: Context) -> None:
+        with pytest.raises(RuntimeError, match="Context stack corruption detected"):
+            async with Context():
+                await Context().__aenter__()
+
     async def test_parent(self) -> None:
         """
         Test that the parent property points to the parent context instance, if any.
