@@ -8,7 +8,7 @@
   :target: https://asphalt.readthedocs.io/en/latest/?badge=latest
   :alt: Documentation Status
 
-Asphalt is an asynchronous microframework for network oriented applications.
+Asphalt is an asynchronous application microframework.
 
 Its highlight features are:
 
