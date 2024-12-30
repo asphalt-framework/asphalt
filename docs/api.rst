@@ -17,6 +17,7 @@ Concurrency
 .. autofunction:: start_service_task
 .. autoclass:: TaskFactory
 .. autoclass:: TaskHandle
+.. autoexception:: ComponentStartError
 
 Contexts and resources
 ----------------------
@@ -46,11 +47,6 @@ Events
 .. autofunction:: stream_events
 .. autofunction:: wait_event
 .. autoexception:: UnboundSignal
-
-Exceptions
-----------
-
-.. autoexception:: ComponentStartError
 
 Application runner
 ------------------
