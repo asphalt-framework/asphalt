@@ -302,8 +302,9 @@ class ComponentContext(Context):
 
             # Wait until a matching resource or resource factory is available
             await self._context.resource_added.wait_event(
-                lambda event: event.resource_name == name
-                and type in event.resource_types,
+                lambda event: (
+                    event.resource_name == name and type in event.resource_types
+                ),
             )
             res = await self._context.get_resource(type, name)
             logger.debug(
