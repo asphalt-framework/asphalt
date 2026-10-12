@@ -110,7 +110,7 @@ def run_application(
     backend_options: dict[str, Any] | None = None,
     max_threads: int | None = None,
     logging: dict[str, Any] | int | None = INFO,
-    start_timeout: int | float | None = 10,
+    start_timeout: float | None = 10,
 ) -> None:
     """
     Configure logging and start the given component.
