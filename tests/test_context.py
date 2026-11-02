@@ -89,10 +89,9 @@ class TestContext:
         Test that the parent property points to the parent context instance, if any.
         """
 
-        async with Context() as parent:
-            async with Context() as child:
-                assert parent.parent is None
-                assert child.parent is parent
+        async with Context() as parent, Context() as child:
+            assert parent.parent is None
+            assert child.parent is parent
 
     @pytest.mark.parametrize(
         "exception", [None, Exception("foo")], ids=["noexception", "exception"]
@@ -369,7 +368,7 @@ class TestContext:
         assert context.get_resource_nowait(float) == 5
 
     async def test_add_resource_return_type_optional(self, context: Context) -> None:
-        def factory() -> Optional[str]:  # noqa: UP007
+        def factory() -> Optional[str]:
             return "foo"
 
         context.add_resource_factory(factory)
